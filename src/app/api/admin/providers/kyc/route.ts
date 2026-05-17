@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       from: (table: string) => {
         select: (columns: string) => {
           in: (column: string, values: string[]) => Promise<{
-            data: Array<{ id: string; id_document_url?: string | null; insurance_document_url?: string | null; insurance_status?: string | null }> | null;
+            data: Array<{ id: string; id_document_url?: string | null; selfie_video_url?: string | null; insurance_document_url?: string | null; insurance_status?: string | null }> | null;
             error: { message: string } | null;
           }>;
         };
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
     if (action === "approve" || action === "reject") {
       const { data: submittedRows, error: submittedError } = await adminDb
         .from("sellers")
-        .select("id,id_document_url,insurance_document_url,insurance_status")
+        .select("id,id_document_url,selfie_video_url,insurance_document_url,insurance_status")
         .in("id", providerIds);
 
       if (submittedError) {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
 
       const submittedProviderIds = new Set(
         (submittedRows || [])
-          .filter((row) => Boolean(row.id_document_url || row.insurance_document_url || row.insurance_status))
+          .filter((row) => Boolean(row.id_document_url && row.selfie_video_url && (row.insurance_document_url || row.insurance_status)))
           .map((row) => row.id)
       );
       const withoutDocs = providerIds.filter((id) => !submittedProviderIds.has(id));

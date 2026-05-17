@@ -39,10 +39,12 @@ interface BidCardProps {
 
 export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat }: BidCardProps) {
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const feeBreakdown = calculateBookingTokenBreakdown(Number(bid.amount));
 
   const handleAction = async (action: string, handler?: (id: string) => void) => {
     setLoading(action);
+    setError(null);
     try {
       const response = await fetch("/api/bids", {
         method: "PATCH",
@@ -52,6 +54,9 @@ export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat 
 
       if (response.ok) {
         handler?.(bid.id);
+      } else {
+        const data = await response.json().catch(() => null);
+        setError(data?.error || "Could not update this bid.");
       }
     } catch (error) {
       console.error("Bid action error:", error);
@@ -178,6 +183,12 @@ export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat 
       )}
 
       {/* Actions */}
+      {error && (
+        <div className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {bid.status === "pending" && (
         <div className="flex gap-2">
           {isClient ? (

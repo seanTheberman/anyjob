@@ -178,6 +178,15 @@ const BUDGET_OPTIONS = [
   { value: "500+", label: "500€+", min: 500, max: null },
 ];
 
+function roundToCoarseCoordinate(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function buildCoarseLocationLabel(city: string, postalCode: string) {
+  const postalPrefix = postalCode.trim().slice(0, 3);
+  return [city.trim(), postalPrefix ? `${postalPrefix} area` : ""].filter(Boolean).join(", ");
+}
+
 interface FormData {
   category_slug: string;
   subcategory_slug: string;
@@ -191,6 +200,12 @@ interface FormData {
   address: string;
   city: string;
   postal_code: string;
+  latitude: number | null;
+  longitude: number | null;
+  coarse_latitude: number | null;
+  coarse_longitude: number | null;
+  location_accuracy_meters: number | null;
+  coarse_location_label: string;
   estimated_duration_hours: number;
   number_of_people_needed: number;
   budget_range: string;
@@ -220,6 +235,12 @@ const INITIAL_FORM_DATA: FormData = {
   address: "",
   city: "",
   postal_code: "",
+  latitude: null,
+  longitude: null,
+  coarse_latitude: null,
+  coarse_longitude: null,
+  location_accuracy_meters: null,
+  coarse_location_label: "",
   estimated_duration_hours: 2,
   number_of_people_needed: 1,
   budget_range: "",
@@ -451,6 +472,12 @@ function ServiceQuestionnaireContent() {
           address: formData.address,
           city: formData.city,
           postal_code: formData.postal_code,
+          latitude: formData.latitude,
+          longitude: formData.longitude,
+          coarse_latitude: formData.coarse_latitude,
+          coarse_longitude: formData.coarse_longitude,
+          location_accuracy_meters: formData.location_accuracy_meters,
+          coarse_location_label: formData.coarse_location_label || buildCoarseLocationLabel(formData.city, formData.postal_code),
           estimated_duration_hours: formData.estimated_duration_hours,
           number_of_people_needed: formData.number_of_people_needed,
           budget_range_min: budgetOption?.min || 0,
@@ -1175,6 +1202,34 @@ function Step6Location({
   onNext: () => void;
   onPrevious: () => void;
 }) {
+  const [locationStatus, setLocationStatus] = useState<string | null>(null);
+
+  const requestLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("Location access is not available in this browser.");
+      return;
+    }
+
+    setLocationStatus("Requesting location access...");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+        updateFormData("latitude", latitude);
+        updateFormData("longitude", longitude);
+        updateFormData("coarse_latitude", roundToCoarseCoordinate(latitude));
+        updateFormData("coarse_longitude", roundToCoarseCoordinate(longitude));
+        updateFormData("location_accuracy_meters", Math.round(position.coords.accuracy));
+        updateFormData("coarse_location_label", buildCoarseLocationLabel(formData.city, formData.postal_code));
+        setLocationStatus("Location saved. Providers will only see the approximate area until their quote is accepted.");
+      },
+      () => {
+        setLocationStatus("Location access was not granted. You can still continue with city and address.");
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -1182,11 +1237,24 @@ function Step6Location({
           Where will the service take place?
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
-          Enter the full address
+          Enter the full address. Providers only see the approximate area before quoting.
         </p>
       </div>
 
       <div className="space-y-4">
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-blue-950">Share approximate location</p>
+              <p className="text-sm text-blue-700">This helps nearby providers estimate travel before they quote.</p>
+            </div>
+            <Button type="button" variant="outline" onClick={requestLocation} className="bg-white">
+              <MapPin className="w-4 h-4 mr-2" /> Use my location
+            </Button>
+          </div>
+          {locationStatus && <p className="mt-3 text-sm text-blue-800">{locationStatus}</p>}
+        </div>
+
         <div>
           <Label>Full address</Label>
           <div className="relative">
@@ -1194,7 +1262,10 @@ function Step6Location({
             <Textarea
               placeholder="123 Main St, Apartment 4B..."
               value={formData.address}
-              onChange={(e) => updateFormData("address", e.target.value)}
+              onChange={(e) => {
+                updateFormData("address", e.target.value);
+                updateFormData("coarse_location_label", buildCoarseLocationLabel(formData.city, formData.postal_code));
+              }}
               className="min-h-[80px] pl-10 resize-none"
             />
           </div>
@@ -1208,7 +1279,10 @@ function Step6Location({
               <Input
                 placeholder="Paris"
                 value={formData.city}
-                onChange={(e) => updateFormData("city", e.target.value)}
+                onChange={(e) => {
+                  updateFormData("city", e.target.value);
+                  updateFormData("coarse_location_label", buildCoarseLocationLabel(e.target.value, formData.postal_code));
+                }}
                 className="pl-10"
               />
             </div>
@@ -1218,7 +1292,10 @@ function Step6Location({
             <Input
               placeholder="75001"
               value={formData.postal_code}
-              onChange={(e) => updateFormData("postal_code", e.target.value)}
+              onChange={(e) => {
+                updateFormData("postal_code", e.target.value);
+                updateFormData("coarse_location_label", buildCoarseLocationLabel(formData.city, e.target.value));
+              }}
               maxLength={10}
             />
           </div>

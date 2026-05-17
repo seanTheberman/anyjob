@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { User, MapPin, CreditCard, Bell, Shield, ChevronRight } from "lucide-react";
+import { User, MapPin, CreditCard, Bell, Shield, ChevronRight, BadgeCheck } from "lucide-react";
 import { ImageUploader } from "@/components/upload/ImageUploader";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,6 +15,16 @@ interface UserProfile {
   address: string;
   city: string;
   postalCode: string;
+  kycStatus: string;
+}
+
+interface UploadedFile {
+  id: string;
+  image_url: string;
+  public_id: string;
+  image_type: string;
+  title?: string;
+  description?: string;
 }
 
 const menuItems = [
@@ -35,7 +45,9 @@ export default function AccountPage() {
     address: "",
     city: "",
     postalCode: "",
+    kycStatus: "not_started",
   });
+  const [kycFiles, setKycFiles] = useState<UploadedFile[]>([]);
   const [, setIsEditing] = useState(false);
   const supabase = createClient();
 
@@ -68,6 +80,7 @@ export default function AccountPage() {
           address: profileData.address || "",
           city: profileData.city || "",
           postalCode: profileData.postal_code || "",
+          kycStatus: profileData.kyc_status || "not_started",
         });
       } else {
         setProfile({
@@ -79,8 +92,18 @@ export default function AccountPage() {
           address: "",
           city: "",
           postalCode: "",
+          kycStatus: "not_started",
         });
       }
+
+      const { data: files } = await supabase
+        .from("user_images")
+        .select("id,image_url,public_id,image_type,title,description")
+        .eq("user_id", user.id)
+        .in("image_type", ["id_document", "selfie_video"])
+        .order("created_at", { ascending: false });
+
+      setKycFiles(files || []);
     };
     loadProfile();
   }, [supabase]);
@@ -173,6 +196,42 @@ export default function AccountPage() {
             >
               Save Changes
             </button>
+          </div>
+        </div>
+
+        {/* KYC Verification */}
+        <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-5">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">KYC Verification</h3>
+              <p className="text-sm text-gray-500">Required before accepting a provider quote and paying the booking token.</p>
+            </div>
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+              <BadgeCheck className="h-3.5 w-3.5" />
+              {profile.kycStatus.replace("_", " ")}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <ImageUploader
+              imageType="id_document"
+              maxImages={1}
+              label="Government ID"
+              existingImages={kycFiles.filter((file) => file.image_type === "id_document").slice(0, 1)}
+              onUploadComplete={(file) => {
+                setKycFiles((prev) => [file, ...prev.filter((item) => item.image_type !== "id_document")]);
+                setProfile((prev) => ({ ...prev, kycStatus: "submitted" }));
+              }}
+            />
+            <ImageUploader
+              imageType="selfie_video"
+              maxImages={1}
+              label="Selfie video with ID"
+              existingImages={kycFiles.filter((file) => file.image_type === "selfie_video").slice(0, 1)}
+              onUploadComplete={(file) => {
+                setKycFiles((prev) => [file, ...prev.filter((item) => item.image_type !== "selfie_video")]);
+                setProfile((prev) => ({ ...prev, kycStatus: "submitted" }));
+              }}
+            />
           </div>
         </div>
 

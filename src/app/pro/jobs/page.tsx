@@ -26,6 +26,7 @@ interface Job {
   my_bid: { id: string; amount: number; status: string } | null;
   work_image_count: number;
   custom_tags?: string[] | null;
+  distance_km?: number | null;
 }
 
 const categoryNames: Record<string, string> = {
@@ -276,8 +277,11 @@ export default function BrowseJobsPage() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-gray-500">Address</p>
+                        <p className="text-gray-500">Approx. area</p>
                         <p className="font-medium text-gray-900">{job.address}</p>
+                        {job.distance_km != null && (
+                          <p className="text-xs text-gray-500">{job.distance_km} km away</p>
+                        )}
                       </div>
                       {job.preferred_time_start && (
                         <div>

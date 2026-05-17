@@ -8,6 +8,67 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+const UPLOAD_TYPES = ["profile", "portfolio", "work_image", "id_document", "selfie_video"] as const;
+type UploadType = (typeof UPLOAD_TYPES)[number];
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const DOCUMENT_TYPES = [...IMAGE_TYPES, "application/pdf"];
+const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
+
+function getUploadRules(imageType: UploadType) {
+  if (imageType === "selfie_video") {
+    return {
+      allowedTypes: VIDEO_TYPES,
+      maxSize: 100 * 1024 * 1024,
+      resourceType: "video" as const,
+      error: "Invalid file type. Allowed: MP4, WebM, MOV",
+    };
+  }
+
+  if (imageType === "id_document") {
+    return {
+      allowedTypes: DOCUMENT_TYPES,
+      maxSize: 25 * 1024 * 1024,
+      resourceType: "auto" as const,
+      error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF, PDF",
+    };
+  }
+
+  return {
+    allowedTypes: IMAGE_TYPES,
+    maxSize: 10 * 1024 * 1024,
+    resourceType: "image" as const,
+    error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF",
+  };
+}
+
+async function syncKycUpload(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  userId: string,
+  imageType: UploadType,
+  url: string
+) {
+  if (imageType !== "id_document" && imageType !== "selfie_video") return;
+
+  const timestamp = new Date().toISOString();
+  const column = imageType === "id_document" ? "id_document_url" : "selfie_video_url";
+
+  await supabase
+    .from("buyers")
+    .update({ [column]: url, kyc_status: "submitted", kyc_submitted_at: timestamp })
+    .eq("id", userId);
+
+  await supabase
+    .from("sellers")
+    .update({ [column]: url, verification_status: "pending", kyc_submitted_at: timestamp })
+    .eq("id", userId);
+
+  await supabase
+    .from("eloo_profiles")
+    .update({ kyc_status: "submitted", kyc_submitted_at: timestamp })
+    .eq("id", userId);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -19,7 +80,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const file = formData.get("file") as File;
-    const imageType = formData.get("image_type") as string;
+    const imageType = formData.get("image_type") as UploadType;
     const title = formData.get("title") as string | null;
     const description = formData.get("description") as string | null;
     const inquiryId = formData.get("inquiry_id") as string | null;
@@ -28,19 +89,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    if (!imageType || !["profile", "portfolio", "work_image", "id_document"].includes(imageType)) {
-      return NextResponse.json({ error: "Invalid image type" }, { status: 400 });
+    if (!imageType || !UPLOAD_TYPES.includes(imageType)) {
+      return NextResponse.json({ error: "Invalid upload type" }, { status: 400 });
     }
 
-    // Validate file type
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!allowedTypes.includes(file.type)) {
-      return NextResponse.json({ error: "Invalid file type. Allowed: JPEG, PNG, WebP, GIF" }, { status: 400 });
+    const rules = getUploadRules(imageType);
+    if (!rules.allowedTypes.includes(file.type)) {
+      return NextResponse.json({ error: rules.error }, { status: 400 });
     }
 
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: "File too large. Max 10MB" }, { status: 400 });
+    if (file.size > rules.maxSize) {
+      return NextResponse.json({ error: `File too large. Max ${Math.round(rules.maxSize / 1024 / 1024)}MB` }, { status: 400 });
     }
 
     // Convert file to buffer for Cloudinary upload
@@ -53,8 +112,8 @@ export async function POST(request: NextRequest) {
       cloudinary.uploader.upload_stream(
         {
           folder,
-          resource_type: "image",
-          transformation: imageType === "profile"
+          resource_type: rules.resourceType,
+          transformation: rules.resourceType !== "image" ? undefined : imageType === "profile"
             ? [{ width: 400, height: 400, crop: "fill", gravity: "face" }]
             : [{ width: 1200, height: 900, crop: "limit" }],
         },
@@ -100,6 +159,8 @@ export async function POST(request: NextRequest) {
         .update({ profile_image_url: uploadResult.secure_url })
         .eq("id", user.id);
     }
+
+    await syncKycUpload(supabase, user.id, imageType, uploadResult.secure_url);
 
     return NextResponse.json({ image }, { status: 201 });
   } catch (error) {

@@ -1,6 +1,11 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+function coarsePostalCode(postalCode?: string | null) {
+  const prefix = postalCode?.trim().slice(0, 3);
+  return prefix ? `${prefix} area` : "";
+}
+
 // GET: Fetch details for a specific job
 export async function GET(
   request: NextRequest,
@@ -68,6 +73,7 @@ export async function GET(
     const imageCount = images?.length || 0;
 
     const showContact = myBid?.status === 'accepted';
+    const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(', ');
 
     // Transform the data to match the expected format
     const transformedJob = {
@@ -88,9 +94,13 @@ export async function GET(
         currency: "€"
       },
       location: {
-        address: job.address || 'Address not provided',
+        address: showContact ? (job.address || 'Address not provided') : (coarseLabel || 'Approximate location only'),
         city: job.city || 'Unknown',
-        postalCode: job.postal_code || ''
+        postalCode: showContact ? (job.postal_code || '') : coarsePostalCode(job.postal_code),
+        coarseLabel,
+        latitude: showContact ? job.latitude : job.coarse_latitude,
+        longitude: showContact ? job.longitude : job.coarse_longitude,
+        exactAddressVisible: showContact
       },
       category: job.category_slug || 'general',
       customTags: job.custom_tags || [],

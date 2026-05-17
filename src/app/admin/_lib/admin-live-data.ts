@@ -169,8 +169,9 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
       : Number(row.rating || 0).toFixed(1);
 
     const hasId = Boolean(row.id_document_url);
+    const hasSelfie = Boolean(row.selfie_video_url);
     const hasInsurance = Boolean(row.insurance_document_url || row.insurance_status === "approved");
-    const docsSubmitted = hasId || hasInsurance;
+    const docsSubmitted = hasId && hasSelfie && hasInsurance;
     const sellerStatus = String(row.status || "").toLowerCase();
     const isVerified = row.is_verified === true || sellerStatus === "approved";
     const kycStatus = isVerified ? "Approved" : sellerStatus === "rejected" ? "Rejected" : !docsSubmitted || !hasInsurance ? "Missing document" : "Needs review";
@@ -183,7 +184,7 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
       city: String(row.city || "Unknown"),
       verification: isVerified ? "Verified" : kycStatus,
       kycStatus,
-      documents: [hasId ? "ID" : null, hasInsurance ? "insurance" : null].filter(Boolean).join(", ") || "Missing documents",
+      documents: [hasId ? "ID" : null, hasSelfie ? "selfie video" : null, hasInsurance ? "insurance" : null].filter(Boolean).join(", ") || "Missing documents",
       docsSubmitted,
       rating: averageRating,
       jobs: Number(row.total_jobs || jobsByProvider.get(id) || 0),

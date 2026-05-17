@@ -1,6 +1,35 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+async function hasBuyerKycForQuoteAcceptance(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  userId: string
+) {
+  const { data: files } = await supabase
+    .from("user_images")
+    .select("image_type")
+    .eq("user_id", userId)
+    .in("image_type", ["id_document", "selfie_video"]);
+
+  const fileTypes = new Set((files || []).map((file) => file.image_type));
+  if (fileTypes.has("id_document") && fileTypes.has("selfie_video")) {
+    return true;
+  }
+
+  const { data: buyer } = await supabase
+    .from("buyers")
+    .select("id_document_url,selfie_video_url,kyc_status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return Boolean(
+    buyer &&
+    buyer.id_document_url &&
+    buyer.selfie_video_url &&
+    buyer.kyc_status !== "rejected"
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -208,6 +237,16 @@ export async function PATCH(request: NextRequest) {
       }
       if (bid.status !== "pending") {
         return NextResponse.json({ error: "Can only accept/reject pending bids" }, { status: 400 });
+      }
+
+      if (action === "accept") {
+        const buyerKycComplete = await hasBuyerKycForQuoteAcceptance(supabase, user.id);
+        if (!buyerKycComplete) {
+          return NextResponse.json(
+            { error: "Complete buyer KYC before accepting a quote. Upload your ID document and selfie video from Account." },
+            { status: 403 }
+          );
+        }
       }
 
       const newStatus = action === "accept" ? "accepted" : "rejected";
