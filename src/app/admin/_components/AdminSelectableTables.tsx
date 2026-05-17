@@ -189,7 +189,9 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
   }
 
   function eligibleProviderIds(providerIds: string[], action: "approve" | "request_docs" | "reject") {
-    if (action === "request_docs") return providerIds;
+    if (action === "request_docs") {
+      return providers.filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted).map((provider) => provider.id);
+    }
     return providers.filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted).map((provider) => provider.id);
   }
 
@@ -286,7 +288,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                       {provider.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
                       ) : null}
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
+                      <button disabled={Boolean(pendingAction) || !provider.docsSubmitted} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100">Docs</button>
                       {provider.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
                       ) : null}
@@ -345,7 +347,9 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
   }
 
   function eligibleReviewIds(reviewIds: string[], action: "approve" | "request_docs" | "reject") {
-    if (action === "request_docs") return reviewIds;
+    if (action === "request_docs") {
+      return reviews.filter((review) => reviewIds.includes(review.id) && review.docsSubmitted).map((review) => review.id);
+    }
     return reviews.filter((review) => reviewIds.includes(review.id) && review.docsSubmitted).map((review) => review.id);
   }
 
@@ -444,7 +448,7 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                       {review.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
                       ) : null}
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
+                      <button disabled={Boolean(pendingAction) || !review.docsSubmitted} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100">Docs</button>
                       {review.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
                       ) : null}
