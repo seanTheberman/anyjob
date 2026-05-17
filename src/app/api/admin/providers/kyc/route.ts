@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const providerIds = Array.isArray(body.providerIds)
+    const providerIds: string[] = Array.isArray(body.providerIds)
       ? body.providerIds.filter((id: unknown) => typeof id === "string" && id.length > 0)
       : [];
     const action = body.action;
@@ -64,6 +64,44 @@ export async function POST(request: Request) {
 
     const supabase = createAdminSupabaseClient();
     const now = new Date().toISOString();
+    const adminDb = supabase as never as {
+      from: (table: string) => {
+        select: (columns: string) => {
+          in: (column: string, values: string[]) => Promise<{
+            data: Array<{ id: string; id_document_url?: string | null; insurance_document_url?: string | null; insurance_status?: string | null }> | null;
+            error: { message: string } | null;
+          }>;
+        };
+        update: (values: Record<string, unknown>) => {
+          in: (column: string, values: string[]) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+
+    if (action === "approve" || action === "reject") {
+      const { data: submittedRows, error: submittedError } = await adminDb
+        .from("sellers")
+        .select("id,id_document_url,insurance_document_url,insurance_status")
+        .in("id", providerIds);
+
+      if (submittedError) {
+        return NextResponse.json({ error: submittedError.message }, { status: 500 });
+      }
+
+      const submittedProviderIds = new Set(
+        (submittedRows || [])
+          .filter((row) => Boolean(row.id_document_url || row.insurance_document_url || row.insurance_status))
+          .map((row) => row.id)
+      );
+      const withoutDocs = providerIds.filter((id) => !submittedProviderIds.has(id));
+
+      if (withoutDocs.length) {
+        return NextResponse.json(
+          { error: "Approve/reject requires submitted seller documents", providerIdsWithoutDocs: withoutDocs },
+          { status: 400 }
+        );
+      }
+    }
 
     const sellerUpdate =
       action === "approve"
@@ -76,14 +114,6 @@ export async function POST(request: Request) {
       action === "approve"
         ? { is_verified: true, updated_at: now }
         : { is_verified: false, updated_at: now };
-
-    const adminDb = supabase as never as {
-      from: (table: string) => {
-        update: (values: Record<string, unknown>) => {
-          in: (column: string, values: string[]) => Promise<{ error: { message: string } | null }>;
-        };
-      };
-    };
 
     const [sellerResult, profileResult] = await Promise.all([
       adminDb.from("sellers").update(sellerUpdate).in("id", providerIds),

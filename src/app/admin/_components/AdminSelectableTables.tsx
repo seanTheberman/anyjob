@@ -28,7 +28,7 @@ function BulkBar({
   return (
     <div className="mb-3 flex flex-col gap-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
       <span className="font-medium text-red-900">{selectedCount} selected</span>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-nowrap gap-2 overflow-x-auto">
         {children}
         <button onClick={onClear} className="h-8 rounded-lg border border-red-200 bg-white px-3 font-medium text-red-700 hover:bg-red-100">
           Clear
@@ -188,7 +188,13 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
     });
   }
 
+  function eligibleProviderIds(providerIds: string[], action: "approve" | "request_docs" | "reject") {
+    if (action === "request_docs") return providerIds;
+    return providers.filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted).map((provider) => provider.id);
+  }
+
   async function runKycAction(action: "approve" | "request_docs" | "reject", providerIds = Array.from(selected)) {
+    providerIds = eligibleProviderIds(providerIds, action);
     if (!providerIds.length) return;
     setPendingAction(action);
     setMessage(null);
@@ -254,7 +260,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                 <th className="w-12 px-4 py-3">
                   <input aria-label="Select all providers" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Provider", "Service", "City", "KYC", "Documents", "Rating", "Jobs", "Payouts", "Action"].map((column) => (
+                {["Provider", "Service", "City", "KYC", "Docs submitted", "Documents", "Rating", "Jobs", "Payouts", "Action"].map((column) => (
                   <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
                 ))}
               </tr>
@@ -270,15 +276,20 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.service}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.city}</td>
                   <td className="px-4 py-4"><StatusBadge value={provider.kycStatus} /></td>
+                  <td className="px-4 py-4"><StatusBadge value={provider.docsSubmitted ? "Submitted" : "Not submitted"} /></td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.documents}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.rating}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.jobs}</td>
                   <td className="px-4 py-4"><StatusBadge value={provider.payoutStatus} /></td>
                   <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-2">
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                    <div className="flex flex-nowrap gap-2 whitespace-nowrap">
+                      {provider.docsSubmitted ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                      ) : null}
                       <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                      {provider.docsSubmitted ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
@@ -333,7 +344,13 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
     return reviews.filter((review) => reviewIds.includes(review.id)).map((review) => review.providerId);
   }
 
+  function eligibleReviewIds(reviewIds: string[], action: "approve" | "request_docs" | "reject") {
+    if (action === "request_docs") return reviewIds;
+    return reviews.filter((review) => reviewIds.includes(review.id) && review.docsSubmitted).map((review) => review.id);
+  }
+
   async function runKycAction(action: "approve" | "request_docs" | "reject", reviewIds = Array.from(selected)) {
+    reviewIds = eligibleReviewIds(reviewIds, action);
     const providerIds = providerIdsFor(reviewIds);
     if (!providerIds.length) return;
     setPendingAction(action);
@@ -402,7 +419,7 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                 <th className="w-12 px-4 py-3">
                   <input aria-label="Select all KYC reviews" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Provider", "Issue", "Document", "Priority", "Status", "Submitted", "Payout impact", "Action"].map((column) => (
+                {["Provider", "Issue", "Document", "Docs submitted", "Priority", "Status", "Submitted", "Payout impact", "Action"].map((column) => (
                   <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
                 ))}
               </tr>
@@ -417,15 +434,20 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                   </td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.issue}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.document}</td>
+                  <td className="px-4 py-4"><StatusBadge value={review.docsSubmitted ? "Submitted" : "Not submitted"} /></td>
                   <td className="px-4 py-4"><StatusBadge value={review.priority} /></td>
                   <td className="px-4 py-4"><StatusBadge value={review.status} /></td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.submitted}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.payoutImpact}</td>
                   <td className="px-4 py-4">
-                    <div className="flex flex-wrap gap-2">
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                    <div className="flex flex-nowrap gap-2 whitespace-nowrap">
+                      {review.docsSubmitted ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                      ) : null}
                       <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                      {review.docsSubmitted ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

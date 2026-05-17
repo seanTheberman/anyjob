@@ -48,6 +48,7 @@ export type AdminProvider = {
   verification: string;
   kycStatus: string;
   documents: string;
+  docsSubmitted: boolean;
   rating: string;
   jobs: number;
   payoutStatus: string;
@@ -59,6 +60,7 @@ export type KycReview = {
   provider: string;
   issue: string;
   document: string;
+  docsSubmitted: boolean;
   priority: string;
   status: string;
   submitted: string;

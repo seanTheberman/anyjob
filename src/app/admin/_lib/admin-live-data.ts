@@ -170,9 +170,10 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
 
     const hasId = Boolean(row.id_document_url);
     const hasInsurance = Boolean(row.insurance_document_url || row.insurance_status === "approved");
+    const docsSubmitted = hasId || hasInsurance;
     const sellerStatus = String(row.status || "").toLowerCase();
     const isVerified = row.is_verified === true || sellerStatus === "approved";
-    const kycStatus = isVerified ? "Approved" : sellerStatus === "rejected" ? "Rejected" : !hasInsurance ? "Missing document" : "Needs review";
+    const kycStatus = isVerified ? "Approved" : sellerStatus === "rejected" ? "Rejected" : !docsSubmitted || !hasInsurance ? "Missing document" : "Needs review";
     const payoutStatus = isVerified ? "Enabled" : sellerStatus === "rejected" || sellerStatus === "suspended" ? "Blocked" : "Held";
 
     return {
@@ -183,6 +184,7 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
       verification: isVerified ? "Verified" : kycStatus,
       kycStatus,
       documents: [hasId ? "ID" : null, hasInsurance ? "insurance" : null].filter(Boolean).join(", ") || "Missing documents",
+      docsSubmitted,
       rating: averageRating,
       jobs: Number(row.total_jobs || jobsByProvider.get(id) || 0),
       payoutStatus,
@@ -200,9 +202,10 @@ export async function getKycReviews(): Promise<KycReview[]> {
       provider: provider.name,
       issue: provider.kycStatus,
       document: provider.documents,
+      docsSubmitted: provider.docsSubmitted,
       priority: provider.kycStatus === "Rejected" || provider.payoutStatus === "Blocked" ? "High" : provider.kycStatus === "Needs review" ? "High" : "Medium",
       status: provider.kycStatus,
-      submitted: "Live provider record",
+      submitted: provider.docsSubmitted ? "Submitted" : "Not submitted",
       payoutImpact: provider.payoutStatus === "Enabled" ? "No restriction" : `${provider.payoutStatus} payouts`,
     }));
 }
