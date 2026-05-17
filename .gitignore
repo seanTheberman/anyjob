@@ -1,0 +1,20 @@
+.DS_Store
+
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Environment
+.env*
+!.env.example
+
+# Local tooling and caches
+.playwright-mcp/
+*.tsbuildinfo
+
+# Local screenshots / working captures
+/*.png

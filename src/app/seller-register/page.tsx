@@ -1,0 +1,741 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2 } from "lucide-react";
+
+export default function SellerRegisterPage() {
+  const router = useRouter();
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
+    address: "",
+    city: "",
+    postalCode: "",
+    birthDate: "",
+    serviceCategory: "",
+    experience: "",
+    description: "",
+    siret: "",
+    insurance: "",
+    termsAccepted: false,
+    newsletterAccepted: false
+  });
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [currentStep, setCurrentStep] = useState(1);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [submitError, setSubmitError] = useState<string>("");
+
+  const SERVICE_CATEGORIES = [
+    "Cleaning",
+    "Handyman", 
+    "Gardening",
+    "Moving",
+    "IT",
+    "Home Help",
+    "Tutoring",
+    "Pet Care",
+    "Children",
+    "Other"
+  ];
+
+  const handleInputChange = (field: string, value: string | boolean) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.type === 'application/pdf' || file.type === 'image/jpeg' || file.type === 'image/png') {
+        setUploadedFile(file);
+        setErrors(prev => ({ ...prev, document: "" }));
+      } else {
+        setErrors(prev => ({ ...prev, document: "Invalid file format. PDF, JPG or PNG required." }));
+      }
+    }
+  };
+
+  const validateStep = (step: number): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (step === 1) {
+      if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
+      if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
+      if (!formData.email.trim()) newErrors.email = "Email is required";
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = "Invalid email";
+      if (!formData.phone.trim()) newErrors.phone = "Phone is required";
+      if (!formData.password) newErrors.password = "Password is required";
+      else if (formData.password.length < 8) newErrors.password = "Minimum 8 characters";
+      if (!formData.confirmPassword) newErrors.confirmPassword = "Confirmation is required";
+      else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords do not match";
+    } else if (step === 2) {
+      if (!formData.address.trim()) newErrors.address = "L'adresse est requise";
+      if (!formData.city.trim()) newErrors.city = "La ville est requise";
+      if (!formData.postalCode.trim()) newErrors.postalCode = "Le code postal est requis";
+      if (!formData.birthDate) newErrors.birthDate = "La date de naissance est requise";
+      if (!formData.serviceCategory) newErrors.serviceCategory = "La catégorie de service est requise";
+    } else if (step === 3) {
+      if (!formData.siret.trim()) newErrors.siret = "Le numéro SIRET est requis";
+      if (!uploadedFile) newErrors.document = "Le document est requis";
+      // Remove terms validation from step 3 - it should be validated in step 4
+    } else if (step === 4) {
+      if (!formData.termsAccepted) newErrors.terms = "Les conditions doivent être acceptées";
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNextStep = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, 4));
+    }
+  };
+
+  const handlePrevStep = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  };
+
+  const handleSubmit = async () => {
+    if (validateStep(4)) {
+      setIsLoading(true);
+      setSubmitError("");
+      
+      try {
+        const response = await fetch('/api/auth/register-seller', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            email: formData.email,
+            phone: formData.phone,
+            password: formData.password,
+            address: formData.address,
+            city: formData.city,
+            postalCode: formData.postalCode,
+            birthDate: formData.birthDate,
+            serviceCategory: formData.serviceCategory,
+            experience: formData.experience,
+            description: formData.description,
+            siret: formData.siret,
+            insurance: formData.insurance,
+            termsAccepted: formData.termsAccepted,
+            newsletterAccepted: formData.newsletterAccepted
+          }),
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.session) {
+          // Auto-login: Set the session in Supabase client
+          const supabase = createClient();
+          
+          await supabase.auth.setSession({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+          });
+          
+          // Redirect to seller dashboard (/pro)
+          router.push('/pro');
+          router.refresh();
+        } else if (response.ok) {
+          // Fallback if no session (shouldn't happen)
+          alert("Registration successful! Please log in.");
+          router.push('/login');
+        } else {
+          // Handle server errors
+          setSubmitError(data.error || "Error during registration");
+        }
+      } catch (error) {
+        console.error('Submission error:', error);
+        setSubmitError("Server error. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto p-4 pt-40 pb-8">
+        {/* Progress Bar */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            {[1, 2, 3, 4].map((step) => (
+              <div key={step} className="flex items-center">
+                <div
+                  className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
+                    step <= currentStep
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-200 text-gray-500"
+                  }`}
+                >
+                  {step < currentStep ? <Check className="w-5 h-5" /> : step}
+                </div>
+                {step < 4 && (
+                  <div
+                    className={`flex-1 h-1 mx-2 ${
+                      step < currentStep ? "bg-blue-600" : "bg-gray-200"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-xs text-gray-600">
+            <span>Personal Info</span>
+            <span>Address & Services</span>
+            <span>Documents</span>
+            <span>Verification</span>
+          </div>
+        </div>
+
+        {/* Form Content */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          {currentStep === 1 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Personal Info</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    First Name *
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange("firstName", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.firstName ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="John"
+                    />
+                    {errors.firstName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Last Name *
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange("lastName", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.lastName ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="Doe"
+                    />
+                    {errors.lastName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email *
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange("email", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.email ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="john.doe@email.com"
+                    />
+                    {errors.email && (
+                      <p className="text-red-500 text-xs mt-1">{errors.email}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Phone *
+                  </label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange("phone", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.phone ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="555-0123"
+                    />
+                    {errors.phone && (
+                      <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => handleInputChange("password", e.target.value)}
+                      className={`w-full pr-10 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.password ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                    {errors.password && (
+                      <p className="text-red-500 text-xs mt-1">{errors.password}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Confirm Password *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      value={formData.confirmPassword}
+                      onChange={(e) => handleInputChange("confirmPassword", e.target.value)}
+                      className={`w-full pr-10 pl-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.confirmPassword ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                    {errors.confirmPassword && (
+                      <p className="text-red-500 text-xs mt-1">{errors.confirmPassword}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Address & Services</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Address *
+                  </label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.address}
+                      onChange={(e) => handleInputChange("address", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.address ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="123 Main St"
+                    />
+                    {errors.address && (
+                      <p className="text-red-500 text-xs mt-1">{errors.address}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      City *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.city}
+                      onChange={(e) => handleInputChange("city", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.city ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="New York"
+                    />
+                    {errors.city && (
+                      <p className="text-red-500 text-xs mt-1">{errors.city}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Zip Code *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.postalCode}
+                      onChange={(e) => handleInputChange("postalCode", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.postalCode ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="10001"
+                    />
+                    {errors.postalCode && (
+                      <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Birth Date *
+                  </label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="date"
+                      value={formData.birthDate}
+                      onChange={(e) => handleInputChange("birthDate", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.birthDate ? "border-red-500" : "border-gray-300"
+                      }`}
+                    />
+                    {errors.birthDate && (
+                      <p className="text-red-500 text-xs mt-1">{errors.birthDate}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Main Service Category *
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      value={formData.serviceCategory}
+                      onChange={(e) => handleInputChange("serviceCategory", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none ${
+                        errors.serviceCategory ? "border-red-500" : "border-gray-300"
+                      }`}
+                    >
+                      <option value="">Select a category</option>
+                      {SERVICE_CATEGORIES.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                    {errors.serviceCategory && (
+                      <p className="text-red-500 text-xs mt-1">{errors.serviceCategory}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Experience
+                  </label>
+                  <select
+                    value={formData.experience}
+                    onChange={(e) => handleInputChange("experience", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                  >
+                    <option value="">Select your experience</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => handleInputChange("description", e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Describe your experience and services..."
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 3 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Professional Documents</h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tax ID (SIRET) *
+                  </label>
+                  <div className="relative">
+                    <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.siret}
+                      onChange={(e) => handleInputChange("siret", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.siret ? "border-red-500" : "border-gray-300"
+                      }`}
+                    placeholder="12345678900012"
+                    maxLength={14}
+                  />
+                  {errors.siret && (
+                    <p className="text-red-500 text-xs mt-1">{errors.siret}</p>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Format: 14 digits without spaces
+                </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Liability Insurance
+                  </label>
+                  <select
+                    value={formData.insurance}
+                    onChange={(e) => handleInputChange("insurance", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+                  >
+                    <option value="">Select an option</option>
+                    <option value="yes">Yes, I am insured</option>
+                    <option value="no">No, I do not have insurance</option>
+                    <option value="pending">Subscription in progress</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Identity Document *
+                  </label>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                    <div className="mt-4">
+                      <label htmlFor="file-upload" className="cursor-pointer">
+                        <span className="mt-2 block text-sm font-medium text-gray-900">
+                          Upload your ID
+                        </span>
+                        <span className="mt-1 block text-xs text-gray-500">
+                          PDF, JPG or PNG (Max 5MB)
+                        </span>
+                      </label>
+                      <input
+                        id="file-upload"
+                        name="file-upload"
+                        type="file"
+                        className="sr-only"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={handleFileUpload}
+                      />
+                    </div>
+                    {uploadedFile && (
+                      <div className="mt-4 flex items-center justify-center">
+                        <div className="flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                          <Check className="w-4 h-4" />
+                          <span>{uploadedFile.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setUploadedFile(null)}
+                            className="ml-2 text-green-500 hover:text-green-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    {errors.document && (
+                      <p className="text-red-500 text-xs mt-1">{errors.document}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex">
+                    <Shield className="w-5 h-5 text-blue-600 mt-0.5 mr-3 flex-shrink-0" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Your data is secure</p>
+                      <p>
+                        Your personal info and documents are encrypted and protected according to GDPR.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {currentStep === 4 && (
+            <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Verification</h2>
+              
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="font-semibold text-gray-900 mb-4">Info Summary</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-gray-600">Name:</span>
+                      <p className="font-medium">{formData.firstName} {formData.lastName}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Email:</span>
+                      <p className="font-medium">{formData.email}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Phone:</span>
+                      <p className="font-medium">{formData.phone}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Category:</span>
+                      <p className="font-medium">{formData.serviceCategory}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">City:</span>
+                      <p className="font-medium">{formData.city}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">SIRET:</span>
+                      <p className="font-medium">{formData.siret}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {submitError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex">
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                    <div className="text-sm text-red-800">
+                      <p className="font-medium">Error</p>
+                      <p>{submitError}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="flex items-start">
+                  <input
+                    type="checkbox"
+                    id="terms"
+                    checked={formData.termsAccepted}
+                    onChange={(e) => handleInputChange("termsAccepted", e.target.checked)}
+                    className={`mt-1 mr-3 ${errors.terms ? "border-red-500" : ""}`}
+                  />
+                  <label htmlFor="terms" className="text-sm text-gray-600">
+                    I accept the{" "}
+                    <a href="#" className="text-blue-600 hover:text-blue-800 underline">
+                      terms and conditions
+                    </a>{" "}
+                    and the{" "}
+                    <a href="#" className="text-blue-600 hover:text-blue-800 underline">
+                      privacy policy
+                    </a>{" "}
+                    *
+                  </label>
+                </div>
+                {errors.terms && (
+                  <p className="text-red-500 text-xs">{errors.terms}</p>
+                )}
+
+                <div className="flex items-start">
+                  <input
+                    type="checkbox"
+                    id="newsletter"
+                    checked={formData.newsletterAccepted}
+                    onChange={(e) => handleInputChange("newsletterAccepted", e.target.checked)}
+                    className="mt-1 mr-3"
+                  />
+                  <label htmlFor="newsletter" className="text-sm text-gray-600">
+                    I would like to receive offers and news by email
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation Buttons */}
+          <div className="flex justify-between mt-8">
+            <button
+              type="button"
+              onClick={handlePrevStep}
+              disabled={currentStep === 1}
+              className={`px-6 py-2 rounded-lg font-medium ${
+                currentStep === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Back
+            </button>
+
+            {currentStep < 4 ? (
+              <button
+                type="button"
+                onClick={handleNextStep}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center"
+              >
+                Next
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isLoading}
+                className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Submit registration
+                    <Check className="w-4 h-4 ml-2" />
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
