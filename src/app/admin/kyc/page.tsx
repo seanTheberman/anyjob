@@ -2,9 +2,13 @@ import { BadgeCheck, FileWarning } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
 import { KycWorklist } from "../_components/AdminSelectableTables";
-import { adminKycReviews } from "../_components/admin-data";
+import { getKycReviews } from "../_lib/admin-live-data";
 
-export default function AdminKycPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminKycPage() {
+  const reviews = await getKycReviews();
+
   return (
     <AdminShell
       title="KYC verification"
@@ -22,7 +26,7 @@ export default function AdminKycPage() {
         </>
       }
     >
-      <KycWorklist reviews={adminKycReviews} />
+      <KycWorklist reviews={reviews} />
     </AdminShell>
   );
 }

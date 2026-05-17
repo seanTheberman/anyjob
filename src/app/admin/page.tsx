@@ -2,9 +2,14 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight, Download, Plus } from "lucide-react";
 import { AdminShell } from "./_components/AdminShell";
 import { AdminButtonLink, AdminTable, StatCard, StatusBadge } from "./_components/AdminPrimitives";
-import { activity, controlSummary, metrics, riskQueue } from "./_components/admin-data";
+import { controlSummary } from "./_components/admin-data";
+import { getAdminOverview } from "./_lib/admin-live-data";
 
-export default function AdminDashboard() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminDashboard() {
+  const overview = await getAdminOverview();
+
   return (
     <AdminShell
       title="Marketplace overview"
@@ -23,7 +28,7 @@ export default function AdminDashboard() {
       }
     >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metrics.map((metric) => (
+        {overview.metrics.map((metric) => (
           <StatCard key={metric.label} {...metric} />
         ))}
       </section>
@@ -36,7 +41,13 @@ export default function AdminDashboard() {
               View reports <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <AdminTable columns={["Priority", "Issue", "Subject", "Status"]} rows={riskQueue} actionLabel="Review" />
+          {overview.riskQueue.length ? (
+            <AdminTable columns={["Priority", "Issue", "Subject", "Status"]} rows={overview.riskQueue} actionLabel="Review" />
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+              No live trust or safety items need review.
+            </div>
+          )}
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -64,7 +75,7 @@ export default function AdminDashboard() {
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-950">Live activity</h2>
         <div className="mt-4 divide-y divide-slate-100">
-          {activity.map(([time, title, detail]) => (
+          {overview.activity.length ? overview.activity.map(([time, title, detail]) => (
             <div key={`${time}-${title}`} className="grid gap-2 py-3 md:grid-cols-[80px_1fr_auto] md:items-center">
               <span className="text-sm font-medium text-slate-500">{time}</span>
               <div>
@@ -73,7 +84,9 @@ export default function AdminDashboard() {
               </div>
               <StatusBadge value="Logged" />
             </div>
-          ))}
+          )) : (
+            <p className="text-sm text-slate-600">No live booking, message, or notification activity found yet.</p>
+          )}
         </div>
       </section>
     </AdminShell>

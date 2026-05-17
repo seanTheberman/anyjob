@@ -51,9 +51,9 @@ export function AdminShell({ title, description, children, actions }: AdminShell
 
         <div className="border-t border-white/10 p-4">
           <div className="rounded-lg bg-white/5 p-3">
-            <p className="text-sm font-medium">Preview mode</p>
+            <p className="text-sm font-medium">Live data mode</p>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              Controls are UI-ready. Set up admin APIs before enabling destructive actions.
+              Tables read Supabase server-side. Write actions need audited admin mutation endpoints before production use.
             </p>
           </div>
         </div>

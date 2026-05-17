@@ -1,9 +1,13 @@
 import { Headphones, MessageSquare } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
-import { supportTickets } from "../_components/admin-data";
+import { getAdminSupport } from "../_lib/admin-live-data";
 
-export default function AdminSupportPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminSupportPage() {
+  const supportTickets = await getAdminSupport();
+
   return (
     <AdminShell
       title="Support"
@@ -25,7 +29,13 @@ export default function AdminSupportPage() {
         <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Assign selected</button>
         <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Send macro</button>
       </Toolbar>
-      <AdminTable columns={["Ticket", "Requester", "Topic", "Priority", "Status"]} rows={supportTickets} actionLabel="Reply" />
+      {supportTickets.length ? (
+        <AdminTable columns={["Ticket", "Requester", "Topic", "Priority", "Status"]} rows={supportTickets} actionLabel="Reply" />
+      ) : (
+        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+          No live notification or conversation support items found.
+        </div>
+      )}
     </AdminShell>
   );
 }

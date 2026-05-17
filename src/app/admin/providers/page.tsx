@@ -2,9 +2,13 @@ import { BadgeCheck, Download } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
 import { ProvidersWorklist } from "../_components/AdminSelectableTables";
-import { adminProviders } from "../_components/admin-data";
+import { getAdminProviders } from "../_lib/admin-live-data";
 
-export default function AdminProvidersPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminProvidersPage() {
+  const providers = await getAdminProviders();
+
   return (
     <AdminShell
       title="Providers"
@@ -22,7 +26,7 @@ export default function AdminProvidersPage() {
         </>
       }
     >
-      <ProvidersWorklist providers={adminProviders} />
+      <ProvidersWorklist providers={providers} />
     </AdminShell>
   );
 }

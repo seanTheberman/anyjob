@@ -2,9 +2,13 @@ import { Download, UserPlus } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
 import { UsersWorklist } from "../_components/AdminSelectableTables";
-import { adminUsers } from "../_components/admin-data";
+import { getAdminUsers } from "../_lib/admin-live-data";
 
-export default function AdminUsersPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminUsersPage() {
+  const users = await getAdminUsers();
+
   return (
     <AdminShell
       title="Users"
@@ -22,7 +26,7 @@ export default function AdminUsersPage() {
         </>
       }
     >
-      <UsersWorklist users={adminUsers} />
+      <UsersWorklist users={users} />
     </AdminShell>
   );
 }

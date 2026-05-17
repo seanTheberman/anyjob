@@ -1,9 +1,13 @@
 import { FileDown, Plus } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
-import { reports } from "../_components/admin-data";
+import { getAdminReports } from "../_lib/admin-live-data";
 
-export default function AdminReportsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AdminReportsPage() {
+  const reports = await getAdminReports();
+
   return (
     <AdminShell
       title="Reports"
