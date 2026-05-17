@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -85,7 +86,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert buyer profile data
-    const { error: buyerError } = await supabase
+    const adminSupabase = createAdminSupabaseClient() as unknown as {
+      from: (table: string) => {
+        insert: (values: unknown) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    const { error: buyerError } = await adminSupabase
       .from('buyers')
       .insert([
         {
