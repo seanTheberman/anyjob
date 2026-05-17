@@ -2,12 +2,16 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
     let response = NextResponse.next({
         request: {
             headers: request.headers,
         },
     })
+
+    if (process.env.ROUTE_GUARDS_ENABLED !== 'true') {
+        return response
+    }
 
     const supabase = createServerClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,8 +41,8 @@ export async function middleware(request: NextRequest) {
     // Define protected routes and their required roles
     const protectedRoutes = {
         '/dashboard': 'client',
-        '/pro': 'provider', 
-        '/admin': 'admin'
+        '/pro': 'provider',
+        '/admin': 'admin',
     }
 
     const pathname = request.nextUrl.pathname
@@ -54,7 +58,6 @@ export async function middleware(request: NextRequest) {
         }
     }
 
-    
     // If route is protected and no session, redirect to login
     if (isProtected && !session) {
         return NextResponse.redirect(new URL('/login', request.url))
@@ -62,17 +65,17 @@ export async function middleware(request: NextRequest) {
 
     // If session exists, check user role
     if (session && isProtected && requiredRole) {
-        let userRole: string | null = null;
-        
+        let userRole: string | null = null
+
         // Check eloo_profiles first
         const { data: profile } = await supabase
             .from('eloo_profiles')
             .select('role')
             .eq('id', session.user.id)
             .single()
-        
+
         if (profile?.role) {
-            userRole = profile.role.toLowerCase();
+            userRole = profile.role.toLowerCase()
         } else {
             // Check if user is a seller (treat as provider for /pro routes)
             const { data: seller } = await supabase
@@ -80,19 +83,16 @@ export async function middleware(request: NextRequest) {
                 .select('id')
                 .eq('id', session.user.id)
                 .single()
-            
+
             if (seller) {
-                userRole = 'provider'; // Sellers access /pro as providers
+                userRole = 'provider'
             }
         }
 
-        // Check if user has the required role
-        // Allow sellers (treated as 'provider') to access /pro routes
-        const effectiveRole = userRole;
-        const allowedRoles = requiredRole === 'provider' ? ['provider', 'seller'] : [requiredRole];
-        
+        const effectiveRole = userRole
+        const allowedRoles = requiredRole === 'provider' ? ['provider', 'seller'] : [requiredRole]
+
         if (!effectiveRole || !allowedRoles.includes(effectiveRole)) {
-            // Redirect to appropriate dashboard based on user role
             if (effectiveRole === 'client') {
                 return NextResponse.redirect(new URL('/dashboard', request.url))
             } else if (effectiveRole === 'provider' || effectiveRole === 'seller') {
@@ -100,7 +100,6 @@ export async function middleware(request: NextRequest) {
             } else if (effectiveRole === 'admin') {
                 return NextResponse.redirect(new URL('/admin', request.url))
             } else {
-                // If no valid role, redirect to login
                 return NextResponse.redirect(new URL('/login', request.url))
             }
         }

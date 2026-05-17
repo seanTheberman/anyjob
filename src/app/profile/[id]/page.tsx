@@ -2,9 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ArrowLeft, MapPin, Mail, Star, Calendar } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 
 interface Profile {
   id: string;
@@ -24,11 +22,12 @@ export default function PublicProfilePage({ params }: { params: Promise<{ id: st
     params.then(p => setProfileId(p.id));
   }, [params]);
   
-    const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
+    if (!profileId) return;
+
     const fetchProfile = async () => {
       try {
         const response = await fetch(`/api/profile/${profileId}`);

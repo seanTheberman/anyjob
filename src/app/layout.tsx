@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Dancing_Script } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import { ConditionalHeader } from "@/components/layout/ConditionalHeader";
 import { ConditionalFooter } from "@/components/layout/ConditionalFooter";
@@ -47,9 +48,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${cursive.variable}`} suppressHydrationWarning>
       <body className="min-h-screen flex flex-col">
-        <ConditionalHeader />
+        <Suspense fallback={null}>
+          <ConditionalHeader />
+        </Suspense>
         <main className="flex-1">{children}</main>
-        <ConditionalFooter />
+        <Suspense fallback={null}>
+          <ConditionalFooter />
+        </Suspense>
         <GTranslateWidget />
       </body>
     </html>

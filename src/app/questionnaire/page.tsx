@@ -240,6 +240,21 @@ const TOTAL_STEPS = 9;
 
 // Main page component wrapped in Suspense
 export default function QuestionnairePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    }>
+      <QuestionnaireShell />
+    </Suspense>
+  );
+}
+
+function QuestionnaireShell() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
