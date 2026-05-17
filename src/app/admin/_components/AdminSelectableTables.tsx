@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { CheckSquare, Mail, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { StatusBadge } from "./AdminPrimitives";
@@ -151,10 +152,13 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
 }
 
 export function ProvidersWorklist({ providers }: { providers: AdminProvider[] }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [kyc, setKyc] = useState<FilterOption>("all");
   const [service, setService] = useState<FilterOption>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const services = Array.from(new Set(providers.map((provider) => provider.service)));
   const filtered = useMemo(() => {
@@ -184,6 +188,29 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
     });
   }
 
+  async function runKycAction(action: "approve" | "request_docs" | "reject", providerIds = Array.from(selected)) {
+    if (!providerIds.length) return;
+    setPendingAction(action);
+    setMessage(null);
+
+    const response = await fetch("/api/admin/providers/kyc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, providerIds }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPendingAction(null);
+
+    if (!response.ok) {
+      setMessage(payload.error || "KYC update failed");
+      return;
+    }
+
+    setSelected(new Set());
+    setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.`);
+    router.refresh();
+  }
+
   return (
     <>
       <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
@@ -207,16 +234,17 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
       </div>
 
       <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <ShieldCheck className="h-4 w-4" /> Approve KYC
         </button>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <Mail className="h-4 w-4" /> Request docs
         </button>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <CheckSquare className="h-4 w-4" /> Enable payouts
         </button>
       </BulkBar>
+      {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -246,7 +274,13 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.rating}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.jobs}</td>
                   <td className="px-4 py-4"><StatusBadge value={provider.payoutStatus} /></td>
-                  <td className="px-4 py-4"><button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Review KYC</button></td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -259,10 +293,13 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
 }
 
 export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<FilterOption>("all");
   const [priority, setPriority] = useState<FilterOption>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return reviews.filter((review) => {
@@ -292,6 +329,34 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
     });
   }
 
+  function providerIdsFor(reviewIds: string[]) {
+    return reviews.filter((review) => reviewIds.includes(review.id)).map((review) => review.providerId);
+  }
+
+  async function runKycAction(action: "approve" | "request_docs" | "reject", reviewIds = Array.from(selected)) {
+    const providerIds = providerIdsFor(reviewIds);
+    if (!providerIds.length) return;
+    setPendingAction(action);
+    setMessage(null);
+
+    const response = await fetch("/api/admin/providers/kyc", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, providerIds }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPendingAction(null);
+
+    if (!response.ok) {
+      setMessage(payload.error || "KYC update failed");
+      return;
+    }
+
+    setSelected(new Set());
+    setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.`);
+    router.refresh();
+  }
+
   return (
     <>
       <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
@@ -317,16 +382,17 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
       </div>
 
       <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <ShieldCheck className="h-4 w-4" /> Approve
         </button>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <Mail className="h-4 w-4" /> Request docs
         </button>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <ShieldAlert className="h-4 w-4" /> Reject
         </button>
       </BulkBar>
+      {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -355,7 +421,13 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                   <td className="px-4 py-4"><StatusBadge value={review.status} /></td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.submitted}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.payoutImpact}</td>
-                  <td className="px-4 py-4"><button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Open review</button></td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-wrap gap-2">
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -55,6 +55,7 @@ export type AdminProvider = {
 
 export type KycReview = {
   id: string;
+  providerId: string;
   provider: string;
   issue: string;
   document: string;

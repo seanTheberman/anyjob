@@ -196,6 +196,7 @@ export async function getKycReviews(): Promise<KycReview[]> {
     .filter((provider) => provider.kycStatus !== "Approved" || provider.payoutStatus !== "Enabled")
     .map((provider) => ({
       id: `kyc_${provider.id}`,
+      providerId: provider.id,
       provider: provider.name,
       issue: provider.kycStatus,
       document: provider.documents,

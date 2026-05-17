@@ -1,0 +1,113 @@
+import { NextResponse } from "next/server";
+
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+
+const allowedActions = ["approve", "request_docs", "reject"] as const;
+type KycAction = (typeof allowedActions)[number];
+
+function isKycAction(value: unknown): value is KycAction {
+  return typeof value === "string" && allowedActions.includes(value as KycAction);
+}
+
+async function isAdminRequest() {
+  if (process.env.ADMIN_MUTATIONS_ALLOW_UNAUTHENTICATED === "true") {
+    return true;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) return false;
+
+  const adminDb = supabase as never as {
+    from: (table: string) => {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          single: () => Promise<{ data: { role?: string } | null; error: unknown }>;
+        };
+      };
+    };
+  };
+
+  const [elooProfile, userProfile] = await Promise.all([
+    adminDb.from("eloo_profiles").select("role").eq("id", user.id).single(),
+    adminDb.from("user_profiles").select("role").eq("id", user.id).single(),
+  ]);
+
+  return elooProfile.data?.role === "admin" || userProfile.data?.role === "admin";
+}
+
+export async function POST(request: Request) {
+  try {
+    const isAdmin = await isAdminRequest();
+    if (!isAdmin) {
+      return NextResponse.json({ error: "Admin authorization required" }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const providerIds = Array.isArray(body.providerIds)
+      ? body.providerIds.filter((id: unknown) => typeof id === "string" && id.length > 0)
+      : [];
+    const action = body.action;
+
+    if (!providerIds.length) {
+      return NextResponse.json({ error: "No providers selected" }, { status: 400 });
+    }
+
+    if (!isKycAction(action)) {
+      return NextResponse.json({ error: "Invalid KYC action" }, { status: 400 });
+    }
+
+    const supabase = createAdminSupabaseClient();
+    const now = new Date().toISOString();
+
+    const sellerUpdate =
+      action === "approve"
+        ? { status: "approved", approved_at: now, rejection_reason: null, insurance_status: "approved", background_check_status: "approved", updated_at: now }
+        : action === "reject"
+          ? { status: "rejected", approved_at: null, rejection_reason: body.reason || "Rejected by admin", background_check_status: "rejected", updated_at: now }
+          : { status: "pending", rejection_reason: body.reason || "Additional KYC documents requested", updated_at: now };
+
+    const profileUpdate =
+      action === "approve"
+        ? { is_verified: true, updated_at: now }
+        : { is_verified: false, updated_at: now };
+
+    const adminDb = supabase as never as {
+      from: (table: string) => {
+        update: (values: Record<string, unknown>) => {
+          in: (column: string, values: string[]) => Promise<{ error: { message: string } | null }>;
+        };
+      };
+    };
+
+    const [sellerResult, profileResult] = await Promise.all([
+      adminDb.from("sellers").update(sellerUpdate).in("id", providerIds),
+      adminDb.from("eloo_profiles").update(profileUpdate).in("id", providerIds),
+    ]);
+
+    if (sellerResult.error && profileResult.error) {
+      return NextResponse.json(
+        {
+          error: "Failed to update provider KYC status",
+          details: [sellerResult.error.message, profileResult.error.message],
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({
+      ok: true,
+      action,
+      providerIds,
+      warnings: [sellerResult.error?.message, profileResult.error?.message].filter(Boolean),
+    });
+  } catch (error) {
+    console.error("Admin KYC update failed:", error);
+    return NextResponse.json({ error: "Failed to update KYC status" }, { status: 500 });
+  }
+}
