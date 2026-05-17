@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Search, Briefcase, Globe, ArrowRight } from "lucide-react";
+import { Search, Briefcase, Globe, ArrowRight, PlusCircle } from "lucide-react";
 import { SUPPORTED_LANGUAGES } from "@/lib/categories";
 
 type SearchResult = {
@@ -157,6 +157,10 @@ export function SearchBar() {
         }
     };
 
+    const handleCustomService = () => {
+        window.location.href = "/questionnaire?category=custom";
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setSearchQuery(e.target.value);
         setShowDropdown(true);
@@ -265,6 +269,16 @@ export function SearchBar() {
                 </button>
             </div>
 
+            <div className="mt-[52px] flex justify-center">
+                <button
+                    onClick={handleCustomService}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/15 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/60"
+                >
+                    <PlusCircle className="h-4 w-4" />
+                    Request custom service
+                </button>
+            </div>
+
             {/* Language Selector Dropdown */}
             {isClient && showLanguageSelector && (
                 <div className="absolute top-full right-0 mt-3 z-[99999] w-72 bg-white dark:bg-gray-950 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -357,6 +371,13 @@ export function SearchBar() {
                             <div className="text-gray-500 dark:text-gray-400 text-sm font-medium">
                                 {getNoResultsText()}
                             </div>
+                            <button
+                                onClick={handleCustomService}
+                                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-700"
+                            >
+                                <PlusCircle className="h-4 w-4" />
+                                Request custom service
+                            </button>
                         </div>
                     )}
                 </div>
