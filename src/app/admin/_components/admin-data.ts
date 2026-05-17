@@ -104,6 +104,25 @@ export const kycReviews = [
   ["John Doe", "Annual re-check", "Insurance renewal", "Low", "Approved", "View file"],
 ];
 
+export type KycReview = {
+  id: string;
+  provider: string;
+  issue: string;
+  document: string;
+  priority: string;
+  status: string;
+  submitted: string;
+  payoutImpact: string;
+};
+
+export const adminKycReviews: KycReview[] = [
+  { id: "kyc_3001", provider: "Amelia Brown", issue: "ID mismatch", document: "Passport", priority: "High", status: "Needs review", submitted: "Today", payoutImpact: "Payouts held" },
+  { id: "kyc_3002", provider: "Maya Chen", issue: "Insurance missing", document: "Insurance certificate", priority: "Medium", status: "Missing document", submitted: "Yesterday", payoutImpact: "Limited bidding" },
+  { id: "kyc_3003", provider: "Oliver Grant", issue: "Expired ID", document: "Driving licence", priority: "High", status: "Rejected", submitted: "3 days ago", payoutImpact: "Account blocked" },
+  { id: "kyc_3004", provider: "John Doe", issue: "Annual re-check", document: "Insurance renewal", priority: "Low", status: "Approved", submitted: "Last week", payoutImpact: "No restriction" },
+  { id: "kyc_3005", provider: "Priya Nair", issue: "Address proof unclear", document: "Utility bill", priority: "Medium", status: "Needs review", submitted: "2h ago", payoutImpact: "Payouts held" },
+];
+
 export const jobs = [
   ["AJ-4921", "Deep cleaning", "Sarah Johnson", "Amelia Brown", "Dispute", "Open case"],
   ["AJ-4916", "Furniture assembly", "Marcus Lee", "John Doe", "Matched", "View bids"],

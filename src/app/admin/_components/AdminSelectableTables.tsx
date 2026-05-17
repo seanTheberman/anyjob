@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { CheckSquare, Mail, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { StatusBadge } from "./AdminPrimitives";
-import type { AdminProvider, AdminUser } from "./admin-data";
+import type { AdminProvider, AdminUser, KycReview } from "./admin-data";
 
 type FilterOption = "all" | string;
 
@@ -253,6 +253,115 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
           </table>
         </div>
         <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500">{filtered.length} providers shown</div>
+      </div>
+    </>
+  );
+}
+
+export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<FilterOption>("all");
+  const [priority, setPriority] = useState<FilterOption>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  const filtered = useMemo(() => {
+    return reviews.filter((review) => {
+      const statusMatch = status === "all" || review.status === status;
+      const priorityMatch = priority === "all" || review.priority === priority;
+      return statusMatch && priorityMatch && includesQuery(Object.values(review), query);
+    });
+  }, [priority, query, reviews, status]);
+
+  const allVisibleSelected = filtered.length > 0 && filtered.every((review) => selected.has(review.id));
+
+  function toggleAll() {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) filtered.forEach((review) => next.delete(review.id));
+      else filtered.forEach((review) => next.add(review.id));
+      return next;
+    });
+  }
+
+  function toggleOne(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <>
+      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid gap-2 lg:grid-cols-[1fr_190px_170px_auto]">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" placeholder="Search provider, issue, document" />
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="all">All KYC statuses</option>
+            <option value="Needs review">Needs review</option>
+            <option value="Missing document">Missing document</option>
+            <option value="Rejected">Rejected</option>
+            <option value="Approved">Approved</option>
+          </select>
+          <select value={priority} onChange={(event) => setPriority(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="all">All priorities</option>
+            <option value="High">High</option>
+            <option value="Medium">Medium</option>
+            <option value="Low">Low</option>
+          </select>
+          <button onClick={() => { setQuery(""); setStatus("all"); setPriority("all"); }} className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
+        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+          <ShieldCheck className="h-4 w-4" /> Approve
+        </button>
+        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+          <Mail className="h-4 w-4" /> Request docs
+        </button>
+        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+          <ShieldAlert className="h-4 w-4" /> Reject
+        </button>
+      </BulkBar>
+
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="w-12 px-4 py-3">
+                  <input aria-label="Select all KYC reviews" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
+                </th>
+                {["Provider", "Issue", "Document", "Priority", "Status", "Submitted", "Payout impact", "Action"].map((column) => (
+                  <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map((review) => (
+                <tr key={review.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-4"><input aria-label={`Select ${review.provider} KYC review`} type="checkbox" checked={selected.has(review.id)} onChange={() => toggleOne(review.id)} /></td>
+                  <td className="px-4 py-4">
+                    <p className="text-sm font-medium text-slate-950">{review.provider}</p>
+                    <p className="text-xs text-slate-500">{review.id}</p>
+                  </td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{review.issue}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{review.document}</td>
+                  <td className="px-4 py-4"><StatusBadge value={review.priority} /></td>
+                  <td className="px-4 py-4"><StatusBadge value={review.status} /></td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{review.submitted}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{review.payoutImpact}</td>
+                  <td className="px-4 py-4"><button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Open review</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500">{filtered.length} KYC reviews shown</div>
       </div>
     </>
   );
