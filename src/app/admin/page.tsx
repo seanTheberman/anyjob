@@ -1,153 +1,81 @@
-"use client";
-
-import { Shield, Users, DollarSign, TrendingUp, Settings, LogOut } from "lucide-react";
 import Link from "next/link";
+import { AlertTriangle, ArrowRight, Download, Plus } from "lucide-react";
+import { AdminShell } from "./_components/AdminShell";
+import { AdminButtonLink, AdminTable, StatCard, StatusBadge } from "./_components/AdminPrimitives";
+import { activity, controlSummary, metrics, riskQueue } from "./_components/admin-data";
 
 export default function AdminDashboard() {
-    return (
-        <div className="min-h-screen bg-gray-100">
-            {/* Header */}
-            <header className="bg-white shadow-sm border-b">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center gap-3">
-                            <Link href="/" className="text-2xl font-bold text-red-600">
-                                AnyJob
-                            </Link>
-                            <span className="px-2.5 py-1 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                                Admin
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-                                <Settings className="w-5 h-5" />
-                            </button>
-                            <button className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-                                <LogOut className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </header>
+  return (
+    <AdminShell
+      title="Marketplace overview"
+      description="Monitor demand, supply, revenue, disputes, support load, and trust queues from one operations console."
+      actions={
+        <>
+          <AdminButtonLink href="/admin/reports">
+            <Download className="h-4 w-4" />
+            Export report
+          </AdminButtonLink>
+          <AdminButtonLink href="/admin/settings">
+            <Plus className="h-4 w-4" />
+            Configure rules
+          </AdminButtonLink>
+        </>
+      }
+    >
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {metrics.map((metric) => (
+          <StatCard key={metric.label} {...metric} />
+        ))}
+      </section>
 
-            {/* Main Content */}
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-                    <p className="text-gray-600 mt-2">Manage the AnyJob platform</p>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Total Users</p>
-                                <p className="text-2xl font-bold text-gray-900">1,234</p>
-                            </div>
-                            <div className="p-3 bg-blue-100 rounded-lg">
-                                <Users className="w-6 h-6 text-blue-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Providers</p>
-                                <p className="text-2xl font-bold text-gray-900">456</p>
-                            </div>
-                            <div className="p-3 bg-green-100 rounded-lg">
-                                <Shield className="w-6 h-6 text-green-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Revenue</p>
-                                <p className="text-2xl font-bold text-gray-900">£12,345</p>
-                            </div>
-                            <div className="p-3 bg-yellow-100 rounded-lg">
-                                <DollarSign className="w-6 h-6 text-yellow-600" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm font-medium text-gray-600">Growth</p>
-                                <p className="text-2xl font-bold text-gray-900">+23%</p>
-                            </div>
-                            <div className="p-3 bg-purple-100 rounded-lg">
-                                <TrendingUp className="w-6 h-6 text-purple-600" />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
-                        <div className="space-y-3">
-                            <Link href="/admin/users" className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <Users className="w-5 h-5 text-gray-600" />
-                                    <span className="font-medium text-gray-900">Manage Users</span>
-                                </div>
-                            </Link>
-                            <Link href="/admin/providers" className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <Shield className="w-5 h-5 text-gray-600" />
-                                    <span className="font-medium text-gray-900">Manage Providers</span>
-                                </div>
-                            </Link>
-                            <Link href="/admin/jobs" className="block p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
-                                <div className="flex items-center gap-3">
-                                    <Settings className="w-5 h-5 text-gray-600" />
-                                    <span className="font-medium text-gray-900">Manage Jobs</span>
-                                </div>
-                            </Link>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h2>
-                        <div className="space-y-3">
-                            <div className="p-3 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium text-gray-900">New provider registration</p>
-                                        <p className="text-sm text-gray-500">John Doe - Handyman</p>
-                                    </div>
-                                    <span className="text-xs text-gray-500">2h ago</span>
-                                </div>
-                            </div>
-                            <div className="p-3 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium text-gray-900">Job completed</p>
-                                        <p className="text-sm text-gray-500">Furniture Assembly - £95</p>
-                                    </div>
-                                    <span className="text-xs text-gray-500">5h ago</span>
-                                </div>
-                            </div>
-                            <div className="p-3 border border-gray-200 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <p className="font-medium text-gray-900">New user signup</p>
-                                        <p className="text-sm text-gray-500">Sarah Johnson</p>
-                                    </div>
-                                    <span className="text-xs text-gray-500">1d ago</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-950">Trust and safety queue</h2>
+            <Link href="/admin/reports" className="inline-flex items-center gap-1 text-sm font-medium text-red-600">
+              View reports <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <AdminTable columns={["Priority", "Issue", "Subject", "Status"]} rows={riskQueue} actionLabel="Review" />
         </div>
-    );
+
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-amber-600" />
+            <h2 className="text-lg font-semibold text-slate-950">Current admin control</h2>
+          </div>
+          <div className="mt-4 space-y-3">
+            {controlSummary.map((item) => {
+              const Icon = item.icon;
+              return (
+                <div key={item.label} className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                  <Icon className="mt-0.5 h-4 w-4 text-slate-500" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900">{item.label}</p>
+                    <p className="text-sm text-slate-600">{item.value}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-950">Live activity</h2>
+        <div className="mt-4 divide-y divide-slate-100">
+          {activity.map(([time, title, detail]) => (
+            <div key={`${time}-${title}`} className="grid gap-2 py-3 md:grid-cols-[80px_1fr_auto] md:items-center">
+              <span className="text-sm font-medium text-slate-500">{time}</span>
+              <div>
+                <p className="text-sm font-medium text-slate-950">{title}</p>
+                <p className="text-sm text-slate-600">{detail}</p>
+              </div>
+              <StatusBadge value="Logged" />
+            </div>
+          ))}
+        </div>
+      </section>
+    </AdminShell>
+  );
 }
