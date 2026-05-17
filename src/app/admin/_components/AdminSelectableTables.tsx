@@ -249,7 +249,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
           <Mail className="h-4 w-4" /> Request docs
         </button>
         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
-          <CheckSquare className="h-4 w-4" /> Enable payouts
+          <CheckSquare className="h-4 w-4" /> Remove limit
         </button>
       </BulkBar>
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
@@ -262,7 +262,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                 <th className="w-12 px-4 py-3">
                   <input aria-label="Select all providers" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Provider", "Service", "City", "KYC", "Docs submitted", "Documents", "Rating", "Jobs", "Payouts", "Action"].map((column) => (
+                {["Provider", "Service", "City", "KYC", "Docs submitted", "Documents", "Rating", "Jobs", "Account", "Action"].map((column) => (
                   <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
                 ))}
               </tr>
@@ -282,7 +282,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.documents}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.rating}</td>
                   <td className="px-4 py-4 text-sm text-slate-700">{provider.jobs}</td>
-                  <td className="px-4 py-4"><StatusBadge value={provider.payoutStatus} /></td>
+                  <td className="px-4 py-4"><StatusBadge value={provider.accountStatus} /></td>
                   <td className="px-4 py-4">
                     <div className="flex flex-nowrap gap-2 whitespace-nowrap">
                       {provider.docsSubmitted ? (
@@ -423,7 +423,7 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                 <th className="w-12 px-4 py-3">
                   <input aria-label="Select all KYC reviews" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Provider", "Issue", "Document", "Docs submitted", "Priority", "Status", "Submitted", "Payout impact", "Action"].map((column) => (
+                {["Provider", "Issue", "Document", "Docs submitted", "Priority", "Status", "Submitted", "Account impact", "Action"].map((column) => (
                   <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
                 ))}
               </tr>
@@ -442,7 +442,7 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                   <td className="px-4 py-4"><StatusBadge value={review.priority} /></td>
                   <td className="px-4 py-4"><StatusBadge value={review.status} /></td>
                   <td className="px-4 py-4 text-sm text-slate-700">{review.submitted}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{review.payoutImpact}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{review.accountImpact}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-nowrap gap-2 whitespace-nowrap">
                       {review.docsSubmitted ? (

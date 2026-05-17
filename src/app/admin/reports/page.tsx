@@ -11,7 +11,7 @@ export default async function AdminReportsPage() {
   return (
     <AdminShell
       title="Reports"
-      description="Schedule and export marketplace, payout, trust, support, and category supply reports for operations review."
+      description="Schedule and export marketplace, trust, account limitation, support, and category supply reports for operations review."
       actions={
         <>
           <AdminButtonLink href="/admin/reports">

@@ -11,7 +11,7 @@ export default async function AdminPaymentsPage() {
   return (
     <AdminShell
       title="Payments"
-      description="Review booking tokens, refunds, provider payouts, subscriptions, failed charges, and settlement batches."
+      description="Review booking tokens, refunds, subscriptions, failed charges, and direct-payment reconciliation."
       actions={
         <>
           <AdminButtonLink href="/admin/reports">
@@ -20,13 +20,13 @@ export default async function AdminPaymentsPage() {
           </AdminButtonLink>
           <AdminButtonLink href="/admin/settings">
             <Banknote className="h-4 w-4" />
-            Payout settings
+            Payment settings
           </AdminButtonLink>
         </>
       }
     >
       <Toolbar>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Release payout</button>
+        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Reconcile token</button>
         <button className="h-9 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-700 hover:bg-red-50">Issue refund</button>
       </Toolbar>
       {payments.length ? (

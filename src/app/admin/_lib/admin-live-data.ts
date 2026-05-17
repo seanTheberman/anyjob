@@ -175,7 +175,7 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
     const sellerStatus = String(row.status || "").toLowerCase();
     const isVerified = row.is_verified === true || sellerStatus === "approved";
     const kycStatus = isVerified ? "Approved" : sellerStatus === "rejected" ? "Rejected" : !docsSubmitted || !hasInsurance ? "Missing document" : "Needs review";
-    const payoutStatus = isVerified ? "Enabled" : sellerStatus === "rejected" || sellerStatus === "suspended" ? "Blocked" : "Held";
+    const accountStatus = isVerified ? "Active" : sellerStatus === "rejected" || sellerStatus === "suspended" ? "Blocked" : "Limited";
 
     return {
       id,
@@ -188,7 +188,7 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
       docsSubmitted,
       rating: averageRating,
       jobs: Number(row.total_jobs || jobsByProvider.get(id) || 0),
-      payoutStatus,
+      accountStatus,
     };
   });
 }
@@ -196,7 +196,7 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
 export async function getKycReviews(): Promise<KycReview[]> {
   const providers = await getAdminProviders();
   return providers
-    .filter((provider) => provider.kycStatus !== "Approved" || provider.payoutStatus !== "Enabled")
+    .filter((provider) => provider.kycStatus !== "Approved" || provider.accountStatus !== "Active")
     .map((provider) => ({
       id: `kyc_${provider.id}`,
       providerId: provider.id,
@@ -204,10 +204,10 @@ export async function getKycReviews(): Promise<KycReview[]> {
       issue: provider.kycStatus,
       document: provider.documents,
       docsSubmitted: provider.docsSubmitted,
-      priority: provider.kycStatus === "Rejected" || provider.payoutStatus === "Blocked" ? "High" : provider.kycStatus === "Needs review" ? "High" : "Medium",
+      priority: provider.kycStatus === "Rejected" || provider.accountStatus === "Blocked" ? "High" : provider.kycStatus === "Needs review" ? "High" : "Medium",
       status: provider.kycStatus,
       submitted: provider.docsSubmitted ? "Submitted" : "Not submitted",
-      payoutImpact: provider.payoutStatus === "Enabled" ? "No restriction" : `${provider.payoutStatus} payouts`,
+      accountImpact: provider.accountStatus === "Active" ? "No restriction" : `Account ${provider.accountStatus.toLowerCase()}: seller cannot quote`,
     }));
 }
 

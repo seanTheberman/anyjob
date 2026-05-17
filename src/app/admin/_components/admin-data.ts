@@ -51,7 +51,7 @@ export type AdminProvider = {
   docsSubmitted: boolean;
   rating: string;
   jobs: number;
-  payoutStatus: string;
+  accountStatus: string;
 };
 
 export type KycReview = {
@@ -64,7 +64,7 @@ export type KycReview = {
   priority: string;
   status: string;
   submitted: string;
-  payoutImpact: string;
+  accountImpact: string;
 };
 
 export const settingsGroups = [
@@ -74,7 +74,7 @@ export const settingsGroups = [
   },
   {
     title: "Trust and safety",
-    items: ["KYC required before bidding", "Insurance document expiry", "Duplicate account detection", "Manual approval threshold"],
+    items: ["KYC required before quoting", "Buyer KYC required before quote acceptance", "Insurance document expiry", "Duplicate account detection"],
   },
   {
     title: "Notifications",

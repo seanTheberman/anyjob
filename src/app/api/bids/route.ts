@@ -30,6 +30,29 @@ async function hasBuyerKycForQuoteAcceptance(
   );
 }
 
+async function hasSellerKycForQuoting(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  userId: string
+) {
+  const { data: seller } = await supabase
+    .from("sellers")
+    .select("status,id_document_url,selfie_video_url,insurance_document_url,insurance_status")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (seller?.status === "approved") {
+    return true;
+  }
+
+  const { data: profile } = await supabase
+    .from("eloo_profiles")
+    .select("is_verified")
+    .eq("id", userId)
+    .maybeSingle();
+
+  return Boolean(profile?.is_verified === true);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -75,6 +98,14 @@ export async function POST(request: NextRequest) {
 
     if (!provider) {
       return NextResponse.json({ error: "Only registered providers can place bids" }, { status: 403 });
+    }
+
+    const sellerKycComplete = await hasSellerKycForQuoting(supabase, user.id);
+    if (!sellerKycComplete) {
+      return NextResponse.json(
+        { error: "Seller account limited. Complete and approve KYC before sending quotes." },
+        { status: 403 }
+      );
     }
 
     // Insert bid

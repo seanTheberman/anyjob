@@ -12,7 +12,7 @@ export default async function AdminKycPage() {
   return (
     <AdminShell
       title="KYC verification"
-      description="Review provider identity checks, insurance documents, expired files, rejected submissions, and payout eligibility."
+      description="Review provider identity checks, selfie video, insurance documents, rejected submissions, and account limitations."
       actions={
         <>
           <AdminButtonLink href="/admin/providers">

@@ -24,7 +24,7 @@ const stats: EarningsStat[] = [
   { label: "Onsite Collections", value: "€720", change: 12.5, trend: "up" },
   { label: "Scheduled to Collect", value: "€195", change: 8.3, trend: "up" },
   { label: "Avg. Seller Quote", value: "€144", change: 15.7, trend: "up" },
-  { label: "AnyJob Payouts", value: "€0", change: 0, trend: "up" },
+  { label: "Platform Transfers", value: "€0", change: 0, trend: "up" },
 ];
 
 const transactions: Transaction[] = [
