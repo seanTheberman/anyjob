@@ -1,7 +1,8 @@
 import { Download, UserPlus } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
-import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
-import { users } from "../_components/admin-data";
+import { AdminButtonLink } from "../_components/AdminPrimitives";
+import { UsersWorklist } from "../_components/AdminSelectableTables";
+import { adminUsers } from "../_components/admin-data";
 
 export default function AdminUsersPage() {
   return (
@@ -21,11 +22,7 @@ export default function AdminUsersPage() {
         </>
       }
     >
-      <Toolbar>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Bulk message</button>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Risk filter</button>
-      </Toolbar>
-      <AdminTable columns={["Name", "Role", "Email", "History", "Status"]} rows={users} />
+      <UsersWorklist users={adminUsers} />
     </AdminShell>
   );
 }
