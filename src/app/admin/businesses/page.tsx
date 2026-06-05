@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Building2, Download } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
@@ -6,9 +7,13 @@ import { getAdminBusinesses } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminBusinessesPage() {
+async function BusinessesContent() {
   const businesses = await getAdminBusinesses();
 
+  return <BusinessesWorklist businesses={businesses} />;
+}
+
+export default function AdminBusinessesPage() {
   return (
     <AdminShell
       title="Businesses"
@@ -26,7 +31,9 @@ export default async function AdminBusinessesPage() {
         </>
       }
     >
-      <BusinessesWorklist businesses={businesses} />
+      <Suspense fallback={<div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading businesses...</div>}>
+        <BusinessesContent />
+      </Suspense>
     </AdminShell>
   );
 }

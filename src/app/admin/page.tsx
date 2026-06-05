@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { AlertTriangle, ArrowRight, Download, Plus } from "lucide-react";
 import { AdminShell } from "./_components/AdminShell";
 import { AdminButtonLink, AdminTable, StatCard, StatusBadge } from "./_components/AdminPrimitives";
@@ -7,26 +8,11 @@ import { getAdminOverview } from "./_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminDashboard() {
+async function OverviewContent() {
   const overview = await getAdminOverview();
 
   return (
-    <AdminShell
-      title="Marketplace overview"
-      description="Monitor demand, supply, revenue, disputes, support load, and trust queues from one operations console."
-      actions={
-        <>
-          <AdminButtonLink href="/admin/reports">
-            <Download className="h-4 w-4" />
-            Export report
-          </AdminButtonLink>
-          <AdminButtonLink href="/admin/settings">
-            <Plus className="h-4 w-4" />
-            Configure rules
-          </AdminButtonLink>
-        </>
-      }
-    >
+    <>
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {overview.metrics.map((metric) => (
           <StatCard key={metric.label} {...metric} />
@@ -75,8 +61,8 @@ export default async function AdminDashboard() {
       <section className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-950">Live activity</h2>
         <div className="mt-4 divide-y divide-slate-100">
-          {overview.activity.length ? overview.activity.map(([time, title, detail]) => (
-            <div key={`${time}-${title}`} className="grid gap-2 py-3 md:grid-cols-[80px_1fr_auto] md:items-center">
+          {overview.activity.length ? overview.activity.map(([time, title, detail], index) => (
+            <div key={`${time}-${title}-${index}`} className="grid gap-2 py-3 md:grid-cols-[80px_1fr_auto] md:items-center">
               <span className="text-sm font-medium text-slate-500">{time}</span>
               <div>
                 <p className="text-sm font-medium text-slate-950">{title}</p>
@@ -89,6 +75,51 @@ export default async function AdminDashboard() {
           )}
         </div>
       </section>
+    </>
+  );
+}
+
+function OverviewFallback() {
+  return (
+    <>
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {["Demand", "Supply", "Revenue", "Trust"].map((label) => (
+          <div key={label} className="h-32 animate-pulse rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="h-4 w-24 rounded bg-slate-100" />
+            <div className="mt-5 h-8 w-16 rounded bg-slate-100" />
+            <div className="mt-4 h-3 w-32 rounded bg-slate-100" />
+          </div>
+        ))}
+      </section>
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.9fr]">
+        <div className="h-80 animate-pulse rounded-lg border border-slate-200 bg-white p-5 shadow-sm" />
+        <div className="h-80 animate-pulse rounded-lg border border-slate-200 bg-white p-5 shadow-sm" />
+      </section>
+    </>
+  );
+}
+
+export default function AdminDashboard() {
+  return (
+    <AdminShell
+      title="Marketplace overview"
+      description="Monitor demand, supply, revenue, disputes, support load, and trust queues from one operations console."
+      actions={
+        <>
+          <AdminButtonLink href="/admin/reports">
+            <Download className="h-4 w-4" />
+            Export report
+          </AdminButtonLink>
+          <AdminButtonLink href="/admin/settings">
+            <Plus className="h-4 w-4" />
+            Configure rules
+          </AdminButtonLink>
+        </>
+      }
+    >
+      <Suspense fallback={<OverviewFallback />}>
+        <OverviewContent />
+      </Suspense>
     </AdminShell>
   );
 }

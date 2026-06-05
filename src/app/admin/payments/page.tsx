@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Banknote, Download } from "lucide-react";
 import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
@@ -6,9 +7,19 @@ import { getAdminPayments } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminPaymentsPage() {
+async function PaymentsContent() {
   const payments = await getAdminPayments();
 
+  return payments.length ? (
+    <AdminTable columns={["Reference", "Type", "Amount", "Status"]} rows={payments} actionLabel="Open" />
+  ) : (
+    <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+      No live booking payments or subscriptions found.
+    </div>
+  );
+}
+
+export default function AdminPaymentsPage() {
   return (
     <AdminShell
       title="Payments"
@@ -30,13 +41,9 @@ export default async function AdminPaymentsPage() {
         <AdminActionButton label="Reconcile token" context="visible payments" />
         <AdminActionButton label="Issue refund" context="visible payments" />
       </Toolbar>
-      {payments.length ? (
-        <AdminTable columns={["Reference", "Type", "Amount", "Status"]} rows={payments} actionLabel="Open" />
-      ) : (
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-          No live booking payments or subscriptions found.
-        </div>
-      )}
+      <Suspense fallback={<div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading payments...</div>}>
+        <PaymentsContent />
+      </Suspense>
     </AdminShell>
   );
 }

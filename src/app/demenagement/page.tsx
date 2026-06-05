@@ -2,12 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Clock, Phone, ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
+import { ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
+import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { ProviderSlider } from "@/components/ui/provider-slider";
 import { ProviderCard } from "@/components/ui/provider-card";
-
-const ANYJOB_EMERGENCY_PHONE = "+448001234567";
-const ANYJOB_EMERGENCY_DISPLAY = "+44 800 123 4567";
 
 const MOVING_SUBCATEGORIES = [
     {
@@ -88,21 +86,6 @@ const MOVING_PROVIDERS = [
         image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
         isNew: true,
         tags: ["Licensed", "Safe driver", "Reliable"],
-    },
-];
-
-const EMERGENCY_MOVING_PROVIDERS = [
-    {
-        name: "Maxandre Movers",
-        specialty: "2-person emergency loading team",
-        phone: "+33 7 56 21 44 10",
-        eta: "20-35 min",
-    },
-    {
-        name: "Lucas Transport",
-        specialty: "Van, driver, and same-day transport",
-        phone: "+33 6 42 18 77 90",
-        eta: "30-45 min",
     },
 ];
 
@@ -202,65 +185,7 @@ export default function DemenagementPage() {
                         ))}
                     </div>
                 </section>
-
-                {/* Emergency Services Banner */}
-                <section className="relative w-full overflow-hidden rounded-3xl shadow-lg">
-                    <Image
-                        src="https://images.unsplash.com/photo-1742858492775-8f58f645aa12?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1400"
-                        alt="Emergency moving services"
-                        fill
-                        className="object-cover object-center"
-                    />
-                    <div className="absolute inset-0 bg-red-900/60 mix-blend-multiply"></div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 via-gray-900/40 to-transparent"></div>
-
-                    <div className="relative grid gap-8 p-8 sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:p-12">
-                        <div className="flex min-h-72 flex-col justify-center">
-                            <div className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/25 backdrop-blur">
-                                <Clock className="h-4 w-4" />
-                                24/7 emergency dispatch
-                            </div>
-                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 drop-shadow-md">
-                                Emergency move?
-                            </h2>
-                            <p className="text-sm sm:text-base text-gray-100 mb-6 font-medium text-red-50">
-                                Call AnyJob. We find the best suited available moving provider and share their contact details immediately.
-                            </p>
-                            <div className="flex flex-col gap-3 sm:flex-row">
-                                <a href={`tel:${ANYJOB_EMERGENCY_PHONE}`} className="inline-flex w-fit items-center justify-center rounded-full bg-white px-7 py-3 font-bold text-gray-900 shadow-xl transition hover:bg-gray-100">
-                                    <Phone className="mr-2 h-4 w-4" />
-                                    {ANYJOB_EMERGENCY_DISPLAY}
-                                </a>
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl bg-white/95 p-4 shadow-2xl backdrop-blur">
-                            <div className="mb-4">
-                                <p className="text-xs font-bold uppercase tracking-wide text-red-600">Best matches now</p>
-                                <h3 className="text-lg font-extrabold text-gray-950">Emergency provider contacts</h3>
-                            </div>
-                            <div className="space-y-3">
-                                {EMERGENCY_MOVING_PROVIDERS.map((provider) => (
-                                    <div key={provider.phone} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div>
-                                                <p className="font-bold text-gray-950">{provider.name}</p>
-                                                <p className="mt-1 text-sm text-gray-600">{provider.specialty}</p>
-                                                <p className="mt-2 inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
-                                                    ETA {provider.eta}
-                                                </p>
-                                            </div>
-                                            <a href={`tel:${provider.phone.replaceAll(" ", "")}`} className="shrink-0 rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700">
-                                                Call
-                                            </a>
-                                        </div>
-                                        <p className="mt-3 text-sm font-semibold text-gray-900">{provider.phone}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                <EmergencyJobsSection />
 
                 {/* Providers Grid */}
                 <section>

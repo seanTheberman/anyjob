@@ -1,8 +1,11 @@
 import {
   Activity,
+  Award,
   BarChart3,
+  Bell,
   BriefcaseBusiness,
   Building2,
+  Newspaper,
   CreditCard,
   FileText,
   Headphones,
@@ -18,7 +21,10 @@ export const adminNavItems = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "Providers", href: "/admin/providers", icon: ShieldCheck },
+  { label: "Badges", href: "/admin/badges", icon: Award },
+  { label: "Notifications", href: "/admin/notifications", icon: Bell },
   { label: "Businesses", href: "/admin/businesses", icon: Building2 },
+  { label: "Blog", href: "/admin/blog", icon: Newspaper },
   { label: "KYC Review", href: "/admin/kyc", icon: ScanFace },
   { label: "Jobs", href: "/admin/jobs", icon: BriefcaseBusiness },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
@@ -80,6 +86,29 @@ export type KycReview = {
   status: string;
   submitted: string;
   accountImpact: string;
+};
+
+export type AdminLiveJob = {
+  id: string;
+  shortId: string;
+  datePosted: string;
+  postedLabel: string;
+  idleDays: number;
+  status: string;
+  customer: string;
+  email: string;
+  phone: string;
+  address: string;
+  town: string;
+  county: string;
+  type: string;
+  size: string;
+  beds: string;
+  purpose: string;
+  quotes: number;
+  lastActivity: string;
+  lastActivityAt: string | null;
+  tabStatus: "live" | "expired" | "awaiting_buyer" | "no_quotes" | "all";
 };
 
 export const settingsGroups = [

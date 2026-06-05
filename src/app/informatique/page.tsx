@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Users, ThumbsUp, ShieldCheck, Computer, Wifi, Monitor } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Users, ThumbsUp, ShieldCheck, Computer, Wifi, Monitor } from "lucide-react";
+import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { ProviderSlider } from "@/components/ui/provider-slider";
 import { ProviderCard } from "@/components/ui/provider-card";
 
@@ -185,30 +185,7 @@ export default function InformatiquePage() {
                         ))}
                     </div>
                 </section>
-
-                {/* Emergency Services Banner */}
-                <section className="relative w-full h-64 sm:h-72 rounded-3xl overflow-hidden shadow-lg group cursor-pointer">
-                    <Image
-                        src="https://images.unsplash.com/photo-1517048676732-d65bc937f952"
-                        alt="Emergency IT services"
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-700 object-center"
-                    />
-                    <div className="absolute inset-0 bg-red-900/60 mix-blend-multiply"></div>
-                    <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 via-gray-900/40 to-transparent"></div>
-
-                    <div className="absolute inset-0 flex flex-col justify-center p-8 sm:p-12 max-w-2xl">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 drop-shadow-md">
-                            Emergency IT failure?
-                        </h2>
-                        <p className="text-sm sm:text-base text-gray-100 mb-6 font-medium text-red-50">
-                            Quick 24/7 intervention for your IT emergencies and hardware failures.
-                        </p>
-                        <Button className="w-fit rounded-full bg-white text-gray-900 hover:bg-gray-100 font-bold px-8 shadow-xl">
-                            Contact emergency <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                    </div>
-                </section>
+                <EmergencyJobsSection />
 
                 {/* Providers Grid */}
                 <section>

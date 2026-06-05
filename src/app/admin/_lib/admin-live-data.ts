@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import type { AdminBusiness, AdminProvider, AdminUser, KycReview } from "../_components/admin-data";
+import type { AdminBusiness, AdminLiveJob, AdminProvider, AdminUser, KycReview } from "../_components/admin-data";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -27,7 +27,7 @@ function daysAgo(value?: string | null) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-async function maybeRows<T = AnyRecord>(table: string, select = "*", limit = 500): Promise<T[]> {
+async function maybeRows<T = AnyRecord>(table: string, select = "*", limit = 100): Promise<T[]> {
   const supabase = createAdminSupabaseClient();
   const client = supabase as never as {
     from: (name: string) => {
@@ -73,22 +73,10 @@ async function maybeCount(table: string) {
 }
 
 export async function getAdminUsers(): Promise<AdminUser[]> {
-  const [profiles, buyers, bookings] = await Promise.all([
-    maybeRows<AnyRecord>("eloo_profiles"),
-    maybeRows<AnyRecord>("buyers"),
-    maybeRows<AnyRecord>("eloo_bookings"),
+  const [profiles, buyers] = await Promise.all([
+    maybeRows<AnyRecord>("eloo_profiles", "id,role,email,full_name,city,is_active,last_login_at,updated_at,created_at", 100),
+    maybeRows<AnyRecord>("buyers", "id,email,first_name,last_name,city,email_verified,updated_at,created_at", 100),
   ]);
-
-  const bookingStats = new Map<string, { count: number; spend: number; cancelled: number }>();
-  for (const booking of bookings) {
-    const clientId = String(booking.client_id || "");
-    if (!clientId) continue;
-    const current = bookingStats.get(clientId) || { count: 0, spend: 0, cancelled: 0 };
-    current.count += 1;
-    current.spend += Number(booking.total_price || 0);
-    if (String(booking.status || "").toLowerCase() === "cancelled") current.cancelled += 1;
-    bookingStats.set(clientId, current);
-  }
 
   const merged = new Map<string, AnyRecord>();
   for (const profile of profiles) {
@@ -101,11 +89,10 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
 
   return Array.from(merged.values()).map((row) => {
     const id = String(row.id);
-    const stats = bookingStats.get(id) || { count: 0, spend: 0, cancelled: 0 };
     const isActive = row.is_active !== false;
     const emailVerified = row.email_verified !== false;
-    const risk = !isActive || stats.cancelled > 2 ? "High" : !emailVerified ? "Medium" : "Low";
-    const status = !isActive ? "Blocked" : !emailVerified ? "Pending email" : stats.count >= 10 ? "VIP" : "Active";
+    const risk = !isActive ? "High" : !emailVerified ? "Medium" : "Low";
+    const status = !isActive ? "Blocked" : !emailVerified ? "Pending email" : "Active";
 
     return {
       id,
@@ -113,8 +100,8 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
       role: String(row.role || "client"),
       email: String(row.email || ""),
       city: String(row.city || "Unknown"),
-      bookings: stats.count,
-      spend: money(stats.spend),
+      bookings: 0,
+      spend: "Not loaded",
       status,
       risk,
       lastSeen: daysAgo(String(row.last_login_at || row.updated_at || row.created_at || "")),
@@ -123,34 +110,10 @@ export async function getAdminUsers(): Promise<AdminUser[]> {
 }
 
 export async function getAdminProviders(): Promise<AdminProvider[]> {
-  const [profiles, sellers, services, bookings, reviews] = await Promise.all([
-    maybeRows<AnyRecord>("eloo_profiles"),
-    maybeRows<AnyRecord>("sellers"),
-    maybeRows<AnyRecord>("eloo_provider_services"),
-    maybeRows<AnyRecord>("eloo_bookings"),
-    maybeRows<AnyRecord>("eloo_reviews"),
+  const [profiles, sellers] = await Promise.all([
+    maybeRows<AnyRecord>("eloo_profiles", "id,role,email,full_name,city,is_verified,created_at", 100),
+    maybeRows<AnyRecord>("sellers", "id,email,first_name,last_name,city,service_category,status,id_document_url,selfie_video_url,insurance_document_url,insurance_status,rating,total_jobs,created_at", 100),
   ]);
-
-  const servicesByProvider = new Map<string, AnyRecord[]>();
-  for (const service of services) {
-    const providerId = String(service.provider_id || "");
-    if (!providerId) continue;
-    servicesByProvider.set(providerId, [...(servicesByProvider.get(providerId) || []), service]);
-  }
-
-  const jobsByProvider = new Map<string, number>();
-  for (const booking of bookings) {
-    const providerId = String(booking.provider_id || "");
-    if (!providerId) continue;
-    jobsByProvider.set(providerId, (jobsByProvider.get(providerId) || 0) + 1);
-  }
-
-  const ratingsByProvider = new Map<string, number[]>();
-  for (const review of reviews) {
-    const providerId = String(review.reviewee_id || "");
-    if (!providerId) continue;
-    ratingsByProvider.set(providerId, [...(ratingsByProvider.get(providerId) || []), Number(review.rating || 0)]);
-  }
 
   const merged = new Map<string, AnyRecord>();
   for (const profile of profiles) {
@@ -162,11 +125,7 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
 
   return Array.from(merged.values()).map((row) => {
     const id = String(row.id);
-    const providerServices = servicesByProvider.get(id) || [];
-    const ratingValues = ratingsByProvider.get(id) || [];
-    const averageRating = ratingValues.length
-      ? (ratingValues.reduce((sum, value) => sum + value, 0) / ratingValues.length).toFixed(1)
-      : Number(row.rating || 0).toFixed(1);
+    const averageRating = Number(row.rating || 0).toFixed(1);
 
     const hasId = Boolean(row.id_document_url);
     const hasSelfie = Boolean(row.selfie_video_url);
@@ -182,14 +141,14 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
     return {
       id,
       name: fullName(row),
-      service: String(row.service_category || providerServices[0]?.title || "Not set"),
+      service: String(row.service_category || "Not set"),
       city: String(row.city || "Unknown"),
       verification: isVerified ? "Verified" : kycStatus,
       kycStatus,
       documents: [hasId ? "ID" : null, hasSelfie ? "selfie video" : null, hasInsurance ? "insurance" : null].filter(Boolean).join(", ") || "Missing documents",
       docsSubmitted,
       rating: averageRating,
-      jobs: Number(row.total_jobs || jobsByProvider.get(id) || 0),
+      jobs: Number(row.total_jobs || 0),
       accountStatus,
     };
   });
@@ -213,83 +172,137 @@ export async function getAdminBusinesses(): Promise<AdminBusiness[]> {
 }
 
 export async function getKycReviews(): Promise<KycReview[]> {
-  const providers = await getAdminProviders();
-  return providers
-    .filter((provider) => provider.kycStatus !== "Approved" || provider.accountStatus !== "Active")
-    .map((provider) => ({
-      id: `kyc_${provider.id}`,
-      providerId: provider.id,
-      provider: provider.name,
-      issue: provider.kycStatus,
-      document: provider.documents,
-      docsSubmitted: provider.docsSubmitted,
-      priority: provider.kycStatus === "Rejected" || provider.accountStatus === "Blocked" ? "High" : provider.kycStatus === "Needs review" ? "High" : "Medium",
-      status: provider.kycStatus,
-      submitted: provider.docsSubmitted ? "Submitted" : "Not submitted",
-      accountImpact: provider.accountStatus === "Active" ? "No restriction" : `Account ${provider.accountStatus.toLowerCase()}: seller cannot quote`,
-    }));
+  const sellers = await maybeRows<AnyRecord>("sellers", "id,email,first_name,last_name,status,id_document_url,selfie_video_url,insurance_document_url,insurance_status,created_at", 100);
+
+  return sellers
+    .map((row) => {
+      const hasId = Boolean(row.id_document_url);
+      const hasSelfie = Boolean(row.selfie_video_url);
+      const hasInsurance = Boolean(row.insurance_document_url || row.insurance_status === "approved");
+      const docsSubmitted = hasId && hasSelfie && hasInsurance;
+      const sellerStatus = String(row.status || "").toLowerCase();
+      const isSuspended = sellerStatus === "suspended";
+      const isRejected = sellerStatus === "rejected";
+      const isVerified = !isSuspended && !isRejected && sellerStatus === "approved";
+      const kycStatus = isSuspended ? "Suspended" : isVerified ? "Approved" : isRejected ? "Rejected" : !docsSubmitted || !hasInsurance ? "Missing document" : "Needs review";
+      const accountStatus = isVerified ? "Active" : isSuspended || isRejected ? "Blocked" : "Limited";
+
+      return {
+        id: `kyc_${String(row.id)}`,
+        providerId: String(row.id),
+        provider: fullName(row),
+        issue: kycStatus,
+        document: [hasId ? "ID" : null, hasSelfie ? "selfie video" : null, hasInsurance ? "insurance" : null].filter(Boolean).join(", ") || "Missing documents",
+        docsSubmitted,
+        priority: kycStatus === "Rejected" || accountStatus === "Blocked" ? "High" : kycStatus === "Needs review" ? "High" : "Medium",
+        status: kycStatus,
+        submitted: docsSubmitted ? "Submitted" : "Not submitted",
+        accountImpact: accountStatus === "Active" ? "No restriction" : `Account ${accountStatus.toLowerCase()}: seller cannot quote`,
+      };
+    })
+    .filter((review) => review.status !== "Approved" || review.accountImpact !== "No restriction");
 }
 
 export async function getAdminJobs() {
-  const [inquiries, bookings, bids] = await Promise.all([
-    maybeRows<AnyRecord>("service_inquiries"),
-    maybeRows<AnyRecord>("eloo_bookings"),
-    maybeRows<AnyRecord>("bids"),
+  const [inquiries, bids] = await Promise.all([
+    maybeRows<AnyRecord>(
+      "service_inquiries",
+      "id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,status,created_at,updated_at,submitted_at",
+      100
+    ),
+    maybeRows<AnyRecord>("bids", "id,inquiry_id,status,amount,created_at,updated_at", 500),
   ]);
 
-  const bidCounts = new Map<string, number>();
+  const bidsByInquiry = new Map<string, AnyRecord[]>();
   for (const bid of bids) {
     const inquiryId = String(bid.inquiry_id || "");
     if (!inquiryId) continue;
-    bidCounts.set(inquiryId, (bidCounts.get(inquiryId) || 0) + 1);
+    const current = bidsByInquiry.get(inquiryId) || [];
+    current.push(bid);
+    bidsByInquiry.set(inquiryId, current);
   }
 
-  const inquiryRows = inquiries.map((job) => [
-    String(job.id || "").slice(0, 8),
-    String(job.job_description || job.category_slug || "Service request").slice(0, 60),
-    String([job.first_name, job.last_name].filter(Boolean).join(" ") || job.email || "Client"),
-    `${bidCounts.get(String(job.id)) || 0} bids`,
-    String(job.status || "submitted"),
-    "Open",
-  ]);
+  const jobs: AdminLiveJob[] = inquiries.map((job) => {
+    const id = String(job.id || "");
+    const jobBids = bidsByInquiry.get(id) || [];
+    const status = String(job.status || "submitted");
+    const createdAt = String(job.submitted_at || job.created_at || "");
+    const lastBidAt = jobBids
+      .map((bid) => String(bid.updated_at || bid.created_at || ""))
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null;
+    const lastActivityAt = [String(job.updated_at || ""), lastBidAt || ""].filter(Boolean).sort().at(-1) || createdAt || null;
+    const idleDays = lastActivityAt ? Math.max(Math.floor((Date.now() - new Date(lastActivityAt).getTime()) / 86400000), 0) : 0;
+    const quoteCount = jobBids.length;
+    const acceptedQuote = jobBids.some((bid) => String(bid.status || "").toLowerCase() === "accepted");
+    const awaitingBuyer = quoteCount > 0 && !acceptedQuote && ["submitted", "open", "pending"].includes(status.toLowerCase());
+    const noQuotes = quoteCount === 0;
+    const expired = idleDays >= 7 && !acceptedQuote;
 
-  const bookingRows = bookings.map((booking) => [
-    String(booking.id || "").slice(0, 8),
-    String(booking.notes || booking.service_id || "Booking"),
-    String(booking.client_id || "Client"),
-    String(booking.provider_id || "Unassigned"),
-    String(booking.status || "pending"),
-    "Open",
-  ]);
+    return {
+      id,
+      shortId: id.slice(0, 8),
+      datePosted: createdAt,
+      postedLabel: createdAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(createdAt)) : "Unknown",
+      idleDays,
+      status,
+      customer: String([job.first_name, job.last_name].filter(Boolean).join(" ") || job.email || "Client"),
+      email: String(job.email || ""),
+      phone: String(job.phone || ""),
+      address: String(job.address || job.coarse_location_label || "Address not set"),
+      town: String(job.city || "Unknown"),
+      county: String(job.city || "Unknown"),
+      type: String(job.subcategory_slug || job.category_slug || job.service_type || "Service").replaceAll("-", " "),
+      size: job.estimated_duration_hours ? `${job.estimated_duration_hours}h est.` : "Not set",
+      beds: job.number_of_people_needed ? String(job.number_of_people_needed) : "-",
+      purpose: job.job_urgency ? String(job.job_urgency).replaceAll("_", " ") : job.budget_range_min || job.budget_range_max ? "Quoted budget" : "Service",
+      quotes: quoteCount,
+      lastActivity: lastActivityAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(lastActivityAt)) : "Unknown",
+      lastActivityAt,
+      tabStatus: expired ? "expired" : noQuotes ? "no_quotes" : awaitingBuyer ? "awaiting_buyer" : "live",
+    };
+  });
 
-  return [...inquiryRows, ...bookingRows].slice(0, 100);
+  return jobs.sort((a, b) => (b.lastActivityAt || "").localeCompare(a.lastActivityAt || "")).slice(0, 100);
 }
 
 export async function getAdminOverview() {
-  const [users, providers, jobs, bookings, subscriptions, messages] = await Promise.all([
-    getAdminUsers(),
-    getAdminProviders(),
-    getAdminJobs(),
-    maybeRows<AnyRecord>("eloo_bookings"),
-    maybeRows<AnyRecord>("eloo_subscriptions"),
-    maybeRows<AnyRecord>("eloo_messages"),
+  const [profileCount, sellerCount, inquiryCount, bookingCount, reviewCount, bookings, subscriptions, messages, sellers, inquiries] = await Promise.all([
+    maybeCount("eloo_profiles"),
+    maybeCount("sellers"),
+    maybeCount("service_inquiries"),
+    maybeCount("eloo_bookings"),
+    maybeCount("eloo_reviews"),
+    maybeRows<AnyRecord>("eloo_bookings", "id,total_price,status,created_at", 25),
+    maybeRows<AnyRecord>("eloo_subscriptions", "id,price_monthly,status,created_at", 25),
+    maybeRows<AnyRecord>("eloo_messages", "id,content,created_at", 3),
+    maybeRows<AnyRecord>("sellers", "id,first_name,last_name,email,status,id_document_url,selfie_video_url,insurance_document_url,insurance_status,created_at", 10),
+    maybeRows<AnyRecord>("service_inquiries", "id,job_description,status,created_at", 10),
   ]);
 
   const revenue = bookings.reduce((sum, booking) => sum + Number(booking.total_price || 0), 0) +
     subscriptions.reduce((sum, sub) => sum + Number(sub.price_monthly || 0), 0);
-  const openDisputes = jobs.filter((job) => String(job[4]).toLowerCase().includes("dispute")).length;
-  const pendingKyc = providers.filter((provider) => provider.kycStatus !== "Approved").length;
+  const openDisputes = inquiries.filter((job) => String(job.status || "").toLowerCase().includes("dispute")).length;
+  const kycQueue = sellers.map((row) => {
+    const hasId = Boolean(row.id_document_url);
+    const hasSelfie = Boolean(row.selfie_video_url);
+    const hasInsurance = Boolean(row.insurance_document_url || row.insurance_status === "approved");
+    const status = String(row.status || "").toLowerCase();
+    const kycStatus = status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : !hasId || !hasSelfie || !hasInsurance ? "Missing document" : "Needs review";
+    return { name: fullName(row), kycStatus };
+  }).filter((provider) => provider.kycStatus !== "Approved");
 
   return {
     metrics: [
-      { label: "Gross booking value", value: money(revenue), delta: "Live", tone: "text-emerald-700", detail: `Across ${bookings.length} bookings/subscriptions` },
-      { label: "Active users", value: String(users.length), delta: "Live", tone: "text-emerald-700", detail: "Client/admin accounts found" },
-      { label: "Verified providers", value: String(providers.filter((provider) => provider.kycStatus === "Approved").length), delta: `${pendingKyc} pending`, tone: pendingKyc ? "text-amber-700" : "text-emerald-700", detail: `${providers.length} provider records found` },
-      { label: "Open jobs", value: String(jobs.length), delta: `${openDisputes} disputes`, tone: openDisputes ? "text-red-700" : "text-emerald-700", detail: "Service inquiries plus bookings" },
+      { label: "Gross booking value", value: money(revenue), delta: "Sample", tone: "text-emerald-700", detail: `Recent ${bookings.length} bookings/subscriptions` },
+      { label: "Active users", value: String(profileCount), delta: "Count", tone: "text-emerald-700", detail: "Profile records" },
+      { label: "Verified providers", value: String(Math.max(sellerCount - kycQueue.length, 0)), delta: `${kycQueue.length} sampled pending`, tone: kycQueue.length ? "text-amber-700" : "text-emerald-700", detail: `${sellerCount} seller records` },
+      { label: "Open jobs", value: String(inquiryCount + bookingCount), delta: `${openDisputes} sampled disputes`, tone: openDisputes ? "text-red-700" : "text-emerald-700", detail: `${reviewCount} reviews tracked` },
     ],
     riskQueue: [
-      ...providers.filter((provider) => provider.kycStatus !== "Approved").map((provider) => [provider.kycStatus === "Rejected" ? "High" : "Medium", "KYC review", provider.name, provider.kycStatus, "Review"]),
-      ...jobs.filter((job) => String(job[4]).toLowerCase().includes("dispute")).map((job) => ["High", "Job dispute", String(job[1]), String(job[4]), "Open"]),
+      ...kycQueue.map((provider) => [provider.kycStatus === "Rejected" ? "High" : "Medium", "KYC review", provider.name, provider.kycStatus, "Review"]),
+      ...inquiries.filter((job) => String(job.status || "").toLowerCase().includes("dispute")).map((job) => ["High", "Job dispute", String(job.job_description || job.id), String(job.status), "Open"]),
     ].slice(0, 10),
     activity: [
       ...messages.slice(0, 3).map((message) => [daysAgo(String(message.created_at || "")), "Message activity", String(message.content || "").slice(0, 80)]),
@@ -299,12 +312,14 @@ export async function getAdminOverview() {
 }
 
 export async function getAdminAnalytics() {
-  const [users, providers, jobs, bookings, reviews] = await Promise.all([
-    getAdminUsers(),
-    getAdminProviders(),
-    getAdminJobs(),
-    maybeRows<AnyRecord>("eloo_bookings"),
-    maybeRows<AnyRecord>("eloo_reviews"),
+  const [userCount, providerCount, inquiryCount, bookingCount, reviewCount, bookings, sellers] = await Promise.all([
+    maybeCount("eloo_profiles"),
+    maybeCount("sellers"),
+    maybeCount("service_inquiries"),
+    maybeCount("eloo_bookings"),
+    maybeCount("eloo_reviews"),
+    maybeRows<AnyRecord>("eloo_bookings", "id,status,created_at", 100),
+    maybeRows<AnyRecord>("sellers", "id,rating,status,created_at", 100),
   ]);
 
   const completed = bookings.filter((booking) => booking.status === "completed").length;
@@ -314,26 +329,26 @@ export async function getAdminAnalytics() {
 
   return {
     stats: [
-      { label: "Users", value: String(users.length), delta: "Live", detail: "Client/admin accounts" },
-      { label: "Providers", value: String(providers.length), delta: "Live", detail: "Provider accounts" },
+      { label: "Users", value: String(userCount), delta: "Count", detail: "Client/admin accounts" },
+      { label: "Providers", value: String(providerCount), delta: "Count", detail: "Provider accounts" },
       { label: "Completion rate", value: completionRate, delta: "Live", detail: "Completed bookings" },
-      { label: "Reviews", value: String(reviews.length), delta: "Live", detail: "Review records" },
+      { label: "Reviews", value: String(reviewCount), delta: "Count", detail: "Review records" },
     ],
     rows: [
-      ["Total jobs", String(jobs.length), "Live", "Tracked", "Inspect"],
+      ["Total jobs", String(inquiryCount + bookingCount), "Count", "Tracked", "Inspect"],
       ["Completed bookings", String(completed), "Live", "Tracked", "Inspect"],
       ["Cancellation rate", cancellationRate, "Live", cancelled > 0 ? "Needs review" : "Healthy", "Inspect"],
-      ["Pending KYC", String(providers.filter((provider) => provider.kycStatus !== "Approved").length), "Live", "Needs review", "Inspect"],
-      ["Average provider rating", providers.length ? (providers.reduce((sum, p) => sum + Number(p.rating || 0), 0) / providers.length).toFixed(1) : "0.0", "Live", "Tracked", "Inspect"],
+      ["Pending KYC", String(sellers.filter((seller) => String(seller.status || "").toLowerCase() !== "approved").length), "Sample", "Needs review", "Inspect"],
+      ["Average provider rating", sellers.length ? (sellers.reduce((sum, p) => sum + Number(p.rating || 0), 0) / sellers.length).toFixed(1) : "0.0", "Sample", "Tracked", "Inspect"],
     ],
   };
 }
 
 export async function getAdminHistory() {
   const [bookings, messages, notifications] = await Promise.all([
-    maybeRows<AnyRecord>("eloo_bookings"),
-    maybeRows<AnyRecord>("eloo_messages"),
-    maybeRows<AnyRecord>("eloo_notifications"),
+    maybeRows<AnyRecord>("eloo_bookings", "id,status,created_at", 50),
+    maybeRows<AnyRecord>("eloo_messages", "id,content,created_at", 50),
+    maybeRows<AnyRecord>("eloo_notifications", "id,title,type,is_read,created_at", 50),
   ]);
 
   return [
@@ -345,8 +360,8 @@ export async function getAdminHistory() {
 
 export async function getAdminPayments() {
   const [bookings, subscriptions] = await Promise.all([
-    maybeRows<AnyRecord>("eloo_bookings"),
-    maybeRows<AnyRecord>("eloo_subscriptions"),
+    maybeRows<AnyRecord>("eloo_bookings", "id,total_price,is_paid,created_at", 100),
+    maybeRows<AnyRecord>("eloo_subscriptions", "id,plan,price_monthly,status,created_at", 100),
   ]);
 
   return [
@@ -357,8 +372,8 @@ export async function getAdminPayments() {
 
 export async function getAdminSupport() {
   const [notifications, conversations] = await Promise.all([
-    maybeRows<AnyRecord>("eloo_notifications"),
-    maybeRows<AnyRecord>("eloo_conversations"),
+    maybeRows<AnyRecord>("eloo_notifications", "id,title,type,is_read,created_at", 100),
+    maybeRows<AnyRecord>("eloo_conversations", "id,is_active,created_at", 100),
   ]);
 
   return [

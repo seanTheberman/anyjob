@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { FileDown, Plus } from "lucide-react";
 import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
@@ -6,9 +7,13 @@ import { getAdminReports } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminReportsPage() {
+async function ReportsContent() {
   const reports = await getAdminReports();
 
+  return <AdminTable columns={["Report", "Format", "Cadence", "Status"]} rows={reports} actionLabel="Manage" />;
+}
+
+export default function AdminReportsPage() {
   return (
     <AdminShell
       title="Reports"
@@ -30,7 +35,9 @@ export default async function AdminReportsPage() {
         <AdminActionButton label="Schedule" context="report delivery" />
         <AdminActionButton label="Email recipients" context="report distribution" />
       </Toolbar>
-      <AdminTable columns={["Report", "Format", "Cadence", "Status"]} rows={reports} actionLabel="Manage" />
+      <Suspense fallback={<div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading reports...</div>}>
+        <ReportsContent />
+      </Suspense>
     </AdminShell>
   );
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { BadgeCheck, FileWarning } from "lucide-react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
@@ -6,9 +7,13 @@ import { getKycReviews } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminKycPage() {
+async function KycContent() {
   const reviews = await getKycReviews();
 
+  return <KycWorklist reviews={reviews} />;
+}
+
+export default function AdminKycPage() {
   return (
     <AdminShell
       title="KYC verification"
@@ -26,7 +31,9 @@ export default async function AdminKycPage() {
         </>
       }
     >
-      <KycWorklist reviews={reviews} />
+      <Suspense fallback={<div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading KYC queue...</div>}>
+        <KycContent />
+      </Suspense>
     </AdminShell>
   );
 }

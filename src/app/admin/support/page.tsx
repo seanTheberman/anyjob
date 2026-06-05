@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { Headphones, MessageSquare } from "lucide-react";
 import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
@@ -6,9 +7,32 @@ import { getAdminSupport } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminSupportPage() {
+async function SupportContent() {
   const supportTickets = await getAdminSupport();
 
+  return supportTickets.length ? (
+    <AdminTable columns={["Ticket", "Requester", "Topic", "Priority", "Status"]} rows={supportTickets} actionLabel="Reply" />
+  ) : (
+    <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
+      No live notification or conversation support items found.
+    </div>
+  );
+}
+
+function SupportFallback() {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="h-5 w-40 animate-pulse rounded bg-slate-100" />
+      <div className="mt-5 space-y-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="h-12 animate-pulse rounded bg-slate-100" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function AdminSupportPage() {
   return (
     <AdminShell
       title="Support"
@@ -30,13 +54,9 @@ export default async function AdminSupportPage() {
         <AdminActionButton label="Assign selected" context="visible support tickets" />
         <AdminActionButton label="Send macro" context="visible support tickets" />
       </Toolbar>
-      {supportTickets.length ? (
-        <AdminTable columns={["Ticket", "Requester", "Topic", "Priority", "Status"]} rows={supportTickets} actionLabel="Reply" />
-      ) : (
-        <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-          No live notification or conversation support items found.
-        </div>
-      )}
+      <Suspense fallback={<SupportFallback />}>
+        <SupportContent />
+      </Suspense>
     </AdminShell>
   );
 }

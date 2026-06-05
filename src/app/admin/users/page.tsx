@@ -1,4 +1,5 @@
 import { Download, UserPlus } from "lucide-react";
+import { Suspense } from "react";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
 import { UsersWorklist } from "../_components/AdminSelectableTables";
@@ -6,8 +7,13 @@ import { getAdminUsers } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminUsersPage() {
+async function UsersContent() {
   const users = await getAdminUsers();
+
+  return <UsersWorklist users={users} />;
+}
+
+export default function AdminUsersPage() {
 
   return (
     <AdminShell
@@ -26,7 +32,9 @@ export default async function AdminUsersPage() {
         </>
       }
     >
-      <UsersWorklist users={users} />
+      <Suspense fallback={<div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">Loading users...</div>}>
+        <UsersContent />
+      </Suspense>
     </AdminShell>
   );
 }

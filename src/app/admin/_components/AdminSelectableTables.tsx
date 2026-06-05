@@ -38,6 +38,18 @@ function BulkBar({
   );
 }
 
+function TruncatedCell({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  const title = typeof children === "string" ? children : undefined;
+
+  return (
+    <td className={`px-3 py-4 text-sm text-slate-700 ${className}`}>
+      <div title={title} className="truncate">
+        {children}
+      </div>
+    </td>
+  );
+}
+
 export function UsersWorklist({ users }: { users: AdminUser[] }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<FilterOption>("all");
@@ -440,45 +452,67 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
       </BulkBar>
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+          <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200">
+            <colgroup>
+              <col className="w-11" />
+              <col className="w-[190px]" />
+              <col className="w-[145px]" />
+              <col className="w-[250px]" />
+              <col className="w-[165px]" />
+              <col className="w-[80px]" />
+              <col className="w-[95px]" />
+              <col className="w-[88px]" />
+            </colgroup>
             <thead className="bg-slate-50">
               <tr>
-                <th className="w-12 px-4 py-3">
+                <th className="px-3 py-3">
                   <input aria-label="Select all businesses" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Business", "Registration", "Industry", "City", "Contact", "Document", "Work types", "Created", "Status", "Action"].map((column) => (
-                  <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
+                {["Business", "Registration", "Contact", "Work types", "Created", "Status", "Action"].map((column) => (
+                  <th
+                    key={column}
+                    className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 ${column === "Action" ? "text-right" : ""}`}
+                  >
+                    {column}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((business) => (
-                <tr key={business.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4"><input aria-label={`Select ${business.name}`} type="checkbox" checked={selected.has(business.id)} onChange={() => toggleOne(business.id)} /></td>
-                  <td className="px-4 py-4">
-                    <p className="text-sm font-medium text-slate-950">{business.name}</p>
-                    <p className="text-xs text-slate-500">{business.id}</p>
+                <tr key={business.id} className="group hover:bg-slate-50">
+                  <td className="px-3 py-4"><input aria-label={`Select ${business.name}`} type="checkbox" checked={selected.has(business.id)} onChange={() => toggleOne(business.id)} /></td>
+                  <td className="px-3 py-4">
+                    <p title={business.name} className="truncate text-sm font-medium text-slate-950">{business.name}</p>
+                    <p title={`${business.industry} · ${business.city} · ${business.id}`} className="truncate text-xs text-slate-500">
+                      {business.industry} · {business.city}
+                    </p>
                   </td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.registrationNumber}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.industry}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.city}</td>
-                  <td className="max-w-72 px-4 py-4 text-sm text-slate-700">{business.contact}</td>
-                  <td className="px-4 py-4"><StatusBadge value={business.document} /></td>
-                  <td className="max-w-56 px-4 py-4 text-sm text-slate-700">{business.workTypes}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{business.created}</td>
-                  <td className="px-4 py-4"><StatusBadge value={business.status} /></td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-nowrap gap-2 whitespace-nowrap">
+                  <TruncatedCell>{business.registrationNumber}</TruncatedCell>
+                  <TruncatedCell>{business.contact}</TruncatedCell>
+                  <TruncatedCell>{business.workTypes}</TruncatedCell>
+                  <TruncatedCell>{business.created}</TruncatedCell>
+                  <td className="px-3 py-4"><StatusBadge value={business.status} /></td>
+                  <td className="px-3 py-4">
+                    <div className="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
                       {business.status === "approved" ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend", [business.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Suspend</button>
+                        <button title="Suspend business" aria-label={`Suspend ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
+                          <UserX className="h-4 w-4" />
+                        </button>
                       ) : (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", [business.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                        <button title="Approve business" aria-label={`Approve ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">
+                          <ShieldCheck className="h-4 w-4" />
+                        </button>
                       )}
-                      <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs", [business.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
+                      <button title="Request documents" aria-label={`Request documents from ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                        <Mail className="h-4 w-4" />
+                      </button>
                       {business.status !== "approved" ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject", [business.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                        <button title="Reject business" aria-label={`Reject ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
+                          <ShieldAlert className="h-4 w-4" />
+                        </button>
                       ) : null}
                     </div>
                   </td>
