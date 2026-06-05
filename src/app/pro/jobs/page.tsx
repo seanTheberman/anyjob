@@ -1,10 +1,11 @@
 "use client";
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
-import { useState, useEffect } from "react";
-import { MapPin, Calendar, DollarSign, Clock, Search, Filter, Gavel, ImageIcon, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { MapPin, Calendar, DollarSign, Clock, Search, Filter, Gavel, ImageIcon, ChevronDown, ChevronUp, Loader2, ShieldAlert } from "lucide-react";
 import { BidForm } from "@/components/bids/BidForm";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
+import { useSellerVerification } from "@/hooks/useSellerVerification";
 
 interface Job {
   id: string;
@@ -64,8 +65,11 @@ export default function BrowseJobsPage() {
   const [searchCity, setSearchCity] = useState("");
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
   const [showBidForm, setShowBidForm] = useState<string | null>(null);
+  const { verificationStatus, loading: verificationLoading } = useSellerVerification();
 
-  const fetchJobs = async () => {
+  const canPlaceBid = Boolean(verificationStatus?.isVerified);
+
+  const fetchJobs = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -82,11 +86,11 @@ export default function BrowseJobsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory, searchCity]);
 
   useEffect(() => {
     fetchJobs();
-  }, [selectedCategory]);
+  }, [fetchJobs]);
 
   const handleBidSubmitted = () => {
     setShowBidForm(null);
@@ -140,6 +144,16 @@ export default function BrowseJobsPage() {
         {/* Results count */}
         {!loading && (
           <p className="text-sm text-gray-500 mb-4">{jobs.length} job{jobs.length !== 1 ? "s" : ""} available</p>
+        )}
+
+        {!verificationLoading && !canPlaceBid && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-semibold">KYC approval is required before placing bids.</p>
+              <p className="mt-1 text-amber-800">You can still browse jobs, but bidding unlocks after your provider verification is approved.</p>
+            </div>
+          </div>
         )}
 
         {/* Jobs List */}
@@ -246,11 +260,12 @@ export default function BrowseJobsPage() {
                       </div>
                     ) : (
                       <button
+                        disabled={verificationLoading || !canPlaceBid}
                         onClick={() => setShowBidForm(showBidForm === job.id ? null : job.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 transition-colors"
                       >
                         <DollarSign className="w-4 h-4" />
-                        Place Bid
+                        {verificationLoading ? "Checking KYC..." : canPlaceBid ? "Place Bid" : "KYC Required"}
                       </button>
                     )}
                     <button

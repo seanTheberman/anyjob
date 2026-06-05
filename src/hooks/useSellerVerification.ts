@@ -34,18 +34,26 @@ export function useSellerVerification() {
         // Check if user is a seller
         const { data: seller, error: sellerError } = await supabase
           .from("sellers")
-          .select("status, email_verified, phone_verified, id_document_url, background_check_status")
+          .select("status, email_verified, phone_verified, id_document_url, insurance_document_url, background_check_status")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
 
         if (sellerError || !seller) {
-          // Not a seller
+          setVerificationStatus({
+            isVerified: false,
+            status: null,
+            kycComplete: false,
+            emailVerified: Boolean(user.email_confirmed_at),
+            phoneVerified: false,
+            documentsUploaded: false,
+            backgroundCheckStatus: null,
+          });
           setLoading(false);
           return;
         }
 
         // Determine KYC completion
-        const documentsUploaded = !!seller.id_document_url;
+        const documentsUploaded = Boolean(seller.id_document_url || seller.insurance_document_url);
         const kycComplete = seller.email_verified && seller.phone_verified && documentsUploaded;
         
         // Determine if verified (approved status and complete KYC)

@@ -1,4 +1,5 @@
 import { History, Search } from "lucide-react";
+import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
 import { getAdminHistory } from "../_lib/admin-live-data";
@@ -26,8 +27,8 @@ export default async function AdminHistoryPage() {
       }
     >
       <Toolbar>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Admin actions</button>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Account events</button>
+        <AdminActionButton label="Admin actions" context="history filter" />
+        <AdminActionButton label="Account events" context="history filter" />
       </Toolbar>
       {rows.length ? (
         <AdminTable columns={["Time", "Event", "Detail", "Status"]} rows={rows} actionLabel="Open" />

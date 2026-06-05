@@ -3,18 +3,9 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
     Menu,
-    Search,
-    User,
-    Sparkles,
-    Hammer,
-    Shovel,
-    Truck,
-    Baby,
-    PawPrint,
+    X,
 } from "lucide-react";
 
 const NAV_LINKS = [
@@ -26,11 +17,11 @@ const NAV_LINKS = [
 export function Header() {
     const pathname = usePathname();
     const isHomePage = pathname === "/";
-    const [isScrolled, setIsScrolled] = useState(false);
+    const [isScrolled, setIsScrolled] = useState(!isHomePage);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     useEffect(() => {
         if (!isHomePage) {
-            setIsScrolled(true);
             return;
         }
 
@@ -80,55 +71,81 @@ export function Header() {
 
                     {/* Desktop Actions */}
                     <div className="hidden lg:flex items-center gap-3">
-                        <Link href="/login">
-                            <Button className="rounded-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300 px-6">
-                                Login
-                            </Button>
+                        <Link
+                            href="/login"
+                            className="rounded-full bg-gradient-to-r from-red-500 to-red-600 px-6 py-2 text-sm font-semibold text-white shadow-lg shadow-red-500/25 transition-all duration-300 hover:from-red-600 hover:to-red-700 hover:shadow-red-500/40"
+                        >
+                            Login
                         </Link>
                     </div>
 
                     {/* Mobile Menu */}
-                    <Sheet>
-                        <SheetTrigger
-                            id="mobile-menu-trigger"
-                            aria-label="Open menu"
-                            className="lg:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                        >
-                            <Menu className="w-5 h-5" />
-                            <span className="sr-only">Open menu</span>
-                        </SheetTrigger>
-                        <SheetContent side="right" className="w-80 p-0">
-                            <div className="flex flex-col h-full">
-                                <div className="p-6 border-b">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-2xl font-cursive font-bold text-red-600">
-                                            AnyJob
-                                        </span>
-                                    </div>
-                                </div>
-                                <nav className="flex-1 p-4 space-y-1">
-                                    {NAV_LINKS.map((link) => (
-                                        <Link
-                                            key={link.href}
-                                            href={link.href}
-                                            className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 transition-all"
-                                        >
-                                            {link.label}
-                                        </Link>
-                                    ))}
-                                </nav>
-                                <div className="p-4 border-t space-y-2">
-                                    <Link href="/login" className="block">
-                                        <Button className="w-full rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-lg shadow-red-500/25 hover:shadow-red-500/40 transition-all duration-300">
-                                            Login
-                                        </Button>
-                                    </Link>
-                                </div>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
+                    <button
+                        id="mobile-menu-trigger"
+                        type="button"
+                        aria-label="Open menu"
+                        aria-expanded={mobileMenuOpen}
+                        onPointerDown={() => setMobileMenuOpen(true)}
+                        onTouchStart={() => setMobileMenuOpen(true)}
+                        onClick={() => setMobileMenuOpen(true)}
+                        className="lg:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                    >
+                        <Menu className="w-5 h-5" />
+                        <span className="sr-only">Open menu</span>
+                    </button>
                 </div>
             </div>
+            {mobileMenuOpen && (
+                <div className="fixed inset-0 z-[100002] lg:hidden">
+                    <button
+                        type="button"
+                        aria-label="Close menu backdrop"
+                        className="absolute inset-0 bg-black/20"
+                        onClick={() => setMobileMenuOpen(false)}
+                    />
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Mobile navigation"
+                        className="absolute inset-y-0 right-0 flex w-80 max-w-[85vw] flex-col bg-white shadow-2xl dark:bg-gray-950"
+                    >
+                        <div className="flex items-center justify-between border-b p-6">
+                            <span className="text-2xl font-cursive font-bold text-red-600">
+                                AnyJob
+                            </span>
+                            <button
+                                type="button"
+                                aria-label="Close menu"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="rounded-full p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:hover:bg-gray-800"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <nav className="flex-1 p-4 space-y-1">
+                            {NAV_LINKS.map((link) => (
+                                <Link
+                                    key={link.href}
+                                    href={link.href}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-red-50 dark:hover:bg-red-950/50 hover:text-red-600 transition-all"
+                                >
+                                    {link.label}
+                                </Link>
+                            ))}
+                        </nav>
+                        <div className="p-4 border-t space-y-2">
+                            <Link
+                                href="/login"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="block w-full rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-red-500/25 transition-all duration-300 hover:from-red-600 hover:to-red-700 hover:shadow-red-500/40"
+                            >
+                                Login
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            )}
         </header>
     );
 }

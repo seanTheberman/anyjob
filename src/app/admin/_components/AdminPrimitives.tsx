@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { AdminActionButton } from "./AdminActionButton";
 
 interface StatCardProps {
   label: string;
@@ -47,17 +48,15 @@ export function AdminTable({ columns, rows, actionLabel = "Action" }: AdminTable
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {rows.map((row) => (
-              <tr key={row.join("-")} className="hover:bg-slate-50">
+            {rows.map((row, rowIndex) => (
+              <tr key={`${row.join("-")}-${rowIndex}`} className="hover:bg-slate-50">
                 {row.slice(0, -1).map((cell, index) => (
                   <td key={`${cell}-${index}`} className="px-4 py-4 text-sm text-slate-700">
                     {index === row.length - 2 ? <StatusBadge value={cell} /> : cell}
                   </td>
                 ))}
                 <td className="px-4 py-4 text-right">
-                  <button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                    {row[row.length - 1]}
-                  </button>
+                  <AdminActionButton label={row[row.length - 1]} context={row[0] || "selected row"} />
                 </td>
               </tr>
             ))}

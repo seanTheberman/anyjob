@@ -2,7 +2,7 @@
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { Edit2, Save, ShieldCheck } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { ImageUploader } from "@/components/upload/ImageUploader";
 import { createClient } from "@/lib/supabase/client";
 
@@ -33,7 +33,7 @@ export default function ProfilePage() {
     kycStatus: "not_started",
   });
   const [kycFiles, setKycFiles] = useState<UploadedFile[]>([]);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const loadProfile = async () => {

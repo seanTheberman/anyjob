@@ -73,16 +73,16 @@ export function AdminShell({ title, description, children, actions }: AdminShell
                 className="h-10 w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100"
               />
             </div>
-            <button aria-label="Admin settings" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
+            <Link aria-label="Admin settings" href="/admin/settings" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
               <Settings className="h-4 w-4" />
-            </button>
-            <button aria-label="Admin notifications" className="relative rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
+            </Link>
+            <Link aria-label="Admin notifications" href="/admin/support" className="relative rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
               <Bell className="h-4 w-4" />
               <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
-            </button>
-            <button aria-label="Log out" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
+            </Link>
+            <Link aria-label="Log out" href="/login" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
               <LogOut className="h-4 w-4" />
-            </button>
+            </Link>
           </div>
         </header>
 

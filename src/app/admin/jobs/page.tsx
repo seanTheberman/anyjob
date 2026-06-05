@@ -1,4 +1,5 @@
 import { Download, SlidersHorizontal } from "lucide-react";
+import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
 import { getAdminJobs } from "../_lib/admin-live-data";
@@ -26,8 +27,8 @@ export default async function AdminJobsPage() {
       }
     >
       <Toolbar>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Assign provider</button>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Escalate dispute</button>
+        <AdminActionButton label="Assign provider" context="visible jobs" />
+        <AdminActionButton label="Escalate dispute" context="visible jobs" />
       </Toolbar>
       {jobs.length ? (
         <AdminTable columns={["Job ID", "Service", "Client", "Provider", "Status"]} rows={jobs} />

@@ -41,8 +41,14 @@ export function ImageUploader({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const existingImagesKeyRef = useRef(
+    existingImages.map((image) => `${image.id}:${image.image_url}:${image.image_type}`).join("|")
+  );
 
   useEffect(() => {
+    const nextKey = existingImages.map((image) => `${image.id}:${image.image_url}:${image.image_type}`).join("|");
+    if (existingImagesKeyRef.current === nextKey) return;
+    existingImagesKeyRef.current = nextKey;
     setImages(existingImages);
   }, [existingImages]);
 

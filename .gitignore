@@ -18,3 +18,5 @@ next-env.d.ts
 
 # Local screenshots / working captures
 /*.png
+playwright-report/
+test-results/

@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
       description,
       siret,
       insurance,
+      idDocumentUrl,
+      selfieVideoUrl,
+      insuranceDocumentUrl,
       termsAccepted,
       newsletterAccepted
     } = body;
@@ -134,6 +137,10 @@ export async function POST(request: NextRequest) {
           description: description || null,
           siret: siret || null,
           insurance_status: insurance || null,
+          id_document_url: idDocumentUrl || null,
+          selfie_video_url: selfieVideoUrl || null,
+          insurance_document_url: insuranceDocumentUrl || null,
+          kyc_submitted_at: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? new Date().toISOString() : null,
           terms_accepted: termsAccepted,
           newsletter_subscribed: newsletterAccepted || false,
           status: 'pending',
@@ -147,6 +154,31 @@ export async function POST(request: NextRequest) {
       console.error('Seller insert error:', sellerError);
       return NextResponse.json(
         { error: "Failed to create seller profile" },
+        { status: 500 }
+      );
+    }
+
+    const { error: profileError } = await supabase
+      .from('eloo_profiles')
+      .upsert({
+        id: authData.user.id,
+        email: email.toLowerCase(),
+        first_name: firstName,
+        last_name: lastName,
+        phone,
+        city,
+        postal_code: postalCode,
+        role: 'provider',
+        is_verified: false,
+        kyc_status: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? 'submitted' : 'not_started',
+        kyc_submitted_at: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+    if (profileError) {
+      console.error('Provider profile insert error:', profileError);
+      return NextResponse.json(
+        { error: "Failed to create provider profile" },
         { status: 500 }
       );
     }

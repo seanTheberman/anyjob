@@ -190,9 +190,14 @@ export default function LoginPage() {
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Password
                                 </label>
-                                <a href="#" className="text-xs text-red-600 hover:text-red-700 font-medium">
+                                <button
+                                    type="button"
+                                    onClick={handleMagicLink}
+                                    disabled={loading}
+                                    className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-60"
+                                >
                                     Forgot?
-                                </a>
+                                </button>
                             </div>
                             <div className="relative">
                                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />

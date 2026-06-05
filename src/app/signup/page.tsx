@@ -69,6 +69,21 @@ function SignupPageContent() {
                 return;
             }
 
+            if (role === 'provider') {
+                const providerProfile = await fetch("/api/auth/provider-profile", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ firstName, lastName, email }),
+                });
+
+                if (!providerProfile.ok) {
+                    const payload = await providerProfile.json().catch(() => ({}));
+                    setError(payload.error || "Failed to create provider profile");
+                    setLoading(false);
+                    return;
+                }
+            }
+
             // Redirect to appropriate dashboard
             if (role === 'provider') {
                 window.location.href = "/pro";

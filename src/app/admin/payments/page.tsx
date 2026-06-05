@@ -1,4 +1,5 @@
 import { Banknote, Download } from "lucide-react";
+import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
 import { getAdminPayments } from "../_lib/admin-live-data";
@@ -26,8 +27,8 @@ export default async function AdminPaymentsPage() {
       }
     >
       <Toolbar>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Reconcile token</button>
-        <button className="h-9 rounded-lg border border-red-200 px-3 text-sm font-medium text-red-700 hover:bg-red-50">Issue refund</button>
+        <AdminActionButton label="Reconcile token" context="visible payments" />
+        <AdminActionButton label="Issue refund" context="visible payments" />
       </Toolbar>
       {payments.length ? (
         <AdminTable columns={["Reference", "Type", "Amount", "Status"]} rows={payments} actionLabel="Open" />

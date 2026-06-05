@@ -32,6 +32,33 @@ export function JobListing({ jobs }: JobListingProps) {
     urgency: "",
   });
 
+  const filteredJobs = jobs.filter((job) => {
+    const keyword = filters.keyword.trim().toLowerCase();
+    const city = filters.city.trim().toLowerCase();
+    const state = filters.state.trim().toLowerCase();
+    const minAmount = filters.minAmount ? Number(filters.minAmount) : null;
+    const maxAmount = filters.maxAmount ? Number(filters.maxAmount) : null;
+
+    const keywordText = [
+      job.title,
+      job.description,
+      job.client.name,
+      job.location.city,
+      job.location.state,
+      job.category,
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    const matchesKeyword = !keyword || keywordText.includes(keyword);
+    const matchesType = !filters.jobType || job.category.toLowerCase().includes(filters.jobType.toLowerCase());
+    const matchesCity = !city || (job.location.city || "").toLowerCase().includes(city);
+    const matchesState = !state || (job.location.state || "").toLowerCase().includes(state);
+    const matchesUrgency = !filters.urgency || job.urgency === filters.urgency;
+    const matchesMin = minAmount === null || Number.isNaN(minAmount) || job.budget.max >= minAmount;
+    const matchesMax = maxAmount === null || Number.isNaN(maxAmount) || job.budget.min <= maxAmount;
+
+    return matchesKeyword && matchesType && matchesCity && matchesState && matchesUrgency && matchesMin && matchesMax;
+  });
+
   const urgencyColors = {
     low: "bg-gray-100 text-gray-700",
     medium: "bg-yellow-100 text-yellow-700",
@@ -170,7 +197,13 @@ export function JobListing({ jobs }: JobListingProps) {
 
       {/* Job List */}
       <div className="space-y-4">
-        {jobs.map((job) => (
+        {filteredJobs.length === 0 && (
+          <div className="rounded-xl border border-dashed border-gray-200 bg-white p-8 text-center text-gray-500">
+            No jobs match the current filters.
+          </div>
+        )}
+
+        {filteredJobs.map((job) => (
           <JobApplicationGuard key={job.id}>
             <Link
               href={`/pro/jobs/${job.id}`}
@@ -227,9 +260,11 @@ export function JobListing({ jobs }: JobListingProps) {
                   <div className="flex items-center gap-1.5">
                     <MapPin className="w-4 h-4" />
                     <span>
-                      {job.location.city}, {job.location.state}
+                      {[job.location.city, job.location.state].filter(Boolean).join(", ") || "Location not set"}
                     </span>
-                    <span className="text-gray-400">• {job.location.distance}</span>
+                    {job.location.distance && (
+                      <span className="text-gray-400">• {job.location.distance}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Calendar className="w-4 h-4" />

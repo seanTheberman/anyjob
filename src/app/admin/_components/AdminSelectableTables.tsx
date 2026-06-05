@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { CheckSquare, Mail, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
+import { Mail, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { StatusBadge } from "./AdminPrimitives";
 import type { AdminProvider, AdminUser, KycReview } from "./admin-data";
 
@@ -43,6 +43,7 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
   const [status, setStatus] = useState<FilterOption>("all");
   const [risk, setRisk] = useState<FilterOption>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     return users.filter((user) => {
@@ -53,6 +54,14 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
   }, [query, risk, status, users]);
 
   const allVisibleSelected = filtered.length > 0 && filtered.every((user) => selected.has(user.id));
+  const runBulkAction = (action: string) => {
+    setMessage(`${action} queued for ${selected.size} selected user${selected.size === 1 ? "" : "s"}.`);
+    window.setTimeout(() => setMessage(null), 3500);
+  };
+  const openUser = (user: AdminUser) => {
+    setMessage(`Opened admin review panel for ${user.name}.`);
+    window.setTimeout(() => setMessage(null), 3500);
+  };
 
   function toggleAll() {
     setSelected((current) => {
@@ -101,16 +110,17 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
       </div>
 
       <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button type="button" onClick={() => runBulkAction("Message")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <Mail className="h-4 w-4" /> Message
         </button>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button type="button" onClick={() => runBulkAction("Watchlist")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <ShieldAlert className="h-4 w-4" /> Watchlist
         </button>
-        <button className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button type="button" onClick={() => runBulkAction("Block")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <UserX className="h-4 w-4" /> Block
         </button>
       </BulkBar>
+      {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
@@ -139,7 +149,7 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
                   <td className="px-4 py-4"><StatusBadge value={user.risk} /></td>
                   <td className="px-4 py-4"><StatusBadge value={user.status} /></td>
                   <td className="px-4 py-4 text-sm text-slate-700">{user.lastSeen}</td>
-                  <td className="px-4 py-4"><button className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Open</button></td>
+                  <td className="px-4 py-4"><button type="button" onClick={() => openUser(user)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Open</button></td>
                 </tr>
               ))}
             </tbody>
@@ -247,9 +257,6 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
         </button>
         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <Mail className="h-4 w-4" /> Request docs
-        </button>
-        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
-          <CheckSquare className="h-4 w-4" /> Remove limit
         </button>
       </BulkBar>
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}

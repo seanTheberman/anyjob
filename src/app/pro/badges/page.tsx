@@ -2,6 +2,7 @@
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { Award, Star, TrendingUp, CheckCircle, Lock, ArrowRight } from "lucide-react";
+import { useState } from "react";
 
 interface Badge {
   id: string;
@@ -71,6 +72,8 @@ const badges: Badge[] = [
 ];
 
 export default function BadgesPage() {
+  const [reviewRequested, setReviewRequested] = useState(false);
+
   return (
     <ProviderLayout>
       <div className="max-w-4xl mx-auto mt-4 lg:mt-6">
@@ -181,10 +184,16 @@ export default function BadgesPage() {
           <p className="text-gray-600 mb-4">
             Think you deserve a badge but haven't received it automatically? Request a manual review from our team.
           </p>
-          <button className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
-            Request Review
-            <ArrowRight className="w-4 h-4" />
-          </button>
+          {reviewRequested ? (
+            <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+              Manual badge review requested. Our team will review recent jobs and ratings.
+            </div>
+          ) : (
+            <button type="button" onClick={() => setReviewRequested(true)} className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+              Request Review
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </ProviderLayout>

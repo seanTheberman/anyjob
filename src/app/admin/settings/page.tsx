@@ -1,4 +1,5 @@
 import { Save, ShieldCheck } from "lucide-react";
+import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
 import { settingsGroups } from "../_components/admin-data";
@@ -14,10 +15,10 @@ export default function AdminSettingsPage() {
             <ShieldCheck className="h-4 w-4" />
             Audit changes
           </AdminButtonLink>
-          <AdminButtonLink href="/admin/settings">
+          <span className="inline-flex h-9 items-center gap-1.5">
             <Save className="h-4 w-4" />
-            Save settings
-          </AdminButtonLink>
+            <AdminActionButton label="Save settings" context="marketplace configuration" variant="primary" />
+          </span>
         </>
       }
     >
@@ -31,9 +32,7 @@ export default function AdminSettingsPage() {
                   <span className="text-sm font-medium text-slate-700">{item}</span>
                   <div className="mt-2 flex gap-2">
                     <input className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" defaultValue="Default policy" />
-                    <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                      Edit
-                    </button>
+                    <AdminActionButton label="Edit" context={item} />
                   </div>
                 </label>
               ))}

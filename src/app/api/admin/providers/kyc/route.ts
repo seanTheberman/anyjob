@@ -105,15 +105,15 @@ export async function POST(request: Request) {
 
     const sellerUpdate =
       action === "approve"
-        ? { status: "approved", approved_at: now, rejection_reason: null, insurance_status: "approved", background_check_status: "approved", updated_at: now }
+        ? { status: "approved", approved_at: now, rejection_reason: null, insurance_status: "approved", background_check_status: "approved", email_verified: true, phone_verified: true, updated_at: now }
         : action === "reject"
           ? { status: "rejected", approved_at: null, rejection_reason: body.reason || "Rejected by admin", background_check_status: "rejected", updated_at: now }
           : { status: "pending", rejection_reason: body.reason || "Additional KYC documents requested", updated_at: now };
 
     const profileUpdate =
       action === "approve"
-        ? { is_verified: true, updated_at: now }
-        : { is_verified: false, updated_at: now };
+        ? { is_verified: true, kyc_status: "approved", updated_at: now }
+        : { is_verified: false, kyc_status: action === "reject" ? "rejected" : "submitted", updated_at: now };
 
     const [sellerResult, profileResult] = await Promise.all([
       adminDb.from("sellers").update(sellerUpdate).in("id", providerIds),

@@ -2,6 +2,8 @@
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { Bell, Check, X, Calendar, MessageSquare, Star, ReceiptText } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 interface Notification {
   id: string;
@@ -95,7 +97,16 @@ const notificationColors = {
 };
 
 export default function NotificationsPage() {
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  const [notifications, setNotifications] = useState(mockNotifications);
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  function markAsRead(id: string) {
+    setNotifications((current) => current.map((notification) => notification.id === id ? { ...notification, read: true } : notification));
+  }
+
+  function dismiss(id: string) {
+    setNotifications((current) => current.filter((notification) => notification.id !== id));
+  }
 
   return (
     <ProviderLayout>
@@ -107,7 +118,7 @@ export default function NotificationsPage() {
               {unreadCount > 0 ? `You have ${unreadCount} unread notification${unreadCount > 1 ? "s" : ""}` : "You're all caught up!"}
             </p>
           </div>
-          <button className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+          <button type="button" onClick={() => setNotifications((current) => current.map((notification) => ({ ...notification, read: true })))} className="inline-flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
             <Check className="w-4 h-4" />
             Mark all as read
           </button>
@@ -115,7 +126,7 @@ export default function NotificationsPage() {
 
         {/* Notifications List */}
         <div className="space-y-3">
-          {mockNotifications.map((notification) => {
+          {notifications.map((notification) => {
             const Icon = notificationIcons[notification.type];
             return (
               <div
@@ -140,19 +151,19 @@ export default function NotificationsPage() {
 
                     <div className="flex items-center gap-2">
                       {notification.actionUrl && (
-                        <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                        <Link href={notification.actionUrl} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
                           View Details
-                        </button>
+                        </Link>
                       )}
                       {!notification.read && (
-                        <button className="text-sm text-gray-600 hover:text-gray-700">
+                        <button type="button" onClick={() => markAsRead(notification.id)} className="text-sm text-gray-600 hover:text-gray-700">
                           Mark as read
                         </button>
                       )}
                     </div>
                   </div>
 
-                  <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                  <button type="button" onClick={() => dismiss(notification.id)} className="p-1 text-gray-400 hover:text-gray-600 transition-colors" aria-label={`Dismiss ${notification.title}`}>
                     <X className="w-4 h-4" />
                   </button>
                 </div>
@@ -162,7 +173,7 @@ export default function NotificationsPage() {
         </div>
 
         {/* Empty State (if no notifications) */}
-        {mockNotifications.length === 0 && (
+        {notifications.length === 0 && (
           <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
             <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No notifications</h3>

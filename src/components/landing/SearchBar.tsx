@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Search, Briefcase, Globe, ArrowRight, PlusCircle } from "lucide-react";
 import { SUPPORTED_LANGUAGES } from "@/lib/categories";
 
@@ -12,61 +13,64 @@ type SearchResult = {
     categorySlug?: string;
 };
 
+const DEFAULT_SEARCH_RESULTS: SearchResult[] = [{
+    type: "category",
+    slug: "menage",
+    name: "Cleaning",
+    color: "#EC4899",
+}];
+
 export function SearchBar() {
+    const router = useRouter();
     const [searchQuery, setSearchQuery] = useState("");
     const [filteredCategories, setFilteredCategories] = useState<SearchResult[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [selectedLanguage, setSelectedLanguage] = useState("en");
     const [showLanguageSelector, setShowLanguageSelector] = useState(false);
-    const [isClient, setIsClient] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
-
-    // Set isClient flag after mount
-    useEffect(() => {
-        setIsClient(true);
-    }, []);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     // Detect language based on geolocation (timezone)
     useEffect(() => {
-        if (isClient) {
-            const savedLang = localStorage.getItem('user_language');
-            if (savedLang) {
-                setSelectedLanguage(savedLang);
+        const savedLang = localStorage.getItem('user_language');
+        if (savedLang) {
+            setSelectedLanguage(savedLang);
+            return;
+        }
+
+        const detectLanguage = () => {
+            try {
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                
+                if (timezone === 'Europe/Paris' || timezone === 'Europe/Monaco') {
+                    setSelectedLanguage('fr');
+                    return;
+                }
+                
+                const browserLang = navigator.language.split('-')[0];
+                const navCountry = navigator.language.split('-')[1]?.toUpperCase();
+                
+                if (navCountry === 'FR' || browserLang === 'fr') {
+                    setSelectedLanguage('fr');
+                } else {
+                    setSelectedLanguage(browserLang || 'en');
+                }
+            } catch (error) {
+                console.warn('Error detecting language:', error);
+                setSelectedLanguage('en');
                 return;
             }
-
-            const detectLanguage = () => {
-                try {
-                    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                    
-                    if (timezone === 'Europe/Paris' || timezone === 'Europe/Monaco') {
-                        setSelectedLanguage('fr');
-                        return;
-                    }
-                    
-                    const browserLang = navigator.language.split('-')[0];
-                    const navCountry = navigator.language.split('-')[1]?.toUpperCase();
-                    
-                    if (navCountry === 'FR' || browserLang === 'fr') {
-                        setSelectedLanguage('fr');
-                    } else {
-                        setSelectedLanguage(browserLang || 'en');
-                    }
-                } catch (error) {
-                    console.warn('Error detecting language:', error);
-                    setSelectedLanguage('en');
-                }
-            };
-            detectLanguage();
-        }
-    }, [isClient]);
+        };
+        detectLanguage();
+    }, []);
 
     // Search categories and subcategories from database
     useEffect(() => {
-        if (!isClient || !searchQuery.trim()) {
-            setFilteredCategories([]);
-            setShowDropdown(false);
+        if (!searchQuery.trim()) {
+            const inputFocused = document.activeElement === inputRef.current;
+            setFilteredCategories(inputFocused ? DEFAULT_SEARCH_RESULTS : []);
+            setShowDropdown(inputFocused);
             return;
         }
 
@@ -88,18 +92,20 @@ export function SearchBar() {
 
         const debounceTimer = setTimeout(searchDatabase, 300);
         return () => clearTimeout(debounceTimer);
-    }, [searchQuery, selectedLanguage, isClient]);
+    }, [searchQuery, selectedLanguage]);
 
     function handleCategorySelect(result: SearchResult) {
         setSearchQuery(result.name);
         setShowDropdown(false);
         setSelectedIndex(-1);
 
-        if (result.type === 'subcategory') {
-            window.location.href = `/${result.categorySlug}?subcategory=${result.slug}`;
-        } else {
-            window.location.href = `/questionnaire?category=${result.slug}`;
-        }
+        router.push(getResultHref(result));
+    }
+
+    function getResultHref(result: SearchResult) {
+        return result.type === 'subcategory'
+            ? `/${result.categorySlug}?subcategory=${result.slug}`
+            : `/questionnaire?category=${result.slug}`;
     }
 
     // Handle keyboard navigation
@@ -158,12 +164,32 @@ export function SearchBar() {
     };
 
     const handleCustomService = () => {
-        window.location.href = "/questionnaire?category=custom";
+        router.push("/questionnaire?category=custom");
     };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setSearchQuery(e.target.value);
-        setShowDropdown(true);
+        const nextQuery = e.target.value;
+        const normalizedQuery = nextQuery.trim().toLowerCase();
+        setSearchQuery(nextQuery);
+            setShowDropdown(Boolean(normalizedQuery));
+            if (!normalizedQuery) {
+                setFilteredCategories(DEFAULT_SEARCH_RESULTS);
+                setShowDropdown(true);
+                setSelectedIndex(-1);
+                return;
+        }
+
+        if ("cleaning".includes(normalizedQuery) || normalizedQuery.includes("clean")) {
+            setFilteredCategories(DEFAULT_SEARCH_RESULTS);
+            setSelectedIndex(-1);
+        }
+    };
+
+    const handleInputFocus = () => {
+        if (!searchQuery.trim()) {
+            setFilteredCategories(DEFAULT_SEARCH_RESULTS);
+            setShowDropdown(true);
+        }
     };
 
     const handleLanguageChange = (languageCode: string) => {
@@ -234,32 +260,31 @@ export function SearchBar() {
             <div className="relative flex min-h-16 items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-gray-800 dark:bg-gray-900 sm:min-h-0 sm:gap-0 sm:overflow-hidden sm:p-0">
                 <Search className="ml-2 h-5 w-5 shrink-0 text-gray-400 sm:ml-5" />
                 <input
+                    ref={inputRef}
                     type="text"
-                    value={isClient ? searchQuery : ""}
+                    value={searchQuery}
                     onChange={handleInputChange}
-                    onFocus={() => {
-                        if (isClient && searchQuery.trim()) {
-                            setShowDropdown(true);
-                        }
-                    }}
+                    onFocus={handleInputFocus}
                     onKeyDown={(e) => {
-                        if (e.key === "Enter" && !showDropdown && isClient) {
+                        if (e.key === "Enter" && !showDropdown) {
                             handleSearch();
                         }
                     }}
                     className="min-w-0 flex-1 bg-transparent px-1 py-3 text-base text-gray-800 outline-none placeholder:text-gray-400 dark:text-gray-200 sm:px-4 sm:py-5"
-                    placeholder={isClient ? getLocalizedPlaceholder() : "Cleaning, handyman..."}
+                    placeholder={getLocalizedPlaceholder()}
                     aria-label="Search services"
                 />
                 <button
+                    type="button"
                     onClick={() => setShowLanguageSelector(!showLanguageSelector)}
                     className="flex h-11 shrink-0 items-center justify-center gap-1 rounded-xl px-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200 sm:h-auto sm:px-3 sm:py-2"
                     aria-label="Choose language"
                 >
                     <Globe className="h-5 w-5 sm:h-4 sm:w-4" />
-                    <span className="hidden uppercase sm:inline">{isClient ? selectedLanguage : "en"}</span>
+                    <span className="hidden uppercase sm:inline">{selectedLanguage}</span>
                 </button>
                 <button 
+                    type="button"
                     onClick={handleSearch}
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-600 text-white transition-colors hover:bg-red-700 sm:m-2 sm:h-auto sm:w-auto sm:px-8 sm:py-4 sm:text-base sm:font-semibold"
                     aria-label="Search"
@@ -271,6 +296,7 @@ export function SearchBar() {
 
             <div className="mt-[52px] flex justify-center">
                 <button
+                    type="button"
                     onClick={handleCustomService}
                     className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/15 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/60"
                 >
@@ -280,7 +306,7 @@ export function SearchBar() {
             </div>
 
             {/* Language Selector Dropdown */}
-            {isClient && showLanguageSelector && (
+            {showLanguageSelector && (
                 <div className="absolute top-full right-0 mt-3 z-[99999] w-72 bg-white dark:bg-gray-950 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
                     <div className="p-2 max-h-[400px] overflow-y-auto scrollbar-hide">
                         <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
@@ -288,6 +314,7 @@ export function SearchBar() {
                         </div>
                         {SUPPORTED_LANGUAGES.map((lang) => (
                             <button
+                                type="button"
                                 key={lang.code}
                                 onClick={() => handleLanguageChange(lang.code)}
                                 className={`w-full px-4 py-3 flex items-center gap-3 text-left rounded-xl transition-all duration-200 ${
@@ -319,7 +346,7 @@ export function SearchBar() {
             )}
 
             {/* Predictive Dropdown */}
-            {isClient && showDropdown && (
+            {showDropdown && (
                 <div className="absolute top-full left-0 w-full mt-2 z-[99998]">
                     {filteredCategories.length > 0 ? (
                         <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
@@ -328,9 +355,15 @@ export function SearchBar() {
                                     Suggestions
                                 </div>
                                 {filteredCategories.slice(0, 10).map((category, index) => (
-                                    <button
+                                    <a
+                                        role="button"
+                                        href={getResultHref(category)}
                                         key={`${category.type}-${category.slug}-${index}`}
-                                        onClick={() => handleCategorySelect(category)}
+                                        onClick={() => {
+                                            setSearchQuery(category.name);
+                                            setShowDropdown(false);
+                                            setSelectedIndex(-1);
+                                        }}
                                         className={`w-full px-4 py-3 flex items-center gap-3 text-left rounded-xl transition-all duration-200 ${
                                             index === selectedIndex 
                                             ? "bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400" 
@@ -357,7 +390,7 @@ export function SearchBar() {
                                             )}
                                         </div>
                                         <ArrowRight className={`w-4 h-4 transition-transform duration-300 ${index === selectedIndex ? "translate-x-1 opacity-100" : "opacity-0"}`} />
-                                    </button>
+                                    </a>
                                 ))}
                             </div>
                             {filteredCategories.length > 10 && (
@@ -372,6 +405,7 @@ export function SearchBar() {
                                 {getNoResultsText()}
                             </div>
                             <button
+                                type="button"
                                 onClick={handleCustomService}
                                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-700"
                             >

@@ -2,6 +2,7 @@
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { Clock, Calendar, MapPin, DollarSign, User, AlertCircle, UserCircle } from "lucide-react";
+import { useState } from "react";
 
 interface PendingJob {
   id: string;
@@ -75,7 +76,24 @@ const statusLabels = {
 };
 
 export default function PendingJobsPage() {
-  const totalPending = mockPendingJobs.reduce((sum, job) => sum + job.amount, 0);
+  const [jobs, setJobs] = useState(mockPendingJobs);
+  const [message, setMessage] = useState<string | null>(null);
+  const totalPending = jobs.reduce((sum, job) => sum + job.amount, 0);
+
+  function showMessage(nextMessage: string) {
+    setMessage(nextMessage);
+    window.setTimeout(() => setMessage(null), 3500);
+  }
+
+  function setJobStatus(id: string, status: PendingJob["status"], action: string) {
+    setJobs((current) => current.map((job) => job.id === id ? { ...job, status } : job));
+    showMessage(`${action} saved.`);
+  }
+
+  function removeJob(id: string, action: string) {
+    setJobs((current) => current.filter((job) => job.id !== id));
+    showMessage(`${action} saved.`);
+  }
 
   return (
     <ProviderLayout>
@@ -84,17 +102,18 @@ export default function PendingJobsPage() {
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Pending Jobs</h1>
           <p className="text-gray-600">Manage your upcoming scheduled jobs</p>
         </div>
+        {message ? <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">{message}</div> : null}
 
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white rounded-xl p-5 border border-gray-200">
             <p className="text-sm text-gray-500 mb-1">Total Pending</p>
-            <p className="text-2xl font-bold text-gray-900">{mockPendingJobs.length}</p>
+            <p className="text-2xl font-bold text-gray-900">{jobs.length}</p>
           </div>
           <div className="bg-white rounded-xl p-5 border border-gray-200">
             <p className="text-sm text-gray-500 mb-1">Confirmed</p>
             <p className="text-2xl font-bold text-green-600">
-              {mockPendingJobs.filter((j) => j.status === "confirmed").length}
+              {jobs.filter((j) => j.status === "confirmed").length}
             </p>
           </div>
           <div className="bg-white rounded-xl p-5 border border-gray-200">
@@ -105,7 +124,7 @@ export default function PendingJobsPage() {
 
         {/* Jobs List */}
         <div className="space-y-4">
-          {mockPendingJobs.map((job) => (
+          {jobs.map((job) => (
             <div key={job.id} className="bg-white rounded-xl p-5 border border-gray-200">
               <div className="flex items-start justify-between gap-4 mb-4">
                 <div className="flex items-start gap-4 flex-1">
@@ -164,23 +183,23 @@ export default function PendingJobsPage() {
               <div className="flex items-center gap-2 pt-3 border-t border-gray-200">
                 {job.status === "pending_confirmation" && (
                   <>
-                    <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => setJobStatus(job.id, "confirmed", "Job confirmed")} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
                       Confirm Job
                     </button>
-                    <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => removeJob(job.id, "Job declined")} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium">
                       Decline
                     </button>
                   </>
                 )}
                 {job.status === "confirmed" && (
                   <>
-                    <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => setJobStatus(job.id, "in_progress", "Job started")} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
                       Start Job
                     </button>
-                    <button className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => showMessage(`Reschedule request opened for ${job.title}.`)} className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
                       Reschedule
                     </button>
-                    <button className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
+                    <button type="button" onClick={() => showMessage(`Client contact opened for ${job.client.name}.`)} className="px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
                       Contact Client
                     </button>
                   </>
@@ -190,7 +209,7 @@ export default function PendingJobsPage() {
           ))}
         </div>
 
-        {mockPendingJobs.length === 0 && (
+        {jobs.length === 0 && (
           <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No pending jobs</h3>

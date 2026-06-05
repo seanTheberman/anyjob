@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { Separator } from "@/components/ui/separator";
-import Image from "next/image";
 
 const CATEGORY_LINKS = [
     { href: "/search?cat=menage", label: "Cleaning" },
@@ -18,15 +16,22 @@ const COMPANY_LINKS = [
     { href: "/how-it-works", label: "How it works" },
     { href: "/become-provider", label: "Become a provider" },
     { href: "/pricing", label: "Pricing" },
-    { href: "#", label: "About" },
-    { href: "#", label: "Press" },
+    { href: "/how-it-works#about", label: "About" },
+    { href: "/dashboard/assistance/new?topic=press", label: "Press" },
 ];
 
 const SUPPORT_LINKS = [
-    { href: "#", label: "Help Center" },
-    { href: "#", label: "Trust & Safety" },
-    { href: "#", label: "Terms of Service" },
-    { href: "#", label: "Privacy Policy" },
+    { href: "/dashboard/help", label: "Help Center" },
+    { href: "/how-it-works#trust", label: "Trust & Safety" },
+    { href: "/pricing#terms", label: "Terms of Service" },
+    { href: "/pricing#privacy", label: "Privacy Policy" },
+];
+
+const SOCIAL_LINKS = [
+    { href: "https://twitter.com", label: "twitter" },
+    { href: "https://facebook.com", label: "facebook" },
+    { href: "https://instagram.com", label: "instagram" },
+    { href: "https://linkedin.com", label: "linkedin" },
 ];
 
 export function Footer() {
@@ -48,15 +53,17 @@ export function Footer() {
                         </p>
                         <div className="flex gap-3 pt-2">
                             {/* Social icons */}
-                            {["twitter", "facebook", "instagram", "linkedin"].map((social) => (
+                            {SOCIAL_LINKS.map((social) => (
                                 <a
-                                    key={social}
-                                    href="#"
+                                    key={social.label}
+                                    href={social.href}
+                                    target="_blank"
+                                    rel="noreferrer"
                                     className="w-9 h-9 rounded-full bg-gray-800 hover:bg-red-600 flex items-center justify-center transition-colors duration-200"
-                                    aria-label={social}
+                                    aria-label={social.label}
                                 >
                                     <span className="text-xs font-bold text-gray-400 hover:text-white uppercase">
-                                        {social[0]}
+                                        {social.label[0]}
                                     </span>
                                 </a>
                             ))}
@@ -121,7 +128,9 @@ export function Footer() {
                         {/* App Badges */}
                         <div className="mt-6 flex flex-col gap-3">
                             <a
-                                href="#"
+                                href="https://www.apple.com/app-store/"
+                                target="_blank"
+                                rel="noreferrer"
                                 className="inline-flex items-center gap-3 bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 cursor-pointer transition-colors duration-200 group"
                             >
                                 <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">
@@ -133,7 +142,9 @@ export function Footer() {
                                 </div>
                             </a>
                             <a
-                                href="#"
+                                href="https://play.google.com/store"
+                                target="_blank"
+                                rel="noreferrer"
                                 className="inline-flex items-center gap-3 bg-gray-800 hover:bg-gray-700 rounded-lg px-4 py-3 cursor-pointer transition-colors duration-200 group"
                             >
                                 <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="currentColor">

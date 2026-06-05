@@ -23,6 +23,9 @@ export default function SellerRegisterPage() {
     description: "",
     siret: "",
     insurance: "",
+    documentUrl: "",
+    selfieVideoUrl: "",
+    insuranceDocumentUrl: "",
     termsAccepted: false,
     newsletterAccepted: false
   });
@@ -30,6 +33,7 @@ export default function SellerRegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedDocumentDataUrl, setUploadedDocumentDataUrl] = useState<string>("");
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -62,6 +66,11 @@ export default function SellerRegisterPage() {
       if (file.type === 'application/pdf' || file.type === 'image/jpeg' || file.type === 'image/png') {
         setUploadedFile(file);
         setErrors(prev => ({ ...prev, document: "" }));
+        const reader = new FileReader();
+        reader.onload = () => {
+          setUploadedDocumentDataUrl(typeof reader.result === "string" ? reader.result : "");
+        };
+        reader.readAsDataURL(file);
       } else {
         setErrors(prev => ({ ...prev, document: "Invalid file format. PDF, JPG or PNG required." }));
       }
@@ -86,10 +95,15 @@ export default function SellerRegisterPage() {
       if (!formData.city.trim()) newErrors.city = "La ville est requise";
       if (!formData.postalCode.trim()) newErrors.postalCode = "Le code postal est requis";
       if (!formData.birthDate) newErrors.birthDate = "La date de naissance est requise";
+      else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.birthDate)) newErrors.birthDate = "Use YYYY-MM-DD format";
       if (!formData.serviceCategory) newErrors.serviceCategory = "La catégorie de service est requise";
     } else if (step === 3) {
       if (!formData.siret.trim()) newErrors.siret = "Le numéro SIRET est requis";
-      if (!uploadedFile) newErrors.document = "Le document est requis";
+      if (!uploadedFile && !formData.documentUrl.trim()) newErrors.document = "Le document est requis";
+      if (!formData.selfieVideoUrl.trim()) newErrors.selfieVideoUrl = "Selfie video URL is required";
+      if (formData.insurance === "yes" && !formData.insuranceDocumentUrl.trim()) {
+        newErrors.insuranceDocumentUrl = "Insurance document URL is required";
+      }
       // Remove terms validation from step 3 - it should be validated in step 4
     } else if (step === 4) {
       if (!formData.termsAccepted) newErrors.terms = "Les conditions doivent être acceptées";
@@ -135,6 +149,9 @@ export default function SellerRegisterPage() {
             description: formData.description,
             siret: formData.siret,
             insurance: formData.insurance,
+            idDocumentUrl: uploadedDocumentDataUrl || formData.documentUrl,
+            selfieVideoUrl: formData.selfieVideoUrl,
+            insuranceDocumentUrl: formData.insuranceDocumentUrl,
             termsAccepted: formData.termsAccepted,
             newsletterAccepted: formData.newsletterAccepted
           }),
@@ -425,12 +442,14 @@ export default function SellerRegisterPage() {
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
-                      type="date"
+                      type="text"
+                      inputMode="numeric"
                       value={formData.birthDate}
                       onChange={(e) => handleInputChange("birthDate", e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.birthDate ? "border-red-500" : "border-gray-300"
                       }`}
+                      placeholder="1990-01-01"
                     />
                     {errors.birthDate && (
                       <p className="text-red-500 text-xs mt-1">{errors.birthDate}</p>
@@ -571,7 +590,10 @@ export default function SellerRegisterPage() {
                           <span>{uploadedFile.name}</span>
                           <button
                             type="button"
-                            onClick={() => setUploadedFile(null)}
+                            onClick={() => {
+                              setUploadedFile(null);
+                              setUploadedDocumentDataUrl("");
+                            }}
                             className="ml-2 text-green-500 hover:text-green-700"
                           >
                             <X className="w-4 h-4" />
@@ -584,6 +606,60 @@ export default function SellerRegisterPage() {
                     )}
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Or paste an ID document URL
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.documentUrl}
+                    onChange={(e) => handleInputChange("documentUrl", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="https://example.com/id-document.pdf"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Useful when testing without uploading a local file.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Selfie video URL *
+                  </label>
+                  <input
+                    type="url"
+                    value={formData.selfieVideoUrl}
+                    onChange={(e) => handleInputChange("selfieVideoUrl", e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      errors.selfieVideoUrl ? "border-red-500" : "border-gray-300"
+                    }`}
+                    placeholder="https://example.com/selfie-video.mp4"
+                  />
+                  {errors.selfieVideoUrl && (
+                    <p className="text-red-500 text-xs mt-1">{errors.selfieVideoUrl}</p>
+                  )}
+                </div>
+
+                {formData.insurance === "yes" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Insurance document URL *
+                    </label>
+                    <input
+                      type="url"
+                      value={formData.insuranceDocumentUrl}
+                      onChange={(e) => handleInputChange("insuranceDocumentUrl", e.target.value)}
+                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.insuranceDocumentUrl ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder="https://example.com/insurance-document.pdf"
+                    />
+                    {errors.insuranceDocumentUrl && (
+                      <p className="text-red-500 text-xs mt-1">{errors.insuranceDocumentUrl}</p>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                   <div className="flex">

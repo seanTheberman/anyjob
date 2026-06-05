@@ -1,4 +1,5 @@
 import { Headphones, MessageSquare } from "lucide-react";
+import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
 import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
 import { getAdminSupport } from "../_lib/admin-live-data";
@@ -26,8 +27,8 @@ export default async function AdminSupportPage() {
       }
     >
       <Toolbar>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Assign selected</button>
-        <button className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">Send macro</button>
+        <AdminActionButton label="Assign selected" context="visible support tickets" />
+        <AdminActionButton label="Send macro" context="visible support tickets" />
       </Toolbar>
       {supportTickets.length ? (
         <AdminTable columns={["Ticket", "Requester", "Topic", "Priority", "Status"]} rows={supportTickets} actionLabel="Reply" />

@@ -42,6 +42,23 @@ const popularQuestions = [
 
 export default function HelpCenterPage() {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<string | null>(null);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleCategories = faqCategories.filter((category) =>
+    !normalizedQuery ||
+    category.title.toLowerCase().includes(normalizedQuery) ||
+    category.description.toLowerCase().includes(normalizedQuery)
+  );
+  const visibleQuestions = popularQuestions.filter((question) =>
+    !normalizedQuery || question.toLowerCase().includes(normalizedQuery)
+  );
+  const activeAnswer = selectedQuestion
+    ? "Open your booking from the dashboard to view details, contact support, or manage changes. Booking token refunds and provider issues are reviewed from the same booking record."
+    : selectedTopic
+      ? `Showing help articles for ${selectedTopic}. Use search above to narrow the topic further.`
+      : null;
 
   return (
     <DashboardLayout>
@@ -72,7 +89,11 @@ export default function HelpCenterPage() {
                 <p className="text-sm text-gray-500">Available 24/7</p>
               </div>
             </div>
-            <button className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors">
+            <button
+              type="button"
+              onClick={() => window.location.href = "/dashboard/assistance/new?topic=chat"}
+              className="w-full py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors"
+            >
               Start Chat
             </button>
           </div>
@@ -87,20 +108,34 @@ export default function HelpCenterPage() {
                 <p className="text-sm text-gray-500">Mon-Fri, 9am-6pm</p>
               </div>
             </div>
-            <button className="w-full py-2.5 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors">
+            <a
+              href="tel:+448001234567"
+              className="block w-full py-2.5 bg-gray-200 text-center text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+            >
               +44 800 123 4567
-            </button>
+            </a>
           </div>
         </div>
+
+        {activeAnswer && (
+          <div className="mb-8 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-900">
+            {activeAnswer}
+          </div>
+        )}
 
         {/* FAQ Categories */}
         <h2 className="text-lg font-bold text-gray-900 mb-4">Browse by Topic</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          {faqCategories.map((category) => {
+          {visibleCategories.map((category) => {
             const Icon = category.icon;
             return (
               <button
+                type="button"
                 key={category.title}
+                onClick={() => {
+                  setSelectedTopic(category.title);
+                  setSelectedQuestion(null);
+                }}
                 className="flex items-center gap-4 p-4 bg-white rounded-xl border border-gray-200 hover:shadow-md transition-all text-left"
               >
                 <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center flex-shrink-0">
@@ -122,11 +157,16 @@ export default function HelpCenterPage() {
         {/* Popular Questions */}
         <h2 className="text-lg font-bold text-gray-900 mb-4">Popular Questions</h2>
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {popularQuestions.map((question, index) => (
+          {visibleQuestions.map((question, index) => (
             <button
-              key={index}
+              type="button"
+              key={question}
+              onClick={() => {
+                setSelectedQuestion(question);
+                setSelectedTopic(null);
+              }}
               className={`w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors ${
-                index !== popularQuestions.length - 1 ? "border-b border-gray-100" : ""
+                index !== visibleQuestions.length - 1 ? "border-b border-gray-100" : ""
               }`}
             >
               <div className="flex items-center gap-3">
