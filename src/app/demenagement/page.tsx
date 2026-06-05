@@ -2,46 +2,48 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Users, ThumbsUp, ShieldCheck, Truck, Package, Home } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ArrowRight, Clock, Phone, ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
 import { ProviderSlider } from "@/components/ui/provider-slider";
 import { ProviderCard } from "@/components/ui/provider-card";
+
+const ANYJOB_EMERGENCY_PHONE = "+448001234567";
+const ANYJOB_EMERGENCY_DISPLAY = "+44 800 123 4567";
 
 const MOVING_SUBCATEGORIES = [
     {
         title: "Help Moving",
         description: "Professional help with loading, unloading and transportation",
-        image: "https://images.unsplash.com/photo-1600518464441-9154a4dea21b",
+        image: "https://images.unsplash.com/photo-1600518464441-9154a4dea21b?q=80&w=900&auto=format&fit=crop",
         questionnaireSlug: "help-moving-demenagement",
     },
     {
         title: "Heavy Lifting",
         description: "Specialized help for heavy furniture and appliances",
-        image: "https://images.unsplash.com/photo-1600880292203-757bb62b4baf",
+        image: "https://images.unsplash.com/photo-1580709839515-54b8991e2813?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=900",
         questionnaireSlug: "heavy-lifting-demenagement",
     },
     {
         title: "Packing Services",
         description: "Professional packing and unpacking of your belongings",
-        image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+        image: "https://images.unsplash.com/photo-1580709584417-62cac02078b1?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=900",
         questionnaireSlug: "packing-demenagement",
     },
     {
         title: "Furniture Assembly",
         description: "Assembly and disassembly of furniture for your move",
-        image: "https://images.unsplash.com/photo-1555041469-a586c61ea9bc",
+        image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?q=80&w=900&auto=format&fit=crop",
         questionnaireSlug: "furniture-assembly-demenagement",
     },
     {
         title: "Local Moving",
         description: "Efficient local moving services within your city",
-        image: "https://images.unsplash.com/photo-1600566753086-00f18efc2253",
+        image: "https://images.unsplash.com/photo-1585458941243-bacd4fc6f8d0?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=900",
         questionnaireSlug: "local-moving-demenagement",
     },
     {
         title: "Long Distance",
         description: "Professional long-distance moving services",
-        image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+        image: "https://images.unsplash.com/photo-1742858492775-8f58f645aa12?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=900",
         questionnaireSlug: "long-distance-demenagement",
     },
 ];
@@ -89,6 +91,21 @@ const MOVING_PROVIDERS = [
     },
 ];
 
+const EMERGENCY_MOVING_PROVIDERS = [
+    {
+        name: "Maxandre Movers",
+        specialty: "2-person emergency loading team",
+        phone: "+33 7 56 21 44 10",
+        eta: "20-35 min",
+    },
+    {
+        name: "Lucas Transport",
+        specialty: "Van, driver, and same-day transport",
+        phone: "+33 6 42 18 77 90",
+        eta: "30-45 min",
+    },
+];
+
 export default function DemenagementPage() {
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">
@@ -98,7 +115,7 @@ export default function DemenagementPage() {
                 {/* Main Hero Banner */}
                 <section className="relative w-full h-[20rem] sm:h-[24rem] lg:h-[26rem] rounded-3xl overflow-hidden shadow-xl mt-4">
                     <Image
-                        src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
+                        src="https://images.unsplash.com/photo-1600518464441-9154a4dea21b?q=80&w=1600&auto=format&fit=crop"
                         alt="Moving services"
                         fill
                         className="object-cover"
@@ -140,7 +157,7 @@ export default function DemenagementPage() {
                 {/* Moving Promo Banner */}
                 <section className="relative w-full h-48 sm:h-56 rounded-3xl overflow-hidden shadow-lg group cursor-pointer">
                     <Image
-                        src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
+                        src="https://images.unsplash.com/photo-1585458941243-bacd4fc6f8d0?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1400"
                         alt="Moving special offer"
                         fill
                         className="object-cover"
@@ -187,26 +204,64 @@ export default function DemenagementPage() {
                 </section>
 
                 {/* Emergency Services Banner */}
-                <section className="relative w-full h-64 sm:h-72 rounded-3xl overflow-hidden shadow-lg group cursor-pointer">
+                <section className="relative w-full overflow-hidden rounded-3xl shadow-lg">
                     <Image
-                        src="https://images.unsplash.com/photo-1600566753086-00f18efc2253"
+                        src="https://images.unsplash.com/photo-1742858492775-8f58f645aa12?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1400"
                         alt="Emergency moving services"
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-700 object-center"
+                        className="object-cover object-center"
                     />
                     <div className="absolute inset-0 bg-red-900/60 mix-blend-multiply"></div>
                     <div className="absolute inset-0 bg-gradient-to-r from-gray-900/80 via-gray-900/40 to-transparent"></div>
 
-                    <div className="absolute inset-0 flex flex-col justify-center p-8 sm:p-12 max-w-2xl">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 drop-shadow-md">
-                            Emergency move?
-                        </h2>
-                        <p className="text-sm sm:text-base text-gray-100 mb-6 font-medium text-red-50">
-                            Quick 24/7 intervention for your last-minute moves.
-                        </p>
-                        <Button className="w-fit rounded-full bg-white text-gray-900 hover:bg-gray-100 font-bold px-8 shadow-xl">
-                            Call emergency <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
+                    <div className="relative grid gap-8 p-8 sm:p-10 lg:grid-cols-[1.05fr_0.95fr] lg:p-12">
+                        <div className="flex min-h-72 flex-col justify-center">
+                            <div className="mb-4 inline-flex w-fit items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/25 backdrop-blur">
+                                <Clock className="h-4 w-4" />
+                                24/7 emergency dispatch
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-white mb-3 drop-shadow-md">
+                                Emergency move?
+                            </h2>
+                            <p className="text-sm sm:text-base text-gray-100 mb-6 font-medium text-red-50">
+                                Call AnyJob. We find the best suited available moving provider and share their contact details immediately.
+                            </p>
+                            <div className="flex flex-col gap-3 sm:flex-row">
+                                <a href={`tel:${ANYJOB_EMERGENCY_PHONE}`} className="inline-flex w-fit items-center justify-center rounded-full bg-white px-7 py-3 font-bold text-gray-900 shadow-xl transition hover:bg-gray-100">
+                                    <Phone className="mr-2 h-4 w-4" />
+                                    {ANYJOB_EMERGENCY_DISPLAY}
+                                </a>
+                                <Link href="/questionnaire?category=demenagement&subcategory=help-moving-demenagement&urgency=emergency" className="inline-flex w-fit items-center justify-center rounded-full border border-white/40 bg-white/10 px-7 py-3 font-bold text-white backdrop-blur transition hover:bg-white/20">
+                                    Post emergency request <ArrowRight className="ml-2 h-4 w-4" />
+                                </Link>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl bg-white/95 p-4 shadow-2xl backdrop-blur">
+                            <div className="mb-4">
+                                <p className="text-xs font-bold uppercase tracking-wide text-red-600">Best matches now</p>
+                                <h3 className="text-lg font-extrabold text-gray-950">Emergency provider contacts</h3>
+                            </div>
+                            <div className="space-y-3">
+                                {EMERGENCY_MOVING_PROVIDERS.map((provider) => (
+                                    <div key={provider.phone} className="rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div>
+                                                <p className="font-bold text-gray-950">{provider.name}</p>
+                                                <p className="mt-1 text-sm text-gray-600">{provider.specialty}</p>
+                                                <p className="mt-2 inline-flex items-center rounded-full bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+                                                    ETA {provider.eta}
+                                                </p>
+                                            </div>
+                                            <a href={`tel:${provider.phone.replaceAll(" ", "")}`} className="shrink-0 rounded-full bg-red-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-red-700">
+                                                Call
+                                            </a>
+                                        </div>
+                                        <p className="mt-3 text-sm font-semibold text-gray-900">{provider.phone}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </section>
 

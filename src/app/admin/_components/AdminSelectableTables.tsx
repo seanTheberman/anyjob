@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Mail, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
 import { StatusBadge } from "./AdminPrimitives";
-import type { AdminProvider, AdminUser, KycReview } from "./admin-data";
+import type { AdminBusiness, AdminProvider, AdminUser, KycReview } from "./admin-data";
 
 type FilterOption = "all" | string;
 
@@ -179,6 +179,9 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
     });
   }, [kyc, providers, query, service]);
   const allVisibleSelected = filtered.length > 0 && filtered.every((provider) => selected.has(provider.id));
+  const selectedProviders = providers.filter((provider) => selected.has(provider.id));
+  const hasSelectedInactiveProviders = selectedProviders.some((provider) => provider.accountStatus !== "Active" && provider.docsSubmitted);
+  const hasSelectedActiveProviders = selectedProviders.some((provider) => provider.accountStatus === "Active");
 
   function toggleAll() {
     setSelected((current) => {
@@ -198,14 +201,21 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
     });
   }
 
-  function eligibleProviderIds(providerIds: string[], action: "approve" | "request_docs" | "reject") {
+  function eligibleProviderIds(providerIds: string[], action: "approve" | "request_docs" | "reject" | "suspend") {
+    if (action === "suspend") {
+      return providers
+        .filter((provider) => providerIds.includes(provider.id) && provider.accountStatus === "Active")
+        .map((provider) => provider.id);
+    }
     if (action === "request_docs") {
       return providers.filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted).map((provider) => provider.id);
     }
-    return providers.filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted).map((provider) => provider.id);
+    return providers
+      .filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted && provider.accountStatus !== "Active")
+      .map((provider) => provider.id);
   }
 
-  async function runKycAction(action: "approve" | "request_docs" | "reject", providerIds = Array.from(selected)) {
+  async function runKycAction(action: "approve" | "request_docs" | "reject" | "suspend", providerIds = Array.from(selected)) {
     providerIds = eligibleProviderIds(providerIds, action);
     if (!providerIds.length) return;
     setPendingAction(action);
@@ -237,6 +247,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
           <select value={kyc} onChange={(event) => setKyc(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
             <option value="all">All KYC statuses</option>
             <option value="Approved">Approved</option>
+            <option value="Suspended">Suspended</option>
             <option value="Needs review">Needs review</option>
             <option value="Missing document">Missing document</option>
             <option value="Rejected">Rejected</option>
@@ -252,9 +263,16 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
       </div>
 
       <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
-        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
-          <ShieldCheck className="h-4 w-4" /> Approve KYC
-        </button>
+        {hasSelectedInactiveProviders ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+            <ShieldCheck className="h-4 w-4" /> Approve KYC
+          </button>
+        ) : null}
+        {hasSelectedActiveProviders ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("suspend")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+            <UserX className="h-4 w-4" /> Suspend
+          </button>
+        ) : null}
         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <Mail className="h-4 w-4" /> Request docs
         </button>
@@ -292,11 +310,13 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                   <td className="px-4 py-4"><StatusBadge value={provider.accountStatus} /></td>
                   <td className="px-4 py-4">
                     <div className="flex flex-nowrap gap-2 whitespace-nowrap">
-                      {provider.docsSubmitted ? (
+                      {provider.accountStatus === "Active" ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("suspend", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Suspend</button>
+                      ) : provider.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
                       ) : null}
                       <button disabled={Boolean(pendingAction) || !provider.docsSubmitted} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100">Docs</button>
-                      {provider.docsSubmitted ? (
+                      {provider.docsSubmitted && provider.accountStatus !== "Active" ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
                       ) : null}
                     </div>
@@ -307,6 +327,167 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
           </table>
         </div>
         <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500">{filtered.length} providers shown</div>
+      </div>
+    </>
+  );
+}
+
+export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[] }) {
+  const router = useRouter();
+  const [rows, setRows] = useState(businesses);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<FilterOption>("all");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [message, setMessage] = useState<string | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRows(businesses);
+  }, [businesses]);
+
+  const filtered = useMemo(() => {
+    return rows.filter((business) => {
+      const statusMatch = status === "all" || business.status === status;
+      return statusMatch && includesQuery(Object.values(business), query);
+    });
+  }, [query, rows, status]);
+  const allVisibleSelected = filtered.length > 0 && filtered.every((business) => selected.has(business.id));
+  const selectedBusinesses = rows.filter((business) => selected.has(business.id));
+  const hasSelectedApprovedBusinesses = selectedBusinesses.some((business) => business.status === "approved");
+  const hasSelectedUnapprovedBusinesses = selectedBusinesses.some((business) => business.status !== "approved");
+
+  function toggleAll() {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (allVisibleSelected) filtered.forEach((business) => next.delete(business.id));
+      else filtered.forEach((business) => next.add(business.id));
+      return next;
+    });
+  }
+
+  function toggleOne(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function runBusinessAction(action: "approve" | "reject" | "request_docs" | "suspend", businessIds = Array.from(selected)) {
+    if (!businessIds.length) return;
+    setPendingAction(action);
+    setMessage(null);
+
+    const response = await fetch("/api/admin/businesses/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, businessIds }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPendingAction(null);
+
+    if (!response.ok) {
+      setMessage(payload.error || "Business review update failed");
+      return;
+    }
+
+    setSelected(new Set());
+    setRows((current) => current.map((business) => (
+      businessIds.includes(business.id) ? { ...business, status: payload.status || business.status } : business
+    )));
+    setMessage(`Updated ${businessIds.length} business${businessIds.length === 1 ? "" : "es"}.`);
+    router.refresh();
+  }
+
+  return (
+    <>
+      <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="grid gap-2 lg:grid-cols-[1fr_190px_auto]">
+          <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" placeholder="Search business, registration number, city, contact" />
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="all">All statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="suspended">Suspended</option>
+          </select>
+          <button onClick={() => { setQuery(""); setStatus("all"); }} className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+            Reset
+          </button>
+        </div>
+      </div>
+
+      <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
+        {hasSelectedUnapprovedBusinesses ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+            <ShieldCheck className="h-4 w-4" /> Approve
+          </button>
+        ) : null}
+        {hasSelectedApprovedBusinesses ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+            <UserX className="h-4 w-4" /> Suspend
+          </button>
+        ) : null}
+        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+          <Mail className="h-4 w-4" /> Request docs
+        </button>
+        {hasSelectedUnapprovedBusinesses ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+            <ShieldAlert className="h-4 w-4" /> Reject
+          </button>
+        ) : null}
+      </BulkBar>
+      {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
+
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="w-12 px-4 py-3">
+                  <input aria-label="Select all businesses" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
+                </th>
+                {["Business", "Registration", "Industry", "City", "Contact", "Document", "Work types", "Created", "Status", "Action"].map((column) => (
+                  <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filtered.map((business) => (
+                <tr key={business.id} className="hover:bg-slate-50">
+                  <td className="px-4 py-4"><input aria-label={`Select ${business.name}`} type="checkbox" checked={selected.has(business.id)} onChange={() => toggleOne(business.id)} /></td>
+                  <td className="px-4 py-4">
+                    <p className="text-sm font-medium text-slate-950">{business.name}</p>
+                    <p className="text-xs text-slate-500">{business.id}</p>
+                  </td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{business.registrationNumber}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{business.industry}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{business.city}</td>
+                  <td className="max-w-72 px-4 py-4 text-sm text-slate-700">{business.contact}</td>
+                  <td className="px-4 py-4"><StatusBadge value={business.document} /></td>
+                  <td className="max-w-56 px-4 py-4 text-sm text-slate-700">{business.workTypes}</td>
+                  <td className="px-4 py-4 text-sm text-slate-700">{business.created}</td>
+                  <td className="px-4 py-4"><StatusBadge value={business.status} /></td>
+                  <td className="px-4 py-4">
+                    <div className="flex flex-nowrap gap-2 whitespace-nowrap">
+                      {business.status === "approved" ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend", [business.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Suspend</button>
+                      ) : (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", [business.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                      )}
+                      <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs", [business.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">Docs</button>
+                      {business.status !== "approved" ? (
+                        <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject", [business.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="border-t border-slate-200 px-4 py-3 text-sm text-slate-500">{filtered.length} businesses shown</div>
       </div>
     </>
   );

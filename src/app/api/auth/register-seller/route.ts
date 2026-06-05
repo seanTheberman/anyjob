@@ -1,5 +1,20 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+
+function cleanString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanStringArray(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => cleanString(item)).filter(Boolean);
+}
+
+function cleanNumber(value: unknown, fallback: number | null = null) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,15 +39,43 @@ export async function POST(request: NextRequest) {
       idDocumentUrl,
       selfieVideoUrl,
       insuranceDocumentUrl,
+      workMode = "freelance",
+      shiftNiches,
+      shiftRoles,
+      shiftSkills,
+      shiftCertifications,
+      shiftAvailability,
+      travelRadiusKm,
+      preferredHourlyRate,
+      preferredDayRate,
+      openToFreelanceJobs,
+      openToUrgentShifts,
+      openToRecurringShifts,
       termsAccepted,
       newsletterAccepted
     } = body;
+
+    const providerWorkMode = workMode === "shift" || workMode === "both" ? workMode : "freelance";
+    const wantsShiftWork = providerWorkMode === "shift" || providerWorkMode === "both";
+    const shiftNicheList = cleanStringArray(shiftNiches);
+    const shiftRoleList = cleanStringArray(shiftRoles);
+    const shiftSkillList = cleanStringArray(shiftSkills);
+    const shiftCertificationList = cleanStringArray(shiftCertifications);
+    const hourlyRate = cleanNumber(preferredHourlyRate);
+    const dayRate = cleanNumber(preferredDayRate);
 
     // Validation
     if (!firstName || !lastName || !email || !phone || !password || !address || 
         !city || !postalCode || !birthDate || !serviceCategory) {
       return NextResponse.json(
         { error: "All required fields must be filled" },
+        { status: 400 }
+      );
+    }
+
+    if (wantsShiftWork && (!shiftNicheList.length || !shiftRoleList.length || (!hourlyRate && !dayRate))) {
+      return NextResponse.json(
+        { error: "Shift workers must choose at least one niche, one role, and a preferred hourly or day rate" },
         { status: 400 }
       );
     }
@@ -141,6 +184,9 @@ export async function POST(request: NextRequest) {
           selfie_video_url: selfieVideoUrl || null,
           insurance_document_url: insuranceDocumentUrl || null,
           kyc_submitted_at: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? new Date().toISOString() : null,
+          provider_work_mode: providerWorkMode,
+          can_work_freelance: providerWorkMode === "freelance" || providerWorkMode === "both",
+          can_work_shifts: wantsShiftWork,
           terms_accepted: termsAccepted,
           newsletter_subscribed: newsletterAccepted || false,
           status: 'pending',
@@ -172,6 +218,9 @@ export async function POST(request: NextRequest) {
         is_verified: false,
         kyc_status: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? 'submitted' : 'not_started',
         kyc_submitted_at: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? new Date().toISOString() : null,
+        provider_work_mode: providerWorkMode,
+        can_work_freelance: providerWorkMode === "freelance" || providerWorkMode === "both",
+        can_work_shifts: wantsShiftWork,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' });
 
@@ -181,6 +230,50 @@ export async function POST(request: NextRequest) {
         { error: "Failed to create provider profile" },
         { status: 500 }
       );
+    }
+
+    if (wantsShiftWork) {
+      const admin = createAdminSupabaseClient();
+      const adminDb = admin as never as {
+        from: (table: string) => {
+          upsert: (values: Record<string, unknown>, options?: Record<string, unknown>) => {
+            select: (columns?: string) => {
+              single: () => Promise<{ data: Record<string, unknown> | null; error: { message: string } | null }>;
+            };
+          };
+        };
+      };
+
+      const { error: shiftProfileError } = await adminDb
+        .from("shift_worker_profiles")
+        .upsert({
+          user_id: authData.user.id,
+          provider_profile_id: authData.user.id,
+          work_mode: providerWorkMode === "both" ? "both" : "shift",
+          niches: shiftNicheList,
+          preferred_roles: shiftRoleList,
+          skills: shiftSkillList,
+          certifications: shiftCertificationList,
+          availability: shiftAvailability && typeof shiftAvailability === "object" ? shiftAvailability : {},
+          travel_radius_km: cleanNumber(travelRadiusKm, 10),
+          preferred_hourly_rate: hourlyRate,
+          preferred_day_rate: dayRate,
+          market_rate_acknowledged_at: new Date().toISOString(),
+          open_to_freelance_jobs: providerWorkMode === "both" || openToFreelanceJobs === true,
+          open_to_urgent_shifts: openToUrgentShifts === true,
+          open_to_recurring_shifts: openToRecurringShifts === true,
+          status: "available",
+        }, { onConflict: "user_id" })
+        .select("*")
+        .single();
+
+      if (shiftProfileError) {
+        console.error("Shift worker profile insert error:", shiftProfileError);
+        return NextResponse.json(
+          { error: "Seller account was created, but shift worker profile setup failed" },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json({

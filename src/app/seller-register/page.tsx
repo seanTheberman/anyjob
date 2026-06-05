@@ -1,13 +1,51 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2 } from "lucide-react";
+import { getShiftNiche, SHIFT_NICHES } from "@/lib/shift-work";
+
+type ProviderWorkMode = "freelance" | "shift" | "both";
+
+type SellerRegistrationForm = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  password: string;
+  confirmPassword: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  birthDate: string;
+  serviceCategory: string;
+  experience: string;
+  description: string;
+  workMode: ProviderWorkMode;
+  shiftNiche: string;
+  shiftRoles: string[];
+  shiftSkills: string;
+  shiftCertifications: string;
+  shiftAvailability: string;
+  travelRadiusKm: string;
+  preferredHourlyRate: string;
+  preferredDayRate: string;
+  openToFreelanceJobs: boolean;
+  openToUrgentShifts: boolean;
+  openToRecurringShifts: boolean;
+  siret: string;
+  insurance: string;
+  documentUrl: string;
+  selfieVideoUrl: string;
+  insuranceDocumentUrl: string;
+  termsAccepted: boolean;
+  newsletterAccepted: boolean;
+};
 
 export default function SellerRegisterPage() {
   const router = useRouter();
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<SellerRegistrationForm>({
     firstName: "",
     lastName: "",
     email: "",
@@ -21,6 +59,18 @@ export default function SellerRegisterPage() {
     serviceCategory: "",
     experience: "",
     description: "",
+    workMode: "freelance" as ProviderWorkMode,
+    shiftNiche: SHIFT_NICHES[0].value,
+    shiftRoles: [] as string[],
+    shiftSkills: "",
+    shiftCertifications: "",
+    shiftAvailability: "",
+    travelRadiusKm: "10",
+    preferredHourlyRate: String(SHIFT_NICHES[0].hourlyAverage),
+    preferredDayRate: String(SHIFT_NICHES[0].dayAverage),
+    openToFreelanceJobs: true,
+    openToUrgentShifts: false,
+    openToRecurringShifts: false,
     siret: "",
     insurance: "",
     documentUrl: "",
@@ -49,8 +99,29 @@ export default function SellerRegisterPage() {
     "Tutoring",
     "Pet Care",
     "Children",
+    "Healthcare",
+    "Hospitality",
+    "Retail",
+    "Logistics",
+    "Events",
     "Other"
   ];
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    if (mode === "shift" || mode === "both" || mode === "freelance") {
+      const niche = getShiftNiche(params.get("niche"));
+      setFormData((prev) => ({
+        ...prev,
+        workMode: mode,
+        serviceCategory: mode === "shift" || mode === "both" ? niche.label : prev.serviceCategory,
+        shiftNiche: niche.value,
+        preferredHourlyRate: String(niche.hourlyAverage),
+        preferredDayRate: String(niche.dayAverage),
+      }));
+    }
+  }, []);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -58,6 +129,37 @@ export default function SellerRegisterPage() {
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }));
     }
+  };
+
+  const handleWorkModeChange = (mode: ProviderWorkMode) => {
+    const niche = getShiftNiche(formData.shiftNiche);
+    setFormData((prev) => ({
+      ...prev,
+      workMode: mode,
+      serviceCategory: mode === "shift" || mode === "both" ? niche.label : prev.serviceCategory,
+      openToFreelanceJobs: mode === "both" || prev.openToFreelanceJobs,
+    }));
+  };
+
+  const handleShiftNicheChange = (value: string) => {
+    const niche = getShiftNiche(value);
+    setFormData((prev) => ({
+      ...prev,
+      shiftNiche: niche.value,
+      serviceCategory: niche.label,
+      preferredHourlyRate: String(niche.hourlyAverage),
+      preferredDayRate: String(niche.dayAverage),
+      shiftRoles: prev.shiftRoles.filter((role) => (niche.roles as readonly string[]).includes(role)),
+    }));
+  };
+
+  const toggleShiftRole = (role: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      shiftRoles: prev.shiftRoles.includes(role)
+        ? prev.shiftRoles.filter((item) => item !== role)
+        : [...prev.shiftRoles, role],
+    }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,6 +199,12 @@ export default function SellerRegisterPage() {
       if (!formData.birthDate) newErrors.birthDate = "La date de naissance est requise";
       else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.birthDate)) newErrors.birthDate = "Use YYYY-MM-DD format";
       if (!formData.serviceCategory) newErrors.serviceCategory = "La catégorie de service est requise";
+      if ((formData.workMode === "shift" || formData.workMode === "both") && formData.shiftRoles.length === 0) {
+        newErrors.shiftRoles = "Choose at least one shift role";
+      }
+      if ((formData.workMode === "shift" || formData.workMode === "both") && !formData.preferredHourlyRate && !formData.preferredDayRate) {
+        newErrors.shiftRate = "Set an hourly or day fee";
+      }
     } else if (step === 3) {
       if (!formData.siret.trim()) newErrors.siret = "Le numéro SIRET est requis";
       if (!uploadedFile && !formData.documentUrl.trim()) newErrors.document = "Le document est requis";
@@ -147,6 +255,18 @@ export default function SellerRegisterPage() {
             serviceCategory: formData.serviceCategory,
             experience: formData.experience,
             description: formData.description,
+            workMode: formData.workMode,
+            shiftNiches: formData.workMode === "shift" || formData.workMode === "both" ? [formData.shiftNiche] : [],
+            shiftRoles: formData.shiftRoles,
+            shiftSkills: formData.shiftSkills.split(",").map((item) => item.trim()).filter(Boolean),
+            shiftCertifications: formData.shiftCertifications.split(",").map((item) => item.trim()).filter(Boolean),
+            shiftAvailability: { note: formData.shiftAvailability },
+            travelRadiusKm: Number(formData.travelRadiusKm),
+            preferredHourlyRate: formData.preferredHourlyRate ? Number(formData.preferredHourlyRate) : null,
+            preferredDayRate: formData.preferredDayRate ? Number(formData.preferredDayRate) : null,
+            openToFreelanceJobs: formData.workMode === "both" || formData.openToFreelanceJobs,
+            openToUrgentShifts: formData.openToUrgentShifts,
+            openToRecurringShifts: formData.openToRecurringShifts,
             siret: formData.siret,
             insurance: formData.insurance,
             idDocumentUrl: uploadedDocumentDataUrl || formData.documentUrl,
@@ -228,6 +348,48 @@ export default function SellerRegisterPage() {
           {currentStep === 1 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Personal Info</h2>
+
+              <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-gray-900">How do you want to work on AnyJob?</p>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {[
+                    {
+                      value: "freelance" as ProviderWorkMode,
+                      title: "I want to work freelance",
+                      description: "See normal AnyJob service requests and quote clients.",
+                    },
+                    {
+                      value: "shift" as ProviderWorkMode,
+                      title: "I want to work in shifts",
+                      description: "Join the business shift-worker pool for day-wage and shift jobs.",
+                    },
+                    {
+                      value: "both" as ProviderWorkMode,
+                      title: "I want both",
+                      description: "See shift jobs and keep access to freelance jobs.",
+                    },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => handleWorkModeChange(option.value)}
+                      className={`rounded-lg border p-4 text-left transition-colors ${
+                        formData.workMode === option.value
+                          ? "border-blue-500 bg-white ring-2 ring-blue-100"
+                          : "border-gray-200 bg-white hover:border-gray-300"
+                      }`}
+                    >
+                      <span className="block text-sm font-semibold text-gray-950">{option.title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-gray-600">{option.description}</span>
+                    </button>
+                  ))}
+                </div>
+                {formData.workMode === "freelance" ? (
+                  <p className="mt-3 text-xs text-gray-600">Freelance-only providers will not see business shift jobs unless they opt in later.</p>
+                ) : (
+                  <p className="mt-3 text-xs text-blue-700">Shift mode creates your worker-pool profile immediately after registration and verification submission.</p>
+                )}
+              </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -480,6 +642,147 @@ export default function SellerRegisterPage() {
                     )}
                   </div>
                 </div>
+
+                {(formData.workMode === "shift" || formData.workMode === "both") && (
+                  <div className="md:col-span-2 rounded-xl border border-blue-100 bg-blue-50 p-4">
+                    <div className="mb-4 flex flex-col gap-1">
+                      <h3 className="text-base font-semibold text-gray-950">Shift worker setup</h3>
+                      <p className="text-sm text-gray-600">Choose your niche and set the fee businesses will see when they browse the worker pool.</p>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Shift niche *</label>
+                        <select
+                          value={formData.shiftNiche}
+                          onChange={(e) => handleShiftNicheChange(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        >
+                          {SHIFT_NICHES.map((niche) => (
+                            <option key={niche.value} value={niche.value}>{niche.label}</option>
+                          ))}
+                        </select>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Average: €{getShiftNiche(formData.shiftNiche).hourlyAverage}/hour or €{getShiftNiche(formData.shiftNiche).dayAverage}/day
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Travel radius</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.travelRadiusKm}
+                          onChange={(e) => handleInputChange("travelRadiusKm", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Preferred hourly fee</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.preferredHourlyRate}
+                          onChange={(e) => handleInputChange("preferredHourlyRate", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Preferred day fee</label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={formData.preferredDayRate}
+                          onChange={(e) => handleInputChange("preferredDayRate", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <p className="mb-2 text-sm font-medium text-gray-700">Roles you can perform *</p>
+                      <div className="flex flex-wrap gap-2">
+                        {getShiftNiche(formData.shiftNiche).roles.map((role) => (
+                          <button
+                            key={role}
+                            type="button"
+                            onClick={() => toggleShiftRole(role)}
+                            className={`rounded-full border px-3 py-1.5 text-sm font-medium ${
+                              formData.shiftRoles.includes(role)
+                                ? "border-blue-500 bg-blue-600 text-white"
+                                : "border-gray-200 bg-white text-gray-700 hover:border-blue-200"
+                            }`}
+                          >
+                            {role}
+                          </button>
+                        ))}
+                      </div>
+                      {errors.shiftRoles && <p className="mt-1 text-xs text-red-500">{errors.shiftRoles}</p>}
+                      {errors.shiftRate && <p className="mt-1 text-xs text-red-500">{errors.shiftRate}</p>}
+                    </div>
+
+                    <div className="mt-4 grid gap-4 md:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Skills</label>
+                        <input
+                          value={formData.shiftSkills}
+                          onChange={(e) => handleInputChange("shiftSkills", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          placeholder="Comma-separated, e.g. patient care, stockroom"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Certificates or training</label>
+                        <input
+                          value={formData.shiftCertifications}
+                          onChange={(e) => handleInputChange("shiftCertifications", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                          placeholder="Comma-separated"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Availability note</label>
+                      <textarea
+                        value={formData.shiftAvailability}
+                        onChange={(e) => handleInputChange("shiftAvailability", e.target.value)}
+                        rows={3}
+                        className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                        placeholder="Example: weekdays after 6pm, weekends all day"
+                      />
+                    </div>
+
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={formData.openToFreelanceJobs}
+                          onChange={(e) => handleInputChange("openToFreelanceJobs", e.target.checked)}
+                        />
+                        Also show freelance jobs
+                      </label>
+                      <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={formData.openToUrgentShifts}
+                          onChange={(e) => handleInputChange("openToUrgentShifts", e.target.checked)}
+                        />
+                        Same-day shifts
+                      </label>
+                      <label className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={formData.openToRecurringShifts}
+                          onChange={(e) => handleInputChange("openToRecurringShifts", e.target.checked)}
+                        />
+                        Recurring shifts
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

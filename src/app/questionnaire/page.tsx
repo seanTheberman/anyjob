@@ -319,7 +319,8 @@ function ServiceQuestionnaireContent() {
   // Get pre-selected category from URL
   useEffect(() => {
     const cat = searchParams.get("category");
-    if (cat) {
+    const providerId = searchParams.get("provider");
+    if (cat && !providerId) {
       setFormData((prev) => ({
         ...prev,
         category_slug: cat,

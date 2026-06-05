@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   BriefcaseBusiness,
+  Building2,
   CreditCard,
   FileText,
   Headphones,
@@ -17,6 +18,7 @@ export const adminNavItems = [
   { label: "Overview", href: "/admin", icon: LayoutDashboard },
   { label: "Users", href: "/admin/users", icon: Users },
   { label: "Providers", href: "/admin/providers", icon: ShieldCheck },
+  { label: "Businesses", href: "/admin/businesses", icon: Building2 },
   { label: "KYC Review", href: "/admin/kyc", icon: ScanFace },
   { label: "Jobs", href: "/admin/jobs", icon: BriefcaseBusiness },
   { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
@@ -52,6 +54,19 @@ export type AdminProvider = {
   rating: string;
   jobs: number;
   accountStatus: string;
+};
+
+export type AdminBusiness = {
+  id: string;
+  name: string;
+  registrationNumber: string;
+  industry: string;
+  city: string;
+  contact: string;
+  document: string;
+  status: string;
+  workTypes: string;
+  created: string;
 };
 
 export type KycReview = {

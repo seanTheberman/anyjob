@@ -15,24 +15,46 @@ interface UploadedFile {
   description?: string;
 }
 
+type ProfileState = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  bio: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  hourlyRate: number;
+  profileImageUrl: string;
+  rating: number;
+  totalJobs: number;
+  kycStatus: string;
+};
+
+const emptyProfile: ProfileState = {
+  firstName: "",
+  lastName: "",
+  email: "",
+  phone: "",
+  bio: "",
+  address: "",
+  city: "",
+  postalCode: "",
+  hourlyRate: 0,
+  profileImageUrl: "",
+  rating: 0,
+  totalJobs: 0,
+  kycStatus: "not_started",
+};
+
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    bio: "",
-    address: "",
-    city: "",
-    postalCode: "",
-    hourlyRate: 0,
-    profileImageUrl: "",
-    rating: 0,
-    totalJobs: 0,
-    kycStatus: "not_started",
-  });
+  const [profile, setProfile] = useState<ProfileState>(emptyProfile);
+  const [savedProfile, setSavedProfile] = useState<ProfileState>(emptyProfile);
   const [kycFiles, setKycFiles] = useState<UploadedFile[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
@@ -47,7 +69,7 @@ export default function ProfilePage() {
         .single();
 
       if (seller) {
-        setProfile({
+        const nextProfile = {
           firstName: seller.first_name || "",
           lastName: seller.last_name || "",
           email: seller.email || user.email || "",
@@ -61,7 +83,9 @@ export default function ProfilePage() {
           rating: seller.rating || 0,
           totalJobs: seller.total_jobs || 0,
           kycStatus: seller.verification_status || "not_started",
-        });
+        };
+        setProfile(nextProfile);
+        setSavedProfile(nextProfile);
       }
 
       const { data: files } = await supabase
@@ -76,6 +100,93 @@ export default function ProfilePage() {
     loadProfile();
   }, [supabase]);
 
+  async function saveProfile() {
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setSaving(false);
+      setSaveError("Sign in again before saving profile changes.");
+      return;
+    }
+
+    const normalizedProfile = {
+      ...profile,
+      firstName: profile.firstName.trim(),
+      lastName: profile.lastName.trim(),
+      email: profile.email.trim().toLowerCase(),
+      phone: profile.phone.trim(),
+      bio: profile.bio.trim(),
+      address: profile.address.trim(),
+      city: profile.city.trim(),
+      postalCode: profile.postalCode.trim(),
+      hourlyRate: Number.isFinite(profile.hourlyRate) ? profile.hourlyRate : 0,
+    };
+
+    if (!normalizedProfile.firstName || !normalizedProfile.lastName || !normalizedProfile.email || !normalizedProfile.phone) {
+      setSaving(false);
+      setSaveError("First name, last name, email, and phone are required.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedProfile.email)) {
+      setSaving(false);
+      setSaveError("Enter a valid email address.");
+      return;
+    }
+
+    const sellerUpdate = {
+      first_name: normalizedProfile.firstName,
+      last_name: normalizedProfile.lastName,
+      email: normalizedProfile.email,
+      phone: normalizedProfile.phone,
+      description: normalizedProfile.bio || null,
+      address: normalizedProfile.address,
+      city: normalizedProfile.city,
+      postal_code: normalizedProfile.postalCode,
+      hourly_rate: normalizedProfile.hourlyRate,
+      profile_image_url: normalizedProfile.profileImageUrl || null,
+    };
+
+    const profileUpdate = {
+      first_name: normalizedProfile.firstName,
+      last_name: normalizedProfile.lastName,
+      email: normalizedProfile.email,
+      phone: normalizedProfile.phone,
+      bio: normalizedProfile.bio || null,
+      city: normalizedProfile.city,
+      postal_code: normalizedProfile.postalCode,
+      avatar_url: normalizedProfile.profileImageUrl || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    const [sellerResult, profileResult] = await Promise.all([
+      supabase.from("sellers").update(sellerUpdate).eq("id", user.id),
+      supabase.from("eloo_profiles").update(profileUpdate).eq("id", user.id),
+    ]);
+
+    if (sellerResult.error || profileResult.error) {
+      setSaving(false);
+      setSaveError(sellerResult.error?.message || profileResult.error?.message || "Profile changes could not be saved.");
+      return;
+    }
+
+    setProfile(normalizedProfile);
+    setSavedProfile(normalizedProfile);
+    setIsEditing(false);
+    setSaving(false);
+    setSaveMessage("Profile changes saved.");
+  }
+
+  function cancelEditing() {
+    setProfile(savedProfile);
+    setIsEditing(false);
+    setSaveError(null);
+    setSaveMessage(null);
+  }
+
   return (
     <ProviderLayout>
       <div className="max-w-4xl mx-auto mt-4 lg:mt-6">
@@ -84,23 +195,55 @@ export default function ProfilePage() {
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Profile</h1>
             <p className="text-gray-600">Manage your professional profile</p>
           </div>
-          <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <div className="flex flex-wrap justify-end gap-2">
             {isEditing ? (
-              <>
-                <Save className="w-4 h-4" />
-                Save Changes
-              </>
-            ) : (
-              <>
-                <Edit2 className="w-4 h-4" />
-                Edit Profile
-              </>
-            )}
-          </button>
+              <button
+                type="button"
+                onClick={cancelEditing}
+                disabled={saving}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (isEditing) void saveProfile();
+                else {
+                  setSaveError(null);
+                  setSaveMessage(null);
+                  setIsEditing(true);
+                }
+              }}
+              disabled={saving}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isEditing ? (
+                <>
+                  <Save className="w-4 h-4" />
+                  {saving ? "Saving..." : "Save Changes"}
+                </>
+              ) : (
+                <>
+                  <Edit2 className="w-4 h-4" />
+                  Edit Profile
+                </>
+              )}
+            </button>
+          </div>
         </div>
+
+        {saveError ? (
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+            {saveError}
+          </div>
+        ) : null}
+        {saveMessage ? (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+            {saveMessage}
+          </div>
+        ) : null}
 
         {/* Profile Photo */}
         <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">

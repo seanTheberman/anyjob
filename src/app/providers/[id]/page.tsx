@@ -1,5 +1,6 @@
 import Image from "next/image";
-import { Mail, MapPin, Phone, Star, Check, MessageCircle } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Briefcase, Check, Clock, MapPin, Star } from "lucide-react";
 import { ProviderProfileLayout } from "@/components/providers/ProviderProfileLayout";
 
 const PROVIDERS: Record<string, ProviderProfile> = {
@@ -7,6 +8,7 @@ const PROVIDERS: Record<string, ProviderProfile> = {
         id: "volodymyr-handyman",
         name: "Volodymyr",
         category: "Handyman",
+        categorySlug: "bricolage",
         avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop",
         rating: 4.8,
         reviewCount: 23,
@@ -36,6 +38,7 @@ type ProviderProfile = {
     id: string;
     name: string;
     category: string;
+    categorySlug: string;
     avatar: string;
     rating: number;
     reviewCount: number;
@@ -56,6 +59,7 @@ function buildFallbackProvider(slug: string): ProviderProfile {
         id: slug,
         name: "Provider",
         category: "Service",
+        categorySlug: "custom",
         avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=800&auto=format&fit=crop",
         rating: 4.8,
         reviewCount: 12,
@@ -81,6 +85,7 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
     const { id } = await params;
     const normalizedId = decodeURIComponent(id).replace(/\.$/, "");
     const provider = PROVIDERS[normalizedId] ?? buildFallbackProvider(normalizedId);
+    const bookingHref = `/questionnaire?provider=${encodeURIComponent(provider.id)}&providerName=${encodeURIComponent(provider.name)}&providerCategory=${encodeURIComponent(provider.categorySlug)}`;
 
     return (
         <ProviderProfileLayout>
@@ -105,9 +110,9 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
                         <div className="space-y-3 mb-6">
                             <div className="flex items-center">
                                 <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center mr-3">
-                                    <Mail className="w-4 h-4 text-red-500" />
+                                    <Briefcase className="w-4 h-4 text-red-500" />
                                 </div>
-                                <span className="text-gray-700">{provider.email}</span>
+                                <span className="text-gray-700">{provider.services.slice(0, 2).join(" · ")}</span>
                             </div>
                             <div className="flex items-center">
                                 <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center mr-3">
@@ -117,25 +122,20 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
                             </div>
                             <div className="flex items-center">
                                 <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center mr-3">
-                                    <Phone className="w-4 h-4 text-red-500" />
-                                </div>
-                                <span className="text-gray-700">{provider.phone}</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center mr-3">
-                                    <MessageCircle className="w-4 h-4 text-red-500" />
+                                    <Clock className="w-4 h-4 text-red-500" />
                                 </div>
                                 <span className="text-gray-700">{provider.experience}</span>
                             </div>
                         </div>
-                        <div className="flex gap-4">
-                            <button className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+                        <div className="flex flex-col gap-3 sm:flex-row">
+                            <Link href={bookingHref} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700">
                                 Book this provider
-                            </button>
-                            <button className="flex-1 border border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-medium hover:bg-gray-50 transition-colors">
-                                Send a message
-                            </button>
+                                <ArrowRight className="h-4 w-4" />
+                            </Link>
                         </div>
+                        <p className="mt-3 text-sm text-gray-500">
+                            Booking starts with job details first. You will describe the work before any booking is confirmed.
+                        </p>
                     </div>
                 </div>
 
@@ -163,13 +163,13 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
                     <div className="space-y-3">
                         <div className="flex items-center">
                             <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center mr-3">
-                                <MessageCircle className="w-4 h-4 text-red-500" />
+                                <Briefcase className="w-4 h-4 text-red-500" />
                             </div>
                             <span className="text-gray-700"><strong>Hourly Rate:</strong> {provider.hourlyRate}</span>
                         </div>
                         <div className="flex items-center">
                             <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center mr-3">
-                                <MessageCircle className="w-4 h-4 text-red-500" />
+                                <Clock className="w-4 h-4 text-red-500" />
                             </div>
                             <span className="text-gray-700"><strong>Availability:</strong> {provider.availability}</span>
                         </div>
@@ -243,35 +243,8 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
                         </div>
                     </div>
 
-                    {/* Give Rating & Write Review */}
-                    <div className="mb-6">
-                        <div className="flex items-center gap-4 mb-4">
-                            <span className="text-gray-700">Give us rating</span>
-                            <div className="flex gap-1">
-                                {[...Array(5)].map((_, i) => (
-                                    <Star key={i} className="w-6 h-6 text-gray-200 cursor-pointer hover:text-yellow-400" />
-                                ))}
-                            </div>
-                        </div>
-                        <button className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            Write a Review
-                        </button>
-                    </div>
-
-                    {/* Review Form */}
-                    <div className="mb-8">
-                        <textarea 
-                            className="w-full h-32 p-4 bg-gray-100 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-red-500"
-                            placeholder="Share your experience..."
-                        />
-                        <div className="flex justify-end mt-4">
-                            <button className="bg-red-500 text-white px-8 py-2 rounded-lg font-medium hover:bg-red-600 transition-colors">
-                                Submit
-                            </button>
-                        </div>
+                    <div className="mb-8 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600">
+                        Reviews are shown from completed bookings. Only clients who booked and completed work with this provider can leave a rating.
                     </div>
 
                     {/* Customer Reviews */}

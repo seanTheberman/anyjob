@@ -12,6 +12,7 @@ const NAV_LINKS = [
     { href: "/search", label: "Find a Provider" },
     { href: "/how-it-works", label: "How it works" },
     { href: "/become-provider", label: "Become a Provider" },
+    { href: "/register-business", label: "Register as a Business" },
 ];
 
 export function Header() {

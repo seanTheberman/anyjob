@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
-import type { AdminProvider, AdminUser, KycReview } from "../_components/admin-data";
+import type { AdminBusiness, AdminProvider, AdminUser, KycReview } from "../_components/admin-data";
 
 type AnyRecord = Record<string, unknown>;
 
@@ -173,9 +173,11 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
     const hasInsurance = Boolean(row.insurance_document_url || row.insurance_status === "approved");
     const docsSubmitted = hasId && hasSelfie && hasInsurance;
     const sellerStatus = String(row.status || "").toLowerCase();
-    const isVerified = row.is_verified === true || sellerStatus === "approved";
-    const kycStatus = isVerified ? "Approved" : sellerStatus === "rejected" ? "Rejected" : !docsSubmitted || !hasInsurance ? "Missing document" : "Needs review";
-    const accountStatus = isVerified ? "Active" : sellerStatus === "rejected" || sellerStatus === "suspended" ? "Blocked" : "Limited";
+    const isSuspended = sellerStatus === "suspended";
+    const isRejected = sellerStatus === "rejected";
+    const isVerified = !isSuspended && !isRejected && (row.is_verified === true || sellerStatus === "approved");
+    const kycStatus = isSuspended ? "Suspended" : isVerified ? "Approved" : isRejected ? "Rejected" : !docsSubmitted || !hasInsurance ? "Missing document" : "Needs review";
+    const accountStatus = isVerified ? "Active" : isSuspended || isRejected ? "Blocked" : "Limited";
 
     return {
       id,
@@ -191,6 +193,23 @@ export async function getAdminProviders(): Promise<AdminProvider[]> {
       accountStatus,
     };
   });
+}
+
+export async function getAdminBusinesses(): Promise<AdminBusiness[]> {
+  const businesses = await maybeRows<AnyRecord>("business_profiles");
+
+  return businesses.map((row) => ({
+    id: String(row.id || ""),
+    name: String(row.business_name || row.legal_name || "Unknown business"),
+    registrationNumber: String(row.registration_number || "Missing"),
+    industry: String(row.industry || "Unknown"),
+    city: String(row.city || "Unknown"),
+    contact: [row.contact_name, row.contact_email, row.contact_phone].filter(Boolean).map(String).join(" · ") || "Not set",
+    document: row.document_url ? String(row.document_source || "Document") : "Missing document",
+    status: String(row.status || "pending"),
+    workTypes: Array.isArray(row.typical_work_types) ? row.typical_work_types.map(String).join(", ") : "Not set",
+    created: daysAgo(String(row.created_at || "")),
+  }));
 }
 
 export async function getKycReviews(): Promise<KycReview[]> {

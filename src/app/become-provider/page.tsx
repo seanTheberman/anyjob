@@ -210,13 +210,25 @@ export default function BecomeProviderPage() {
                                 </div>
                             </div>
 
-                            {/* CTA Button */}
-                            <button 
-                                onClick={() => router.push('/seller-register')}
-                                className="w-full bg-[#006340] hover:bg-[#005230] text-white font-semibold py-4 px-8 rounded-lg transition-colors cursor-pointer"
-                            >
-                                Get started
-                            </button>
+                            {/* Work Mode Choice */}
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/seller-register?mode=freelance')}
+                                    className="rounded-lg border border-[#006340]/20 bg-white px-4 py-4 text-left transition-colors hover:border-[#006340] hover:bg-green-50"
+                                >
+                                    <span className="block text-sm font-bold text-gray-950">I want to work freelance</span>
+                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Quote normal AnyJob service requests and set your own project price.</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => router.push('/seller-register?mode=shift')}
+                                    className="rounded-lg bg-[#006340] px-4 py-4 text-left text-white transition-colors hover:bg-[#005230]"
+                                >
+                                    <span className="block text-sm font-bold">I want to work in shifts</span>
+                                    <span className="mt-1 block text-xs leading-5 text-white/80">Join the business worker pool for day-wage and shift work.</span>
+                                </button>
+                            </div>
 
                             {/* Sign In Link */}
                             <p className="mt-4 text-center text-sm text-gray-600">

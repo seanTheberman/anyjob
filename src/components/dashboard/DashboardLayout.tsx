@@ -20,7 +20,8 @@ import {
   FileText,
   Moon,
   Smartphone,
-  Heart
+  Heart,
+  Building2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -34,6 +35,7 @@ interface DashboardLayoutProps {
 const sidebarItems = [
   { icon: LayoutGrid, label: "Reception", href: "/dashboard" },
   { icon: ClipboardList, label: "My requests", href: "/dashboard/requests" },
+  { icon: Building2, label: "Business", href: "/dashboard/business" },
   { icon: Mail, label: "Mail", href: "/dashboard/mail" },
   { icon: UserCircle, label: "Account", href: "/dashboard/account" },
   { icon: MessageSquare, label: "Assistance", href: "/dashboard/assistance" },
@@ -44,7 +46,7 @@ const sidebarItems = [
 const bottomNavItems = [
   { icon: LayoutGrid, label: "Home", href: "/dashboard" },
   { icon: ClipboardList, label: "Requests", href: "/dashboard/requests" },
-  { icon: Mail, label: "Messages", href: "/dashboard/mail" },
+  { icon: Building2, label: "Business", href: "/dashboard/business" },
   { icon: UserCircle, label: "Profile", href: "/dashboard/account" },
   { icon: Heart, label: "Saved", href: "/dashboard/saved" },
 ];
@@ -117,7 +119,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-hidden">
       {/* Top Navigation - Desktop Only Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 lg:block hidden">
+      <header className="fixed left-0 right-0 top-0 z-50 bg-white border-b border-gray-200 lg:block hidden">
         <div className="flex items-center justify-between px-4 lg:px-6 h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
@@ -199,7 +201,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       </header>
 
       {/* Mobile Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 lg:hidden">
+      <header className="fixed left-0 right-0 top-0 z-50 bg-white border-b border-gray-200 lg:hidden">
         <div className="flex items-center justify-between px-4 h-14">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2">
@@ -317,9 +319,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
       </header>
 
-      <div className="flex flex-1 lg:flex-row flex-col">
+      <div className="flex flex-1 flex-col pt-14 lg:flex-row lg:pt-16">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:block sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 overflow-y-auto">
+        <aside className="hidden lg:block fixed left-0 top-16 bottom-0 z-40 w-64 bg-white border-r border-gray-200 overflow-y-auto">
           <nav className="p-4 pt-12 space-y-1">
             {sidebarItems.map((item) => {
               const Icon = item.icon;
@@ -353,7 +355,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-h-[calc(100vh-8rem)] lg:min-h-[calc(100vh-4rem)] p-4 lg:p-6 pb-24 lg:pb-6">
+        <main className="flex-1 min-h-[calc(100vh-8rem)] lg:ml-64 lg:min-h-[calc(100vh-4rem)] p-4 lg:p-6 pb-24 lg:pb-6">
           {children}
         </main>
       </div>

@@ -16,6 +16,7 @@ import {
   Bell,
   CheckCircle,
   Clock,
+  Calendar,
   BarChart3,
   Award,
   ChevronDown,
@@ -27,7 +28,6 @@ import {
   Moon,
   Smartphone,
   Home,
-  History,
   Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -40,6 +40,7 @@ interface ProviderLayoutProps {
 const sidebarItems = [
   { icon: Briefcase, label: "Live Jobs", href: "/pro" },
   { icon: Search, label: "Browse Jobs", href: "/pro/jobs" },
+  { icon: Calendar, label: "Shift Board", href: "/pro/shifts" },
   { icon: User, label: "Profile", href: "/pro/profile" },
   { icon: Wrench, label: "My Services", href: "/pro/services" },
   { icon: DollarSign, label: "Earnings", href: "/pro/earnings" },
@@ -56,7 +57,7 @@ const sidebarItems = [
 const bottomNavItems = [
   { icon: Home, label: "Home", href: "/pro" },
   { icon: Briefcase, label: "Jobs", href: "/pro/jobs" },
-  { icon: History, label: "Completed", href: "/pro/completed" },
+  { icon: Calendar, label: "Shifts", href: "/pro/shifts" },
   { icon: MessageSquare, label: "Chat", href: "/pro/messages" },
   { icon: User, label: "Profile", href: "/pro/profile" },
 ];
@@ -368,7 +369,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         )}
       </header>
 
-      <div className="flex flex-1 lg:flex-row flex-col">
+      <div className="flex min-h-0 flex-1 lg:flex-row flex-col">
         {/* Desktop Sidebar */}
         <aside className="hidden lg:block sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 overflow-y-auto">
           <nav className="p-4 pt-12 space-y-1">
@@ -404,7 +405,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-h-[calc(100vh-8rem)] lg:min-h-[calc(100vh-4rem)] p-4 lg:p-6 pb-24 lg:pb-6">
+        <main className="flex-1 min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">
           {children}
         </main>
       </div>

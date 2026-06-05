@@ -29,6 +29,7 @@ export function SearchBar() {
     const [selectedLanguage, setSelectedLanguage] = useState("en");
     const [showLanguageSelector, setShowLanguageSelector] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
+    const searchBoxRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Detect language based on geolocation (timezone)
@@ -256,8 +257,8 @@ export function SearchBar() {
 
     return (
         <>
-        <div className="absolute left-1/2 top-[58%] z-[9999] w-full max-w-2xl -translate-x-1/2 px-4 sm:top-1/2 sm:translate-y-30" ref={searchRef}>
-            <div className="relative flex min-h-16 items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-gray-800 dark:bg-gray-900 sm:min-h-0 sm:gap-0 sm:overflow-hidden sm:p-0">
+        <div className="absolute left-1/2 top-[58%] z-[100000] w-full max-w-2xl -translate-x-1/2 px-4 sm:top-1/2 sm:translate-y-30" ref={searchRef}>
+            <div ref={searchBoxRef} className="relative z-[100000] flex min-h-16 items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-gray-800 dark:bg-gray-900 sm:min-h-0 sm:gap-0 sm:p-0">
                 <Search className="ml-2 h-5 w-5 shrink-0 text-gray-400 sm:ml-5" />
                 <input
                     ref={inputRef}
@@ -292,22 +293,10 @@ export function SearchBar() {
                     <Search className="h-5 w-5 sm:hidden" />
                     <span className="hidden sm:inline">Search</span>
                 </button>
-            </div>
 
-            <div className="mt-[52px] flex justify-center">
-                <button
-                    type="button"
-                    onClick={handleCustomService}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/15 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/60"
-                >
-                    <PlusCircle className="h-4 w-4" />
-                    Request custom service
-                </button>
-            </div>
-
-            {/* Language Selector Dropdown */}
-            {showLanguageSelector && (
-                <div className="absolute top-full right-0 mt-3 z-[99999] w-72 bg-white dark:bg-gray-950 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
+                {/* Language Selector Dropdown */}
+                {showLanguageSelector && (
+                <div className="absolute right-0 top-full mt-2 z-[100001] w-72 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.3)] animate-in fade-in zoom-in duration-200 dark:border-gray-800 dark:bg-gray-950">
                     <div className="p-2 max-h-[400px] overflow-y-auto scrollbar-hide">
                         <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
                             Select Language
@@ -343,11 +332,11 @@ export function SearchBar() {
                         ))}
                     </div>
                 </div>
-            )}
+                )}
 
-            {/* Predictive Dropdown */}
-            {showDropdown && (
-                <div className="absolute top-full left-0 w-full mt-2 z-[99998]">
+                {/* Predictive Dropdown */}
+                {showDropdown && (
+                <div className="absolute left-0 top-full z-[100001] mt-2 w-full">
                     {filteredCategories.length > 0 ? (
                         <div className="bg-white dark:bg-gray-950 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-gray-100 dark:border-gray-800 overflow-hidden animate-in fade-in zoom-in duration-200">
                             <div className="p-2 max-h-[400px] overflow-y-auto scrollbar-hide">
@@ -415,7 +404,19 @@ export function SearchBar() {
                         </div>
                     )}
                 </div>
-            )}
+                )}
+            </div>
+
+            <div className="mt-[52px] flex justify-center">
+                <button
+                    type="button"
+                    onClick={handleCustomService}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/15 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/60"
+                >
+                    <PlusCircle className="h-4 w-4" />
+                    Request custom service
+                </button>
+            </div>
         </div>
         </>
     );
