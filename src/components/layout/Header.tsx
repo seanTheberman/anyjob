@@ -89,8 +89,13 @@ export function Header() {
 
                     {/* Mobile Menu */}
                     <Sheet>
-                        <SheetTrigger id="mobile-menu-trigger" className="lg:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <SheetTrigger
+                            id="mobile-menu-trigger"
+                            aria-label="Open menu"
+                            className="lg:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                        >
                             <Menu className="w-5 h-5" />
+                            <span className="sr-only">Open menu</span>
                         </SheetTrigger>
                         <SheetContent side="right" className="w-80 p-0">
                             <div className="flex flex-col h-full">
