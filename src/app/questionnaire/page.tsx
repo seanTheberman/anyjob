@@ -139,6 +139,11 @@ const SUBCATEGORIES: Record<string, Subcategory[]> = {
   ],
 };
 
+function getSubcategoryDisplayName(categorySlug: string, subcategorySlug: string) {
+  if (subcategorySlug.startsWith("other-")) return "Other";
+  return SUBCATEGORIES[categorySlug]?.find((subcategory) => subcategory.slug === subcategorySlug)?.name || subcategorySlug;
+}
+
 const SERVICE_TYPES = [
   { value: "one_time", label: "One time", description: "One-off service" },
   { value: "recurring", label: "Regular", description: "Recurring service (weekly, monthly...)" },
@@ -319,16 +324,26 @@ function ServiceQuestionnaireContent() {
   // Get pre-selected category from URL
   useEffect(() => {
     const cat = searchParams.get("category");
+    const subcategory = searchParams.get("subcategory");
+    const urgency = searchParams.get("urgency");
+    const customQuery = searchParams.get("custom_query")?.trim();
     const providerId = searchParams.get("provider");
     if (cat && !providerId) {
       setFormData((prev) => ({
         ...prev,
         category_slug: cat,
-        subcategory_slug: cat === "custom" ? "custom-job" : prev.subcategory_slug,
+        subcategory_slug: subcategory || (cat === "custom" ? "custom-job" : prev.subcategory_slug),
+        service_type: urgency === "emergency" ? "emergency" : prev.service_type,
+        job_urgency: urgency === "emergency" ? "asap" : prev.job_urgency,
+        custom_tags: cat === "custom" && customQuery
+          ? Array.from(new Set([...prev.custom_tags, customQuery])).slice(0, 8)
+          : prev.custom_tags,
+        tag_input: "",
       }));
-      // Skip category selection step and go directly to subcategory
-      setCurrentStep(2);
-      setStepKey(2);
+      // Skip category selection. If a subcategory is provided, continue at service type and urgency.
+      const nextStep = subcategory ? 3 : 2;
+      setCurrentStep(nextStep);
+      setStepKey(nextStep);
     }
   }, [searchParams]);
 
@@ -767,6 +782,17 @@ function Step2Subcategory({
 }) {
   const subcategories = SUBCATEGORIES[formData.category_slug] || [];
   const category = CATEGORIES.find((c) => c.slug === formData.category_slug);
+  const visibleSubcategories = category
+    ? [
+        ...subcategories,
+        {
+          id: `${category.id}-other`,
+          slug: `other-${category.slug}`,
+          name: "Other",
+          category_id: category.id,
+        },
+      ]
+    : subcategories;
 
   const addCustomTag = () => {
     const tag = formData.tag_input.trim();
@@ -872,7 +898,7 @@ function Step2Subcategory({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {subcategories.map((sub) => (
+        {visibleSubcategories.map((sub) => (
           <button
             key={sub.slug}
             onClick={() => updateFormData("subcategory_slug", sub.slug)}
@@ -1803,8 +1829,8 @@ function Step9Contact({
           <p>
             <span className="font-medium">Service:</span>{" "}
             {formData.category_slug === "custom"
-              ? "Custom Job - Flexible request"
-              : `${CATEGORIES.find((c) => c.slug === formData.category_slug)?.name} - ${SUBCATEGORIES[formData.category_slug]?.find((s) => s.slug === formData.subcategory_slug)?.name}`}
+              ? "Custom job request"
+              : `${CATEGORIES.find((c) => c.slug === formData.category_slug)?.name} - ${getSubcategoryDisplayName(formData.category_slug, formData.subcategory_slug)}`}
           </p>
           {formData.custom_tags.length > 0 && (
             <p>

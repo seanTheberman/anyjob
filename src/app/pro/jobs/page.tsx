@@ -41,7 +41,7 @@ const categoryNames: Record<string, string> = {
   "aide-domicile": "Home Help",
   "cours-particuliers": "Private Tutoring",
   hiver: "Winter Services",
-  custom: "Custom Job",
+  custom: "Custom job request",
 };
 
 const categoryColors: Record<string, string> = {
@@ -288,7 +288,11 @@ export default function BrowseJobsPage() {
                       <div>
                         <p className="text-gray-500">Subcategory</p>
                         <p className="font-medium text-gray-900">
-                          {job.category_slug === "custom" ? "Flexible request" : job.subcategory_slug}
+                          {job.category_slug === "custom"
+                            ? "Flexible request"
+                            : job.subcategory_slug.startsWith("other-")
+                              ? "Other"
+                              : job.subcategory_slug}
                         </p>
                       </div>
                       <div>

@@ -83,11 +83,12 @@ export function SearchBar() {
                 const data = await response.json() as { results?: SearchResult[] };
                 const results = data.results || [];
                 setFilteredCategories(results);
-                setShowDropdown(results.length > 0);
+                setShowDropdown(true);
                 setSelectedIndex(-1);
             } catch (error) {
                 console.error('Search error:', error);
                 setFilteredCategories([]);
+                setShowDropdown(true);
             }
         };
 
@@ -107,6 +108,22 @@ export function SearchBar() {
         return result.type === 'subcategory'
             ? `/${result.categorySlug}?subcategory=${result.slug}`
             : `/questionnaire?category=${result.slug}`;
+    }
+
+    function handleCustomService() {
+        const query = searchQuery.trim();
+        const params = new URLSearchParams({ category: "custom" });
+        if (query) params.set("custom_query", query);
+        router.push(`/questionnaire?${params.toString()}`);
+    }
+
+    function handleSearch() {
+        if (filteredCategories.length > 0) {
+            handleCategorySelect(filteredCategories[0]);
+            return;
+        }
+
+        handleCustomService();
     }
 
     // Handle keyboard navigation
@@ -131,6 +148,8 @@ export function SearchBar() {
                     e.preventDefault();
                     if (selectedIndex >= 0 && selectedIndex < filteredCategories.length) {
                         handleCategorySelect(filteredCategories[selectedIndex]);
+                    } else if (filteredCategories.length === 0) {
+                        handleCustomService();
                     }
                     break;
                 case "Escape":
@@ -157,16 +176,6 @@ export function SearchBar() {
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
-
-    const handleSearch = () => {
-        if (filteredCategories.length > 0) {
-            handleCategorySelect(filteredCategories[0]);
-        }
-    };
-
-    const handleCustomService = () => {
-        router.push("/questionnaire?category=custom");
-    };
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const nextQuery = e.target.value;

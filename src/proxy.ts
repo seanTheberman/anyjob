@@ -3,13 +3,16 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export async function proxy(request: NextRequest) {
+    const pathname = request.nextUrl.pathname
+    const isAdminRoute = pathname.startsWith('/admin')
+
     let response = NextResponse.next({
         request: {
             headers: request.headers,
         },
     })
 
-    if (process.env.ROUTE_GUARDS_ENABLED !== 'true') {
+    if (!isAdminRoute && process.env.ROUTE_GUARDS_ENABLED !== 'true') {
         return response
     }
 
@@ -45,7 +48,6 @@ export async function proxy(request: NextRequest) {
         '/admin': 'admin',
     }
 
-    const pathname = request.nextUrl.pathname
     let isProtected = false
     let requiredRole: string | null = null
 

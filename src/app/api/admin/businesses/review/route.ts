@@ -11,10 +11,6 @@ function isBusinessAction(value: unknown): value is BusinessAction {
 }
 
 async function isAdminRequest() {
-  if (process.env.ADMIN_MUTATIONS_ALLOW_UNAUTHENTICATED === "true") {
-    return true;
-  }
-
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },

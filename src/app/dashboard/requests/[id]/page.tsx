@@ -101,6 +101,7 @@ const getServiceName = (categorySlug: string, subcategorySlug: string) => {
     informatique: "IT Support",
     "aide-domicile": "Home Help",
     "cours-particuliers": "Private Tutoring",
+    custom: "Custom job request",
   };
 
   const subcategoryNames: { [key: string]: string } = {
@@ -109,10 +110,15 @@ const getServiceName = (categorySlug: string, subcategorySlug: string) => {
     "nettoyage-profond": "Deep Cleaning",
     "repassage": "Ironing",
     "nettoyage-apres-construction": "End of Construction Cleaning",
+    "custom-job": "Flexible request",
   };
 
+  if (categorySlug === "custom") {
+    return categoryNames.custom;
+  }
+
   const categoryName = categoryNames[categorySlug] || categorySlug;
-  const subcategoryName = subcategoryNames[subcategorySlug] || subcategorySlug;
+  const subcategoryName = subcategorySlug.startsWith("other-") ? "Other" : subcategoryNames[subcategorySlug] || subcategorySlug;
   
   return `${categoryName} - ${subcategoryName}`;
 };

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Clock, Phone, ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
+import { Clock, Phone, ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
 import { ProviderSlider } from "@/components/ui/provider-slider";
 import { ProviderCard } from "@/components/ui/provider-card";
 
@@ -231,9 +231,6 @@ export default function DemenagementPage() {
                                     <Phone className="mr-2 h-4 w-4" />
                                     {ANYJOB_EMERGENCY_DISPLAY}
                                 </a>
-                                <Link href="/questionnaire?category=demenagement&subcategory=help-moving-demenagement&urgency=emergency" className="inline-flex w-fit items-center justify-center rounded-full border border-white/40 bg-white/10 px-7 py-3 font-bold text-white backdrop-blur transition hover:bg-white/20">
-                                    Post emergency request <ArrowRight className="ml-2 h-4 w-4" />
-                                </Link>
                             </div>
                         </div>
 

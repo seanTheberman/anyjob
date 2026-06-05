@@ -2,10 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, Users, ThumbsUp, ShieldCheck } from "lucide-react";
+import { ArrowRight, PhoneCall, ShieldCheck, ThumbsUp, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProviderCard } from "@/components/ui/provider-card";
 import { ProviderSlider } from "@/components/ui/provider-slider";
+
+const ANYJOB_EMERGENCY_PHONE = "+448001234567";
+const ANYJOB_EMERGENCY_DISPLAY = "+44 800 123 4567";
 
 const WINTER_SERVICES = [
     {
@@ -46,6 +49,24 @@ const SPRING_SERVICES = [
         description: "Create a new atmosphere",
         image: "https://images.unsplash.com/photo-1589939705384-5185137a7f0f?q=80&w=800&auto=format&fit=crop",
         href: "/questionnaire?category=bricolage&subcategory=painting-bricolage",
+    },
+];
+
+const EMERGENCY_SERVICES = [
+    {
+        title: "Emergency move",
+        description: "Last-minute loading, lifting, and urgent moving support.",
+        image: "https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?q=80&w=900&auto=format&fit=crop",
+    },
+    {
+        title: "Emergency cleaning",
+        description: "Same-day cleanups after spills, guests, moves, or incidents.",
+        image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=900&auto=format&fit=crop",
+    },
+    {
+        title: "Emergency repair",
+        description: "Urgent handyman help for leaks, fixtures, small repairs, and safety issues.",
+        image: "https://images.unsplash.com/photo-1581092160607-ee22621dd758?q=80&w=900&auto=format&fit=crop",
     },
 ];
 
@@ -227,6 +248,82 @@ export default function CataloguePage() {
                                 </p>
                             </Link>
                         ))}
+                    </div>
+                </section>
+
+                {/* Emergency Jobs */}
+                <section className="overflow-hidden rounded-3xl bg-gray-950 text-white shadow-2xl">
+                    <div className="grid gap-0 lg:grid-cols-[0.9fr_1.1fr]">
+                        <div className="relative min-h-[320px] p-6 sm:p-8">
+                            <Image
+                                src="https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?q=80&w=1400&auto=format&fit=crop"
+                                alt="Emergency home service dispatch"
+                                fill
+                                className="object-cover opacity-50"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-r from-gray-950 via-gray-950/80 to-gray-950/30" />
+                            <div className="relative z-10 flex h-full flex-col justify-between">
+                                <div>
+                                    <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-red-500/20 px-3 py-1 text-sm font-bold text-red-100 ring-1 ring-red-300/20">
+                                        <Zap className="h-4 w-4" />
+                                        Emergency jobs
+                                    </div>
+                                    <h2 className="max-w-md text-3xl font-extrabold leading-tight">
+                                        Need someone urgently?
+                                    </h2>
+                                    <p className="mt-4 max-w-md text-sm leading-6 text-gray-200">
+                                        Emergency jobs do not go through the normal questionnaire. Call AnyJob and we dispatch the best suited available provider immediately.
+                                    </p>
+                                </div>
+                                <a
+                                    href={`tel:${ANYJOB_EMERGENCY_PHONE}`}
+                                    className="mt-8 inline-flex w-fit items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-gray-950 transition hover:bg-gray-100"
+                                >
+                                    <PhoneCall className="h-4 w-4" />
+                                    Call {ANYJOB_EMERGENCY_DISPLAY}
+                                </a>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-950 p-5 sm:p-6">
+                            <div className="grid gap-2 sm:grid-cols-3">
+                                {[
+                                    ["1", "Call AnyJob", "Use the emergency number instead of posting a normal request."],
+                                    ["2", "We match fast", "AnyJob finds the best suited available provider for the emergency."],
+                                    ["3", "Get contacts", "We share provider contact details so the urgent job can start quickly."],
+                                ].map(([number, title, detail]) => (
+                                    <div key={number} className="rounded-xl bg-white/10 p-3 ring-1 ring-white/10">
+                                        <div className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-xs font-extrabold text-white">
+                                            {number}
+                                        </div>
+                                        <h3 className="text-xs font-extrabold">{title}</h3>
+                                        <p className="mt-1 text-[11px] leading-4 text-gray-300">{detail}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-3">
+                                {EMERGENCY_SERVICES.map((service) => (
+                                    <a key={service.title} href={`tel:${ANYJOB_EMERGENCY_PHONE}`} className="group grid gap-3 overflow-hidden rounded-xl bg-white/10 p-2.5 ring-1 ring-white/10 transition hover:bg-white/15 sm:grid-cols-[104px_1fr_auto] sm:items-center">
+                                        <div className="relative h-24 overflow-hidden rounded-lg sm:h-20">
+                                            <Image
+                                                src={service.image}
+                                                alt={service.title}
+                                                fill
+                                                className="object-cover transition duration-700 group-hover:scale-105"
+                                            />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-sm font-extrabold">{service.title}</h3>
+                                            <p className="mt-1 text-xs leading-4 text-gray-300">{service.description}</p>
+                                        </div>
+                                        <span className="inline-flex items-center whitespace-nowrap text-sm font-bold text-red-200">
+                                            Call now <PhoneCall className="ml-2 h-4 w-4" />
+                                        </span>
+                                    </a>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </section>
 
