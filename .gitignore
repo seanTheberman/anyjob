@@ -20,3 +20,6 @@ next-env.d.ts
 /*.png
 playwright-report/
 test-results/
+
+# Ignored native app workspace
+mobile-app/
