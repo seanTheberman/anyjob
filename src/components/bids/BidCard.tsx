@@ -46,6 +46,23 @@ export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat 
     setLoading(action);
     setError(null);
     try {
+      if (action === "accept") {
+        const response = await fetch("/api/payments/bid-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ bid_id: bid.id }),
+        });
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok || !data?.checkoutUrl) {
+          setError(data?.error || "Could not start Stripe checkout.");
+          return;
+        }
+
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+
       const response = await fetch("/api/bids", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
