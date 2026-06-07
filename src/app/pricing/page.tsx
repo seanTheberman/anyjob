@@ -33,7 +33,7 @@ const PLANS = [
         description: "For regular users",
         features: [
             "Unlimited tasks",
-            "Booking token shown before you confirm",
+            "Provider bid totals shown before you confirm",
             "Priority matching",
             "Dedicated customer support",
             "Extended coverage",

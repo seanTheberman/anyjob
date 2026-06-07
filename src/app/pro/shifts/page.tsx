@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
-import { Briefcase, Calendar, Clock, Loader2, MapPin, Search, ShieldAlert, Users } from "lucide-react";
+import { Briefcase, Calendar, CheckCircle2, Clock, Loader2, MapPin, Search, ShieldAlert, Users, WalletCards } from "lucide-react";
 import { SHIFT_NICHES, getShiftNiche } from "@/lib/shift-work";
 
 type ShiftJob = {
@@ -19,6 +19,13 @@ type ShiftJob = {
   business_preferred_hourly_rate?: number | null;
   business_preferred_day_rate?: number | null;
   business?: { business_name?: string; industry?: string } | null;
+  myApplication?: {
+    id: string;
+    status: string;
+    proposed_hourly_rate?: number | null;
+    proposed_day_rate?: number | null;
+    payment?: { status?: string; agreed_amount?: number; currency?: string } | null;
+  } | null;
 };
 
 export default function ProviderShiftBoardPage() {
@@ -26,27 +33,56 @@ export default function ProviderShiftBoardPage() {
   const [jobs, setJobs] = useState<ShiftJob[]>([]);
   const [reason, setReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applyingId, setApplyingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  async function reloadJobs() {
+    setLoading(true);
+    setError(null);
+    const params = new URLSearchParams();
+    if (niche) params.set("niche", niche);
+    const response = await fetch(`/api/shifts?${params.toString()}`);
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setError(payload.error || "Unable to load shift jobs");
+      setJobs([]);
+    } else {
+      setJobs(payload.jobs || []);
+      setReason(payload.reason || null);
+    }
+    setLoading(false);
+  }
+
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setError(null);
-      const params = new URLSearchParams();
-      if (niche) params.set("niche", niche);
-      const response = await fetch(`/api/shifts?${params.toString()}`);
+    reloadJobs();
+  }, [niche]);
+
+  async function applyForShift(job: ShiftJob) {
+    setApplyingId(job.id);
+    setError(null);
+    try {
+      const response = await fetch("/api/shifts/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          postId: job.id,
+          proposedHourlyRate: job.business_preferred_hourly_rate,
+          proposedDayRate: job.business_preferred_day_rate,
+          message: "I am available for this shift and can work at the posted rate.",
+        }),
+      });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        setError(payload.error || "Unable to load shift jobs");
-        setJobs([]);
-      } else {
-        setJobs(payload.jobs || []);
-        setReason(payload.reason || null);
+        setError(payload.error || "Unable to apply for shift");
+        return;
       }
-      setLoading(false);
+      await reloadJobs();
+    } catch {
+      setError("Unable to apply for shift");
+    } finally {
+      setApplyingId(null);
     }
-    load();
-  }, [niche]);
+  }
 
   return (
     <ProviderLayout>
@@ -130,6 +166,38 @@ export default function ProviderShiftBoardPage() {
                       <Users className="h-4 w-4" />
                       {job.headcount} worker{job.headcount === 1 ? "" : "s"}
                     </span>
+                  </div>
+                  <div className="mt-5 flex flex-col gap-3 rounded-lg border border-gray-100 bg-gray-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-950">
+                        {job.myApplication ? `Application ${job.myApplication.status}` : "Apply for this shift"}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        {job.myApplication?.payment?.status === "held"
+                          ? "Business has paid AnyJob. Wallet credit is pending completion."
+                          : job.myApplication?.payment?.status === "released"
+                            ? "Shift completed. Credit is available in your wallet."
+                            : job.myApplication
+                              ? "The business can now accept, pay AnyJob, and complete the shift."
+                              : "Your application uses the posted rate. You can adjust rates from your shift profile later."}
+                      </p>
+                    </div>
+                    {job.myApplication ? (
+                      <span className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700">
+                        {job.myApplication.payment?.status === "held" || job.myApplication.payment?.status === "released" ? <WalletCards className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                        {job.myApplication.payment?.status ? `Payment ${job.myApplication.payment.status}` : job.myApplication.status}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => applyForShift(job)}
+                        disabled={applyingId === job.id}
+                        className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                      >
+                        {applyingId === job.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        Apply for shift
+                      </button>
+                    )}
                   </div>
                 </article>
               );

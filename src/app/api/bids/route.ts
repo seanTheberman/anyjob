@@ -130,25 +130,6 @@ export async function POST(request: NextRequest) {
       throw bidError;
     }
 
-    // Ensure a conversation exists so client and provider can chat before acceptance
-    const { data: existingConversation } = await supabase
-      .from("eloo_conversations")
-      .select("id")
-      .eq("client_id", inquiry.user_id)
-      .eq("provider_id", user.id)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    if (!existingConversation) {
-      await supabase.from("eloo_conversations").insert({
-        client_id: inquiry.user_id,
-        provider_id: user.id,
-        bid_id: bid.id,
-        is_active: true,
-        last_message_at: new Date().toISOString(),
-      });
-    }
-
     return NextResponse.json({ bid }, { status: 201 });
   } catch (error) {
     console.error("Error creating bid:", error);
@@ -306,7 +287,7 @@ export async function PATCH(request: NextRequest) {
           .eq("status", "pending");
 
         // Update inquiry status
-        await supabase
+        const { error: inquiryUpdateError } = await supabase
           .from("service_inquiries")
           .update({
             status: "bid_accepted",
@@ -314,6 +295,10 @@ export async function PATCH(request: NextRequest) {
             updated_at: timestamp,
           })
           .eq("id", bid.inquiry_id);
+
+        if (inquiryUpdateError) {
+          throw inquiryUpdateError;
+        }
 
         const { data: existingConversation } = await supabase
           .from("eloo_conversations")
@@ -350,14 +335,14 @@ export async function PATCH(request: NextRequest) {
             .select("id")
             .eq("conversation_id", conversation.id)
             .eq("sender_id", bid.provider_id)
-            .eq("content", `Hi! My bid of €${bid.amount} has been accepted. I'm looking forward to working with you. Let me know if you have any questions!`)
+            .eq("content", "Hi! Thanks for accepting my bid. Chat is now unlocked so we can confirm the job details.")
             .maybeSingle();
 
           if (!existingAutoMessage) {
             await supabase.from("eloo_messages").insert({
               conversation_id: conversation.id,
               sender_id: bid.provider_id,
-              content: `Hi! My bid of €${bid.amount} has been accepted. I'm looking forward to working with you. Let me know if you have any questions!`,
+              content: "Hi! Thanks for accepting my bid. Chat is now unlocked so we can confirm the job details.",
             });
           }
         }

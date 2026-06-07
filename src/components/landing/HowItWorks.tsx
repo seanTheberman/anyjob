@@ -17,7 +17,7 @@ const STEPS = [
     },
     {
         number: "3",
-        title: "Pay a booking token, complete the job, and pay the provider directly on site.",
+        title: "Accept the total bid, unlock chat, then complete the job.",
         bgColor: "bg-emerald-100",
         textColor: "text-emerald-600",
     },

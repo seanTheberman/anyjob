@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 function coarsePostalCode(postalCode?: string | null) {
@@ -27,18 +28,6 @@ export async function GET(
     const resolvedParams = await params;
     const jobId = resolvedParams.id;
 
-    // Fetch the specific job inquiry
-    const { data: job, error } = await supabase
-      .from('service_inquiries')
-      .select('*')
-      .eq('id', jobId)
-      .single();
-
-    if (error) {
-      console.error('Job fetch error:', error);
-      return NextResponse.json({ error: "Job not found", details: error.message }, { status: 404 });
-    }
-
     // Check if user has already bid on this job (only if user is authenticated)
     let myBid = null;
     if (user) {
@@ -54,6 +43,37 @@ export async function GET(
         // No bid found, that's okay
         myBid = null;
       }
+    }
+
+    // Fetch the specific job inquiry. Accepted jobs may be hidden by row policies,
+    // but a provider who owns a bid still needs the detail page for contact unlocks.
+    const { data: visibleJob, error } = await supabase
+      .from('service_inquiries')
+      .select('*')
+      .eq('id', jobId)
+      .maybeSingle();
+
+    let job = visibleJob;
+    if (!job && user && myBid) {
+      const adminSupabase = createAdminSupabaseClient() as any;
+      const { data: adminJob, error: adminJobError } = await adminSupabase
+        .from('service_inquiries')
+        .select('*')
+        .eq('id', jobId)
+        .maybeSingle();
+
+      if (adminJobError) {
+        console.error('Admin job fetch error:', adminJobError);
+      }
+      job = adminJob;
+    }
+
+    if (error && !myBid) {
+      console.error('Job fetch error:', error);
+    }
+
+    if (!job) {
+      return NextResponse.json({ error: "Job not found", details: error?.message }, { status: 404 });
     }
 
     // Get bid count for this job

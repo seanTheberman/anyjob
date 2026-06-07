@@ -11,17 +11,13 @@ interface JobApplicationGuardProps {
 export function JobApplicationGuard({ children, fallback }: JobApplicationGuardProps) {
   const { verificationStatus, loading } = useSellerVerification();
 
-  if (loading) {
-    return <>{children}</>; // Show content while loading
-  }
-
   // If not a seller or verification status unknown, show children
-  if (!verificationStatus) {
+  if (!loading && !verificationStatus) {
     return <>{children}</>;
   }
 
   // If verified, show the protected content
-  if (verificationStatus.isVerified) {
+  if (verificationStatus?.isVerified) {
     return <>{children}</>;
   }
 

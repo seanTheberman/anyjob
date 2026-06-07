@@ -17,8 +17,8 @@ interface AssistanceRequest {
 const mockRequests: AssistanceRequest[] = [
   {
     id: "1",
-    title: "Issue with booking token",
-    description: "I need help with a booking token or onsite balance",
+    title: "Issue with accepted bid payment",
+    description: "I need help with an AnyJob fee or accepted bid payment",
     status: "in_progress",
     createdAt: "2026-03-10",
     lastUpdate: "2 hours ago",

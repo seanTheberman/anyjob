@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Building2, Clock, FileText, Loader2, Plus, ShieldCheck, Users } from "lucide-react";
+import { Building2, CheckCircle2, Clock, CreditCard, FileText, Loader2, Plus, ShieldCheck, Users, WalletCards } from "lucide-react";
 
 type BusinessProfile = {
   id: string;
@@ -25,6 +25,35 @@ type BusinessPost = {
   created_at: string;
 };
 
+type ShiftApplication = {
+  id: string;
+  business_work_post_id: string;
+  provider_user_id: string;
+  status: string;
+  proposed_hourly_rate?: number | null;
+  proposed_day_rate?: number | null;
+  message?: string | null;
+  provider?: {
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    city?: string | null;
+    is_verified?: boolean | null;
+  } | null;
+  seller?: {
+    rating?: number | null;
+    total_jobs?: number | null;
+    status?: string | null;
+  } | null;
+  payment?: {
+    id: string;
+    status: string;
+    agreed_amount: number;
+    total_charged: number;
+    currency: string;
+  } | null;
+};
+
 function StatusPill({ value }: { value: string }) {
   const lower = value.toLowerCase();
   const classes = lower === "approved"
@@ -38,10 +67,16 @@ function StatusPill({ value }: { value: string }) {
 export default function BusinessDashboardPage() {
   const [business, setBusiness] = useState<BusinessProfile | null>(null);
   const [posts, setPosts] = useState<BusinessPost[]>([]);
+  const [applications, setApplications] = useState<ShiftApplication[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function load() {
+    load();
+  }, []);
+
+  async function load() {
       const [businessResponse, postsResponse] = await Promise.all([
         fetch("/api/business/register"),
         fetch("/api/business/posts"),
@@ -54,10 +89,42 @@ export default function BusinessDashboardPage() {
         const payload = await postsResponse.json();
         setPosts(payload.posts || []);
       }
+      const applicationsResponse = await fetch("/api/business/shift-applications");
+      if (applicationsResponse.ok) {
+        const payload = await applicationsResponse.json();
+        setApplications(payload.applications || []);
+      }
       setLoading(false);
+  }
+
+  async function runShiftAction(applicationId: string, action: string) {
+    setActionId(`${applicationId}:${action}`);
+    setActionError(null);
+    try {
+      const response = await fetch("/api/business/shift-applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId, action }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setActionError(payload.error || "Unable to update shift application");
+        return;
+      }
+      await load();
+    } catch {
+      setActionError("Unable to update shift application");
+    } finally {
+      setActionId(null);
     }
-    load();
-  }, []);
+  }
+
+  const applicationsByPost = applications.reduce((map, application) => {
+    const current = map.get(application.business_work_post_id) || [];
+    current.push(application);
+    map.set(application.business_work_post_id, current);
+    return map;
+  }, new Map<string, ShiftApplication[]>());
 
   return (
     <DashboardLayout>
@@ -150,17 +217,104 @@ export default function BusinessDashboardPage() {
                 <h2 className="font-semibold text-gray-950">Business posts</h2>
                 <FileText className="h-5 w-5 text-gray-400" />
               </div>
+              {actionError ? <div className="m-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</div> : null}
               {posts.length ? (
                 <div className="divide-y divide-gray-100">
-                  {posts.map((post) => (
-                    <div key={post.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="font-medium text-gray-950">{post.role_title}</p>
-                        <p className="text-sm text-gray-600">{post.work_type.replaceAll("_", " ")} · {post.niche} · {post.city}</p>
+                  {posts.map((post) => {
+                    const postApplications = applicationsByPost.get(post.id) || [];
+                    return (
+                    <div key={post.id} className="p-4">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="font-medium text-gray-950">{post.role_title}</p>
+                          <p className="text-sm text-gray-600">{post.work_type.replaceAll("_", " ")} · {post.niche} · {post.city}</p>
+                        </div>
+                        <StatusPill value={post.status} />
                       </div>
-                      <StatusPill value={post.status} />
+                      {postApplications.length ? (
+                        <div className="mt-4 space-y-3">
+                          {postApplications.map((application) => {
+                            const providerName = `${application.provider?.first_name || ""} ${application.provider?.last_name || ""}`.trim() || application.provider?.email || "Shift worker";
+                            const paymentStatus = application.payment?.status;
+                            return (
+                              <div key={application.id} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <p className="font-semibold text-gray-950">{providerName}</p>
+                                      <StatusPill value={application.status} />
+                                      {paymentStatus ? <StatusPill value={`payment ${paymentStatus}`} /> : null}
+                                    </div>
+                                    <p className="mt-1 text-sm text-gray-600">
+                                      {application.provider?.city || "City not set"} · Rating {Number(application.seller?.rating || 0).toFixed(1)} · {application.seller?.total_jobs || 0} jobs
+                                    </p>
+                                    <p className="mt-1 text-sm text-gray-600">
+                                      Proposed: €{application.proposed_hourly_rate || "-"} / hour · €{application.proposed_day_rate || "-"} / day
+                                    </p>
+                                    {application.payment ? (
+                                      <p className="mt-1 text-sm font-medium text-gray-900">
+                                        Business pays AnyJob: €{application.payment.total_charged} · Provider amount: €{application.payment.agreed_amount}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {application.status === "applied" ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => runShiftAction(application.id, "accept")}
+                                          disabled={Boolean(actionId)}
+                                          className="inline-flex items-center rounded-lg bg-red-600 px-3 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                                        >
+                                          {actionId === `${application.id}:accept` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                                          Accept
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => runShiftAction(application.id, "reject")}
+                                          disabled={Boolean(actionId)}
+                                          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                                        >
+                                          Reject
+                                        </button>
+                                      </>
+                                    ) : null}
+                                    {application.status === "accepted" && (!paymentStatus || paymentStatus === "requires_payment") ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => runShiftAction(application.id, "pay")}
+                                        disabled={Boolean(actionId)}
+                                        className="inline-flex items-center rounded-lg bg-gray-950 px-3 py-2 text-sm font-semibold text-white hover:bg-gray-800 disabled:opacity-60"
+                                      >
+                                        {actionId === `${application.id}:pay` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                                        Pay full amount to AnyJob
+                                      </button>
+                                    ) : null}
+                                    {application.status === "accepted" && paymentStatus === "held" ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => runShiftAction(application.id, "complete")}
+                                        disabled={Boolean(actionId)}
+                                        className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                                      >
+                                        {actionId === `${application.id}:complete` ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <WalletCards className="mr-2 h-4 w-4" />}
+                                        Confirm work done
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : post.work_type !== "freelance_service" ? (
+                        <div className="mt-4 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                          No shift worker applications yet.
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-8 text-center text-sm text-gray-500">No business posts yet.</div>

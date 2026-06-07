@@ -75,7 +75,35 @@ export async function GET(request: NextRequest) {
       return business?.status === "approved" && job.work_type !== "freelance_service";
     });
 
-    return NextResponse.json({ jobs: visibleJobs, workerProfile });
+    const visibleJobIds = visibleJobs.map((job) => String(job.id));
+    const { data: applications } = visibleJobIds.length
+      ? await (admin as never as {
+          from: (table: string) => {
+            select: (columns: string) => {
+              eq: (column: string, value: string) => {
+                in: (column: string, values: string[]) => Promise<{ data: Array<Record<string, unknown>> | null }>;
+              };
+            };
+          };
+        })
+          .from("shift_applications")
+          .select("*, payment:shift_escrow_payments(*)")
+          .eq("provider_user_id", user.id)
+          .in("business_work_post_id", visibleJobIds)
+      : { data: [] };
+
+    const applicationsByPost = new Map((applications || []).map((application) => {
+      const payment = Array.isArray(application.payment) ? application.payment[0] || null : application.payment || null;
+      return [String(application.business_work_post_id), { ...application, payment }];
+    }));
+
+    return NextResponse.json({
+      jobs: visibleJobs.map((job) => ({
+        ...job,
+        myApplication: applicationsByPost.get(String(job.id)) || null,
+      })),
+      workerProfile,
+    });
   } catch (error) {
     console.error("Shift board lookup failed:", error);
     return NextResponse.json({ error: "Failed to load shift jobs" }, { status: 500 });

@@ -1,96 +1,72 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
-import { DollarSign, Calendar, Download, ArrowUpRight, ReceiptText, WalletCards } from "lucide-react";
-import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
+import { Calendar, Download, Loader2, ReceiptText, WalletCards } from "lucide-react";
+import { formatMoney } from "@/lib/booking-token";
 
-interface EarningsStat {
-  label: string;
-  value: string;
-  change: number;
-  trend: "up" | "down";
-}
-
-interface Transaction {
+type WalletEntry = {
   id: string;
-  jobTitle: string;
-  client: string;
-  quote: number;
-  date: string;
-  status: "collected" | "scheduled" | "quoted";
-}
+  amount: number;
+  currency: string;
+  status: "pending" | "available" | "paid_out" | "cancelled";
+  description?: string | null;
+  created_at?: string | null;
+  available_at?: string | null;
+};
 
-const stats: EarningsStat[] = [
-  { label: "Onsite Collections", value: "€720", change: 12.5, trend: "up" },
-  { label: "Scheduled to Collect", value: "€195", change: 8.3, trend: "up" },
-  { label: "Avg. Seller Quote", value: "€144", change: 15.7, trend: "up" },
-  { label: "Platform Transfers", value: "€0", change: 0, trend: "up" },
-];
-
-const transactions: Transaction[] = [
-  {
-    id: "1",
-    jobTitle: "Furniture Assembly",
-    client: "Sarah Johnson",
-    quote: 95,
-    date: "2026-03-14",
-    status: "collected",
-  },
-  {
-    id: "2",
-    jobTitle: "House Cleaning",
-    client: "Michael Brown",
-    quote: 120,
-    date: "2026-03-12",
-    status: "collected",
-  },
-  {
-    id: "3",
-    jobTitle: "Garden Maintenance",
-    client: "David Thompson",
-    quote: 75,
-    date: "2026-03-10",
-    status: "scheduled",
-  },
-  {
-    id: "4",
-    jobTitle: "Interior Painting",
-    client: "Lisa Anderson",
-    quote: 250,
-    date: "2026-03-08",
-    status: "collected",
-  },
-  {
-    id: "5",
-    jobTitle: "Moving Help",
-    client: "Emma Wilson",
-    quote: 180,
-    date: "2026-03-05",
-    status: "quoted",
-  },
-];
-
-const statusColors = {
-  collected: "bg-green-100 text-green-700",
-  scheduled: "bg-blue-100 text-blue-700",
-  quoted: "bg-yellow-100 text-yellow-700",
+type WalletTotals = {
+  pending: number;
+  available: number;
+  paidOut: number;
 };
 
 const statusLabels = {
-  collected: "Collected on site",
-  scheduled: "Collect on site",
-  quoted: "Quote sent",
+  pending: "To be credited",
+  available: "Available",
+  paid_out: "Paid out",
+  cancelled: "Cancelled",
+};
+
+const statusColors = {
+  pending: "bg-amber-100 text-amber-800",
+  available: "bg-emerald-100 text-emerald-800",
+  paid_out: "bg-blue-100 text-blue-800",
+  cancelled: "bg-gray-100 text-gray-700",
 };
 
 export default function EarningsPage() {
-  function exportTransactions() {
-    const header = ["Job", "Client", "Quote", "Date", "Status"];
-    const rows = transactions.map((transaction) => [
-      transaction.jobTitle,
-      transaction.client,
-      formatMoney(transaction.quote),
-      transaction.date,
-      transaction.status,
+  const [entries, setEntries] = useState<WalletEntry[]>([]);
+  const [totals, setTotals] = useState<WalletTotals>({ pending: 0, available: 0, paidOut: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadWallet() {
+      setLoading(true);
+      setError(null);
+      const response = await fetch("/api/provider/wallet");
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(payload.error || "Unable to load wallet");
+      } else {
+        setEntries(payload.entries || []);
+        setTotals(payload.totals || { pending: 0, available: 0, paidOut: 0 });
+      }
+      setLoading(false);
+    }
+    loadWallet();
+  }, []);
+
+  function exportWallet() {
+    const header = ["Description", "Amount", "Currency", "Status", "Created", "Available"];
+    const rows = entries.map((entry) => [
+      entry.description || "Wallet entry",
+      entry.amount,
+      entry.currency,
+      entry.status,
+      entry.created_at || "",
+      entry.available_at || "",
     ]);
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
@@ -99,161 +75,119 @@ export default function EarningsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "anyjob-provider-earnings.csv";
+    link.download = "anyjob-provider-wallet.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
 
   return (
     <ProviderLayout>
-      <div className="max-w-6xl mx-auto mt-4 lg:mt-6">
-        <div className="flex items-center justify-between mb-6">
+      <div className="mx-auto mt-4 max-w-6xl lg:mt-6">
+        <div className="mb-6 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Earnings</h1>
-            <p className="text-gray-600">Track quotes and money you collect directly from clients</p>
+            <h1 className="mb-2 text-2xl font-bold text-gray-900">Earnings</h1>
+            <p className="text-gray-600">Track shift payments held by AnyJob and wallet credits after completed work.</p>
           </div>
-          <button type="button" onClick={exportTransactions} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Download className="w-4 h-4" />
+          <button type="button" onClick={exportWallet} className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 transition-colors hover:bg-gray-50">
+            <Download className="h-4 w-4" />
             Export
           </button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {stats.map((stat) => (
-            <div key={stat.label} className="bg-white rounded-xl p-5 border border-gray-200">
-              <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
-              <div className="flex items-end justify-between">
-                <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                <div className="flex items-center gap-1 text-sm font-medium text-green-600">
-                  <ArrowUpRight className="w-4 h-4" />
-                  {stat.change === 0 ? "No payout" : `${Math.abs(stat.change)}%`}
-                </div>
-              </div>
-            </div>
-          ))}
+        {error ? <div className="mb-6 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+
+        <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="mb-1 text-sm text-gray-500">To be credited</p>
+            <p className="text-2xl font-bold text-gray-900">{formatMoney(totals.pending)}</p>
+            <p className="mt-2 text-xs text-gray-500">Business paid AnyJob; release waits for completed work.</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="mb-1 text-sm text-gray-500">Available wallet</p>
+            <p className="text-2xl font-bold text-gray-900">{formatMoney(totals.available)}</p>
+            <p className="mt-2 text-xs text-gray-500">Credited after business confirms the shift was completed.</p>
+          </div>
+          <div className="rounded-xl border border-gray-200 bg-white p-5">
+            <p className="mb-1 text-sm text-gray-500">Paid out</p>
+            <p className="text-2xl font-bold text-gray-900">{formatMoney(totals.paidOut)}</p>
+            <p className="mt-2 text-xs text-gray-500">Transferred from wallet to provider payout method.</p>
+          </div>
         </div>
 
-        {/* Payment Model */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-6 border border-gray-200">
+        <div className="mb-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="rounded-xl border border-gray-200 bg-white p-6">
             <div className="flex items-start gap-3">
-              <WalletCards className="w-5 h-5 text-red-600 mt-1" />
+              <WalletCards className="mt-1 h-5 w-5 text-red-600" />
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">How you get paid</h3>
+                <h3 className="mb-2 text-lg font-bold text-gray-900">Shift-work wallet</h3>
                 <p className="text-sm leading-relaxed text-gray-600">
-                  AnyJob does not process your full job payment and does not send seller payouts. You collect your quoted amount from the client at the job location.
+                  For business shifts, the business pays the agreed full amount to AnyJob first. The amount appears as to be credited until the work is confirmed.
                 </p>
               </div>
             </div>
           </div>
-          <div className="bg-red-50 rounded-xl p-6 border border-red-100">
+          <div className="rounded-xl border border-red-100 bg-red-50 p-6">
             <div className="flex items-start gap-3">
-              <ReceiptText className="w-5 h-5 text-red-600 mt-1" />
+              <ReceiptText className="mt-1 h-5 w-5 text-red-600" />
               <div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">AnyJob booking token</h3>
+                <h3 className="mb-2 text-lg font-bold text-gray-900">Release after completion</h3>
                 <p className="text-sm leading-relaxed text-gray-600">
-                  When you quote, AnyJob adds a booking token of 20% of your quote, capped at €40, to the client&apos;s total. AnyJob keeps that token as its service fee.
+                  Once the business marks the shift complete, AnyJob releases the held amount into your available wallet balance.
                 </p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Transaction History */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900">Quote and Collection Ledger</h3>
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+          <div className="border-b border-gray-200 p-6">
+            <h3 className="text-lg font-bold text-gray-900">Wallet ledger</h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Job
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Your Quote
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    AnyJob Token
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Client Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {transactions.map((transaction) => (
-                  <tr key={transaction.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{transaction.jobTitle}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-600">{transaction.client}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                        <Calendar className="w-4 h-4" />
-                        {transaction.date}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {formatMoney(calculateBookingTokenBreakdown(transaction.quote).onsiteDue)}
-                      </div>
-                      <div className="text-xs text-gray-500">Collect directly</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-red-600">
-                        {formatMoney(calculateBookingTokenBreakdown(transaction.quote).bookingToken)}
-                      </div>
-                      <div className="text-xs text-gray-500">Kept by AnyJob</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">
-                        {formatMoney(calculateBookingTokenBreakdown(transaction.quote).buyerTotal)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          statusColors[transaction.status]
-                        }`}
-                      >
-                        {statusLabels[transaction.status]}
-                      </span>
-                    </td>
+          {loading ? (
+            <div className="flex items-center justify-center p-10 text-gray-600">
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Loading wallet...
+            </div>
+          ) : entries.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Created</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Amount</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Collection Info */}
-        <div className="mt-6 bg-gray-50 rounded-xl p-6 border border-gray-200">
-          <div className="flex items-start gap-3">
-            <DollarSign className="w-5 h-5 text-gray-700 mt-0.5" />
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-1">No AnyJob seller payout</h4>
-              <p className="text-gray-600 mb-2">
-                The booking token protects the trip and confirms the client. Your job payment is still collected by you directly at the location.
-              </p>
-              <p className="text-sm text-gray-500">
-                Agree the final onsite payment method with the client before starting work.
-              </p>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {entries.map((entry) => (
+                    <tr key={entry.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900">{entry.description || "Wallet entry"}</div>
+                        {entry.available_at ? <div className="text-xs text-gray-500">Available {new Date(entry.available_at).toLocaleString()}</div> : null}
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                          <Calendar className="h-4 w-4" />
+                          {entry.created_at ? new Date(entry.created_at).toLocaleDateString() : "-"}
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-6 py-4 text-sm font-semibold text-gray-900">{formatMoney(entry.amount)}</td>
+                      <td className="whitespace-nowrap px-6 py-4">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[entry.status]}`}>{statusLabels[entry.status]}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </div>
+          ) : (
+            <div className="p-10 text-center">
+              <WalletCards className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+              <h2 className="font-semibold text-gray-950">No wallet entries yet</h2>
+              <p className="mt-1 text-sm text-gray-500">Accepted business shifts will appear here after the business pays AnyJob.</p>
+            </div>
+          )}
         </div>
       </div>
     </ProviderLayout>

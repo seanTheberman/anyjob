@@ -41,8 +41,8 @@ export default function HowItWorksPage() {
                             "Post your need in seconds",
                             "Receive personalized offers from verified providers",
                             "Check reviews, ratings, and portfolios",
-                            "Pay a booking token to confirm your provider",
-                            "Pay the remaining balance directly to the provider on site",
+                            "Accept the total bid to confirm your provider",
+                            "Chat and contact details unlock after confirmation",
                             "Benefit from included insurance coverage",
                             "Leave your review after the mission",
                         ].map((item) => (

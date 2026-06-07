@@ -101,20 +101,20 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
         {hasAmount && (
           <div className="rounded-xl border border-red-100 bg-red-50 p-4">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Your onsite collection</span>
+              <span className="text-gray-600">Your job payout</span>
               <span className="font-semibold text-gray-900">{formatMoney(feeBreakdown.onsiteDue)}</span>
             </div>
             <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-gray-600">AnyJob service fee added to client</span>
+              <span className="text-gray-600">AnyJob fee added to buyer</span>
               <span className="font-semibold text-gray-900">{formatMoney(feeBreakdown.bookingToken)}</span>
             </div>
             <div className="mt-3 border-t border-red-100 pt-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Client sees total offer</span>
+                <span className="text-sm font-medium text-gray-700">Buyer sees total bid</span>
                 <span className="text-lg font-bold text-gray-900">{formatMoney(feeBreakdown.buyerTotal)}</span>
               </div>
               <p className="mt-2 text-xs leading-relaxed text-gray-600">
-                AnyJob collects the booking token only. You collect your quoted amount directly from the client at the job location.
+                The buyer is shown one total bid. AnyJob collects the fee when the buyer accepts; you collect your job payout at the location.
               </p>
             </div>
           </div>

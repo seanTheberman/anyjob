@@ -204,7 +204,7 @@ export default function AccountPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-5">
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">KYC Verification</h3>
-              <p className="text-sm text-gray-500">Required before accepting a provider quote and paying the booking token.</p>
+              <p className="text-sm text-gray-500">Required before accepting a provider quote and paying the AnyJob fee.</p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
               <BadgeCheck className="h-3.5 w-3.5" />

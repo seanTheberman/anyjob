@@ -221,17 +221,17 @@ export default function LoginPage() {
                         </div>
 
                         {/* Submit Button */}
-                        <Button
+                        <button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-xl py-5 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm"
+                            className="inline-flex w-full items-center justify-center rounded-xl bg-red-600 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                         >
                             {loading ? (
                                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Logging in...</>
                             ) : (
                                 <>Log in <ArrowRight className="w-4 h-4 ml-1" /></>
                             )}
-                        </Button>
+                        </button>
                     </form>
 
                     {/* Magic Link */}

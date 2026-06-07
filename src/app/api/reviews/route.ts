@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/client";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = createClient();
+    const supabase = await createServerSupabaseClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -148,14 +148,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("reviews")
-      .select(`
-        *,
-        reviewer:auth.users!reviews_reviewer_id_fkey (
-          id,
-          email,
-          user_metadata
-        )
-      `);
+      .select("*");
 
     // Filter by service inquiry if specified
     if (serviceInquiryId) {
@@ -182,7 +175,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch reviews" }, { status: 500 });
     }
 
-    return NextResponse.json({ reviews }, { status: 200 });
+    const reviewerIds = Array.from(new Set((reviews || []).map((review) => review.reviewer_id).filter(Boolean)));
+    const { data: profiles } = reviewerIds.length
+      ? await supabase
+          .from("eloo_profiles")
+          .select("id,first_name,last_name,avatar_url")
+          .in("id", reviewerIds)
+      : { data: [] };
+
+    const profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+    const enrichedReviews = (reviews || []).map((review) => ({
+      ...review,
+      reviewer: profilesById.get(review.reviewer_id) || {
+        first_name: "AnyJob",
+        last_name: "User",
+        avatar_url: null,
+      },
+    }));
+
+    return NextResponse.json({ reviews: enrichedReviews }, { status: 200 });
 
   } catch (error) {
     console.error("Error in GET /api/reviews:", error);

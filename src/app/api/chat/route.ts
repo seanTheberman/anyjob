@@ -1,6 +1,21 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
+async function isConversationUnlocked(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  conversation: { bid_id?: string | null }
+) {
+  if (!conversation.bid_id) return true;
+
+  const { data: bid } = await supabase
+    .from("bids")
+    .select("status")
+    .eq("id", conversation.bid_id)
+    .maybeSingle();
+
+  return bid?.status === "accepted";
+}
+
 // GET: Fetch conversations and messages
 export async function GET(request: NextRequest) {
   try {
@@ -27,6 +42,14 @@ export async function GET(request: NextRequest) {
 
       if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      }
+
+      const unlocked = await isConversationUnlocked(supabase, conversation);
+      if (!unlocked) {
+        return NextResponse.json(
+          { error: "Chat unlocks after the buyer accepts the bid and pays the AnyJob fee" },
+          { status: 403 }
+        );
       }
 
       const { data: messages, error } = await supabase
@@ -58,9 +81,16 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
+    const unlockedConversations = [];
+    for (const conversation of conversations || []) {
+      if (await isConversationUnlocked(supabase, conversation)) {
+        unlockedConversations.push(conversation);
+      }
+    }
+
     // Get last message and unread count for each conversation
     const conversationsWithMeta = await Promise.all(
-      (conversations || []).map(async (conv) => {
+      unlockedConversations.map(async (conv) => {
         const { data: lastMsg } = await supabase
           .from("eloo_messages")
           .select("content, created_at, sender_id")
@@ -144,6 +174,14 @@ export async function POST(request: NextRequest) {
 
     if (!conversation.is_active) {
       return NextResponse.json({ error: "This conversation is no longer active" }, { status: 400 });
+    }
+
+    const unlocked = await isConversationUnlocked(supabase, conversation);
+    if (!unlocked) {
+      return NextResponse.json(
+        { error: "Chat unlocks after the buyer accepts the bid and pays the AnyJob fee" },
+        { status: 403 }
+      );
     }
 
     // Insert message

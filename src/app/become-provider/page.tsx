@@ -29,7 +29,7 @@ const FEATURES = [
     {
         icon: "💰",
         title: "Set your own rates",
-        description: "You set the quote and collect that amount directly from the client on site. Anyjob only adds and keeps the booking token shown to the client."
+        description: "You set your job payout. Anyjob adds its fee into the buyer's total bid, and the buyer sees one total amount."
     },
     {
         icon: "📈",
@@ -60,8 +60,8 @@ const STEPS = [
     {
         icon: CreditCard,
         number: "4",
-        title: "Understand booking tokens",
-        description: "Anyjob adds 20% of your quote, capped at €40, to the client offer. You still collect your quoted amount yourself."
+        title: "Understand AnyJob fees",
+        description: "Anyjob adds €20 or 20%, whichever is higher, into the buyer's total bid. You still collect your job payout yourself."
     },
     {
         icon: Calendar,

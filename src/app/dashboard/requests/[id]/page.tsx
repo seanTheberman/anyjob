@@ -306,8 +306,8 @@ export default function RequestDetailPage() {
   }
 
   const StatusIcon = statusIcons[inquiry.status as keyof typeof statusIcons] || Clock3;
-  const acceptedPrice = inquiry.actual_price ?? null;
-  const acceptedBreakdown = acceptedPrice ? calculateBookingTokenBreakdown(Number(acceptedPrice)) : null;
+  const acceptedBid = bids.find((bid) => bid.status === "accepted") || null;
+  const acceptedBreakdown = acceptedBid ? calculateBookingTokenBreakdown(Number(acceptedBid.amount)) : null;
 
   return (
     <DashboardLayout>
@@ -474,23 +474,13 @@ export default function RequestDetailPage() {
                   </div>
                 )}
                 {acceptedBreakdown && (
-                  <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Booking token</span>
-                      <span className="font-medium text-gray-900">{formatMoney(acceptedBreakdown.bookingToken, "£")}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-gray-600">Pay provider on site</span>
-                      <span className="font-medium text-gray-900">{formatMoney(acceptedBreakdown.onsiteDue, "£")}</span>
-                    </div>
-                    <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
-                      <span className="text-gray-900 font-medium">Total offer</span>
-                      <span className="font-semibold text-green-600">{formatMoney(acceptedBreakdown.buyerTotal, "£")}</span>
-                    </div>
-                  </>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-900 font-medium">Accepted bid total</span>
+                    <span className="font-semibold text-green-600">{formatMoney(acceptedBreakdown.buyerTotal)}</span>
+                  </div>
                 )}
-                {!inquiry.estimated_price && !inquiry.actual_price && (
-                  <p className="text-gray-500 text-sm">Review provider offers to see the booking token and onsite balance.</p>
+                {!acceptedBreakdown && !inquiry.estimated_price && !inquiry.actual_price && (
+                  <p className="text-gray-500 text-sm">Review provider offers to see the total bid amount.</p>
                 )}
               </div>
             </div>
@@ -511,7 +501,7 @@ export default function RequestDetailPage() {
                     Contact Support
                   </button>
                 </>
-              ) : inquiry.status === "confirmed" || inquiry.status === "in_progress" ? (
+              ) : inquiry.status === "confirmed" || inquiry.status === "in_progress" || inquiry.status === "bid_accepted" ? (
                 <>
                   <button className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-blue-700 transition-colors">
                     <MessageSquare className="w-5 h-5" />

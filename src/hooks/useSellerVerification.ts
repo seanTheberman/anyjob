@@ -13,70 +13,97 @@ interface SellerVerificationStatus {
   backgroundCheckStatus: string | null;
 }
 
+const DEFAULT_LOCKED_STATUS: SellerVerificationStatus = {
+  isVerified: false,
+  status: null,
+  kycComplete: false,
+  emailVerified: false,
+  phoneVerified: false,
+  documentsUploaded: false,
+  backgroundCheckStatus: null,
+};
+
+let cachedVerificationStatus: SellerVerificationStatus | null = null;
+let verificationPromise: Promise<SellerVerificationStatus | null> | null = null;
+
+async function fetchSellerVerificationStatus(): Promise<SellerVerificationStatus | null> {
+  const supabase = createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  const { data: seller, error: sellerError } = await supabase
+    .from("sellers")
+    .select("status, email_verified, phone_verified, id_document_url, selfie_video_url, insurance_document_url, background_check_status")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (sellerError || !seller) {
+    return {
+      ...DEFAULT_LOCKED_STATUS,
+      emailVerified: Boolean(user.email_confirmed_at),
+    };
+  }
+
+  const documentsUploaded = Boolean(
+    seller.id_document_url &&
+    seller.selfie_video_url &&
+    seller.insurance_document_url
+  );
+  const kycComplete = Boolean(seller.email_verified && seller.phone_verified && documentsUploaded);
+
+  return {
+    isVerified: seller.status === "approved",
+    status: seller.status,
+    kycComplete,
+    emailVerified: seller.email_verified || false,
+    phoneVerified: seller.phone_verified || false,
+    documentsUploaded,
+    backgroundCheckStatus: seller.background_check_status,
+  };
+}
+
 export function useSellerVerification() {
-  const [verificationStatus, setVerificationStatus] = useState<SellerVerificationStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [verificationStatus, setVerificationStatus] = useState<SellerVerificationStatus | null>(
+    cachedVerificationStatus ?? DEFAULT_LOCKED_STATUS
+  );
+  const [loading, setLoading] = useState(!cachedVerificationStatus);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     async function checkVerification() {
       try {
-        const supabase = createClient();
-        
-        // Get current user
-        const { data: { user } } = await supabase.auth.getUser();
-        
-        if (!user) {
-          setLoading(false);
-          return;
+        verificationPromise ??= fetchSellerVerificationStatus();
+        const status = await verificationPromise;
+        cachedVerificationStatus = status;
+        verificationPromise = null;
+
+        if (active) {
+          setVerificationStatus(status);
         }
-
-        // Check if user is a seller
-        const { data: seller, error: sellerError } = await supabase
-          .from("sellers")
-          .select("status, email_verified, phone_verified, id_document_url, insurance_document_url, background_check_status")
-          .eq("id", user.id)
-          .maybeSingle();
-
-        if (sellerError || !seller) {
-          setVerificationStatus({
-            isVerified: false,
-            status: null,
-            kycComplete: false,
-            emailVerified: Boolean(user.email_confirmed_at),
-            phoneVerified: false,
-            documentsUploaded: false,
-            backgroundCheckStatus: null,
-          });
-          setLoading(false);
-          return;
-        }
-
-        // Determine KYC completion
-        const documentsUploaded = Boolean(seller.id_document_url || seller.insurance_document_url);
-        const kycComplete = seller.email_verified && seller.phone_verified && documentsUploaded;
-        
-        // Determine if verified (approved status and complete KYC)
-        const isVerified = seller.status === "approved" && kycComplete;
-
-        setVerificationStatus({
-          isVerified,
-          status: seller.status,
-          kycComplete,
-          emailVerified: seller.email_verified || false,
-          phoneVerified: seller.phone_verified || false,
-          documentsUploaded,
-          backgroundCheckStatus: seller.background_check_status,
-        });
       } catch (err) {
         console.error("Error checking verification status:", err);
-        setError("Failed to check verification status");
+        if (active) {
+          setError("Failed to check verification status");
+          setVerificationStatus(DEFAULT_LOCKED_STATUS);
+        }
       } finally {
-        setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     }
 
     checkVerification();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   return { verificationStatus, loading, error };

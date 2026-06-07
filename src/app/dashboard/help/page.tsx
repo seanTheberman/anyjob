@@ -13,8 +13,8 @@ const faqCategories = [
   },
   {
     icon: CreditCard,
-    title: "Booking Tokens & Billing",
-    description: "Booking token, onsite balance, refunds, and billing questions",
+    title: "Payments & Billing",
+    description: "Accepted bids, AnyJob fees, refunds, and billing questions",
     articles: 8,
   },
   {
@@ -33,7 +33,7 @@ const faqCategories = [
 
 const popularQuestions = [
   "How do I book a service?",
-  "How does the booking token work?",
+  "How does the AnyJob fee work?",
   "How do I cancel or reschedule a booking?",
   "What happens if my provider doesn't show up?",
   "How do I contact my provider?",
@@ -55,7 +55,7 @@ export default function HelpCenterPage() {
     !normalizedQuery || question.toLowerCase().includes(normalizedQuery)
   );
   const activeAnswer = selectedQuestion
-    ? "Open your booking from the dashboard to view details, contact support, or manage changes. Booking token refunds and provider issues are reviewed from the same booking record."
+    ? "Open your booking from the dashboard to view details, contact support, or manage changes. AnyJob fee refunds and provider issues are reviewed from the same booking record."
     : selectedTopic
       ? `Showing help articles for ${selectedTopic}. Use search above to narrow the topic further.`
       : null;

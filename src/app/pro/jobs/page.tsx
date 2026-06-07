@@ -146,12 +146,14 @@ export default function BrowseJobsPage() {
           <p className="text-sm text-gray-500 mb-4">{jobs.length} job{jobs.length !== 1 ? "s" : ""} available</p>
         )}
 
-        {!verificationLoading && !canPlaceBid && (
+        {!canPlaceBid && (
           <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
-              <p className="font-semibold">KYC approval is required before placing bids.</p>
-              <p className="mt-1 text-amber-800">You can still browse jobs, but bidding unlocks after your provider verification is approved.</p>
+              <p className="font-semibold">
+                {verificationLoading ? "Checking provider verification..." : "KYC approval is required before placing bids."}
+              </p>
+              <p className="mt-1 text-amber-800">You can still browse jobs, but bidding unlocks only after your provider verification is approved.</p>
             </div>
           </div>
         )}
@@ -254,18 +256,18 @@ export default function BrowseJobsPage() {
                         </div>
                         {job.my_bid.status === "pending" && (
                           <p className="text-xs text-gray-500">
-                            Client total: {formatMoney(calculateBookingTokenBreakdown(Number(job.my_bid.amount)).buyerTotal)}
+                            Buyer sees total bid: {formatMoney(calculateBookingTokenBreakdown(Number(job.my_bid.amount)).buyerTotal)}
                           </p>
                         )}
                       </div>
                     ) : (
                       <button
-                        disabled={verificationLoading || !canPlaceBid}
+                        disabled={!canPlaceBid}
                         onClick={() => setShowBidForm(showBidForm === job.id ? null : job.id)}
                         className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 transition-colors"
                       >
                         <DollarSign className="w-4 h-4" />
-                        {verificationLoading ? "Checking KYC..." : canPlaceBid ? "Place Bid" : "KYC Required"}
+                        {canPlaceBid ? "Place Bid" : "KYC Required"}
                       </button>
                     )}
                     <button

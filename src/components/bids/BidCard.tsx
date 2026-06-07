@@ -119,40 +119,34 @@ export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat 
         {isClient ? (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Total offer</span>
+              <span className="text-sm text-gray-500">Bid total</span>
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatMoney(feeBreakdown.buyerTotal)}
               </span>
             </div>
-            <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-              <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
-                <p className="text-gray-500">Booking token today</p>
-                <p className="font-semibold text-gray-900 dark:text-white">{formatMoney(feeBreakdown.bookingToken)}</p>
-              </div>
-              <div className="rounded-lg bg-white p-3 dark:bg-gray-900">
-                <p className="text-gray-500">Pay provider on site</p>
-                <p className="font-semibold text-gray-900 dark:text-white">{formatMoney(feeBreakdown.onsiteDue)}</p>
-              </div>
-            </div>
             <p className="text-xs leading-relaxed text-gray-500">
-              The booking token confirms the provider and protects the appointment. The remaining balance is paid directly to the provider at the location.
+              Accepting the bid confirms this provider and unlocks chat and contact details.
             </p>
           </div>
         ) : (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-500">Your quote</span>
+              <span className="text-sm text-gray-500">Your job payout</span>
               <span className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatMoney(feeBreakdown.sellerQuote)}
               </span>
             </div>
             <div className="rounded-lg bg-white p-3 text-sm dark:bg-gray-900">
               <div className="flex items-center justify-between">
-                <span className="text-gray-500">Added to client by AnyJob</span>
+                <span className="text-gray-500">AnyJob fee added to buyer</span>
                 <span className="font-semibold text-gray-900 dark:text-white">{formatMoney(feeBreakdown.bookingToken)}</span>
               </div>
+              <div className="mt-2 flex items-center justify-between border-t border-gray-100 pt-2">
+                <span className="font-medium text-gray-700 dark:text-gray-300">Buyer sees total bid</span>
+                <span className="font-bold text-gray-900 dark:text-white">{formatMoney(feeBreakdown.buyerTotal)}</span>
+              </div>
               <p className="mt-2 text-xs text-gray-500">
-                AnyJob keeps this service fee. You collect your quote directly from the client on site.
+                AnyJob keeps this fee when the buyer accepts. The buyer only sees the total bid.
               </p>
             </div>
           </div>
@@ -199,7 +193,7 @@ export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat 
                 className="flex-1 flex items-center justify-center gap-2 bg-green-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
               >
                 {loading === "accept" ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                Accept & Pay Token
+                Accept & Pay Fee
               </button>
               <button
                 onClick={() => handleAction("reject", onReject)}

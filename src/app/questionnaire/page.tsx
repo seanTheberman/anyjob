@@ -320,6 +320,8 @@ function ServiceQuestionnaireContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [stepKey, setStepKey] = useState(1);
+  const isTaskrabbitSelection = searchParams.get("source") === "taskrabbit";
+  const selectedCustomJobName = formData.category_slug === "custom" ? formData.custom_tags[0] : "";
 
   // Get pre-selected category from URL
   useEffect(() => {
@@ -328,6 +330,7 @@ function ServiceQuestionnaireContent() {
     const urgency = searchParams.get("urgency");
     const customQuery = searchParams.get("custom_query")?.trim();
     const providerId = searchParams.get("provider");
+    const isTaskrabbitSelection = searchParams.get("source") === "taskrabbit";
     if (cat && !providerId) {
       setFormData((prev) => ({
         ...prev,
@@ -340,8 +343,12 @@ function ServiceQuestionnaireContent() {
           : prev.custom_tags,
         tag_input: "",
       }));
-      // Skip category selection. If a subcategory is provided, continue at service type and urgency.
-      const nextStep = subcategory ? 3 : 2;
+      // Taskrabbit dropdown selections already name the custom job, so skip tag collection.
+      const nextStep = isTaskrabbitSelection && cat === "custom" && customQuery
+        ? 3
+        : subcategory
+          ? 3
+          : 2;
       setCurrentStep(nextStep);
       setStepKey(nextStep);
     }
@@ -578,6 +585,8 @@ function ServiceQuestionnaireContent() {
             updateFormData={updateFormData}
             onNext={handleNext}
             onPrevious={handlePrevious}
+            showPrevious={!isTaskrabbitSelection}
+            selectedCustomJobName={selectedCustomJobName}
           />
         );
       case 4:
@@ -643,25 +652,6 @@ function ServiceQuestionnaireContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-20">
-      {/* Progress Bar */}
-      <div className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-        <div className="max-w-3xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="text-sm text-gray-500">
-              Step {currentStep} of {TOTAL_STEPS}
-            </div>
-          </div>
-          <div className="h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden">
-            <motion.div
-              className="h-full bg-red-600"
-              initial={{ width: 0 }}
-              animate={{ width: `${(currentStep / TOTAL_STEPS) * 100}%` }}
-              transition={{ duration: 0.3 }}
-            />
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-8">
         <motion.div
@@ -950,14 +940,27 @@ function Step3ServiceType({
   updateFormData,
   onNext,
   onPrevious,
+  showPrevious = true,
+  selectedCustomJobName = "",
 }: {
   formData: FormData;
   updateFormData: (field: keyof FormData, value: unknown) => void;
   onNext: () => void;
   onPrevious: () => void;
+  showPrevious?: boolean;
+  selectedCustomJobName?: string;
 }) {
   return (
     <div className="space-y-8">
+      {selectedCustomJobName && (
+        <div className="rounded-2xl border border-red-100 bg-white p-5 shadow-sm dark:border-red-950 dark:bg-gray-900">
+          <div className="text-sm font-semibold uppercase text-red-600">Selected service</div>
+          <div className="mt-2 text-2xl font-bold text-gray-950 dark:text-white">
+            {selectedCustomJobName}
+          </div>
+        </div>
+      )}
+
       {/* Service Type */}
       <div>
         <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
@@ -1012,9 +1015,13 @@ function Step3ServiceType({
       </div>
 
       <div className="flex justify-between pt-4">
-        <Button variant="outline" onClick={onPrevious}>
-          <ArrowLeft className="w-4 h-4 mr-2" /> Back
-        </Button>
+        {showPrevious ? (
+          <Button variant="outline" onClick={onPrevious}>
+            <ArrowLeft className="w-4 h-4 mr-2" /> Back
+          </Button>
+        ) : (
+          <div />
+        )}
         <Button
           onClick={onNext}
           disabled={!formData.service_type || !formData.job_urgency}
