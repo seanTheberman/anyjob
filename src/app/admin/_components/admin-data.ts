@@ -91,6 +91,7 @@ export type KycReview = {
 
 export type AdminLiveJob = {
   id: string;
+  userId: string;
   shortId: string;
   datePosted: string;
   postedLabel: string;
@@ -109,7 +110,7 @@ export type AdminLiveJob = {
   quotes: number;
   lastActivity: string;
   lastActivityAt: string | null;
-  tabStatus: "live" | "expired" | "awaiting_buyer" | "no_quotes" | "all";
+  tabStatus: "live" | "expired" | "awaiting_buyer" | "no_quotes" | "completed" | "cancelled" | "all";
 };
 
 export const settingsGroups = [

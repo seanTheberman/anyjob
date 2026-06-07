@@ -34,11 +34,11 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const city = searchParams.get("city");
 
-    // Fetch submitted inquiries (open for bids) excluding user's own
+    // Fetch open inquiries for bidding. "submitted" is the canonical live status.
     let query = supabase
       .from("service_inquiries")
       .select("*")
-      .eq("status", "submitted")
+      .in("status", ["submitted", "live", "open", "pending"])
       .neq("user_id", user.id)
       .order("submitted_at", { ascending: false });
 

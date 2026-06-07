@@ -1,11 +1,11 @@
 "use client";
 
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Calendar, Clock, MapPin, Star, ChevronRight, Circle } from "lucide-react";
+import { Calendar, Clock, MapPin, ChevronRight, Circle } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import { getJobStatusColor, getJobStatusLabel } from "@/lib/job-status";
 
 interface ServiceInquiry {
   id: string;
@@ -22,24 +22,6 @@ interface ServiceInquiry {
   status: string;
   created_at: string;
 }
-
-const statusColors = {
-  submitted: "bg-blue-100 text-blue-800",
-  pending: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-green-100 text-green-800",
-  in_progress: "bg-blue-100 text-blue-800",
-  completed: "bg-gray-100 text-gray-800",
-  cancelled: "bg-red-100 text-red-800",
-};
-
-const statusLabels = {
-  submitted: "Submitted",
-  pending: "Pending",
-  confirmed: "Confirmed",
-  in_progress: "In Progress",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
 
 // Helper function to get service name from slugs
 const getServiceName = (categorySlug: string, subcategorySlug: string) => {
@@ -78,14 +60,12 @@ const getServiceName = (categorySlug: string, subcategorySlug: string) => {
 export default function MyRequestsPage() {
   const [inquiries, setInquiries] = useState<ServiceInquiry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
         
         if (user) {
           // Fetch user's service inquiries
@@ -188,10 +168,10 @@ export default function MyRequestsPage() {
                     </h3>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        statusColors[inquiry.status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"
+                        getJobStatusColor(inquiry.status)
                       }`}
                     >
-                      {statusLabels[inquiry.status as keyof typeof statusLabels] || inquiry.status}
+                      {getJobStatusLabel(inquiry.status)}
                     </span>
                   </div>
 

@@ -12,6 +12,7 @@ import { ReviewDisplay } from "@/components/reviews/ReviewDisplay";
 import { BidCard, type Bid } from "@/components/bids/BidCard";
 import { ImageUploader } from "@/components/upload/ImageUploader";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
+import { getJobStatusColor, getJobStatusLabel, jobStatusIcons } from "@/lib/job-status";
 
 interface ServiceInquiry {
   id: string;
@@ -55,39 +56,6 @@ interface Review {
   };
   review_type: "buyer_to_seller" | "seller_to_buyer";
 }
-
-const statusColors = {
-  submitted: "bg-blue-100 text-blue-800",
-  pending: "bg-yellow-100 text-yellow-800",
-  confirmed: "bg-green-100 text-green-800",
-  in_progress: "bg-blue-100 text-blue-800",
-  completed: "bg-gray-100 text-gray-800",
-  converted: "bg-green-100 text-green-800",
-  bid_accepted: "bg-purple-100 text-purple-800",
-  cancelled: "bg-red-100 text-red-800",
-};
-
-const statusLabels = {
-  submitted: "Submitted",
-  pending: "Pending",
-  confirmed: "Confirmed",
-  in_progress: "In Progress",
-  completed: "Completed",
-  converted: "Completed",
-  bid_accepted: "Bid Accepted",
-  cancelled: "Cancelled",
-};
-
-const statusIcons = {
-  submitted: Clock3,
-  pending: Clock3,
-  confirmed: CheckCircle,
-  in_progress: Clock3,
-  completed: CheckCircle,
-  converted: CheckCircle,
-  bid_accepted: CheckCircle,
-  cancelled: XCircle,
-};
 
 // Helper function to get service name from slugs
 const getServiceName = (categorySlug: string, subcategorySlug: string) => {
@@ -135,6 +103,7 @@ export default function RequestDetailPage() {
   const [reviewFormType, setReviewFormType] = useState<"buyer_to_seller" | "seller_to_buyer">("buyer_to_seller");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [bids, setBids] = useState<Bid[]>([]);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -184,23 +153,28 @@ export default function RequestDetailPage() {
     fetchRequestData();
   }, [supabase, params.id]);
 
-  const handleCancelRequest = async () => {
+  const updateRequestStatus = async (status: "cancelled" | "in_progress" | "completed") => {
     if (!inquiry || !user) return;
-    
+
+    setUpdatingStatus(status);
     try {
       const { error } = await supabase
         .from("service_inquiries")
-        .update({ status: "cancelled" })
+        .update({ status, updated_at: new Date().toISOString() })
         .eq("id", inquiry.id)
         .eq("user_id", user.id);
 
       if (error) {
-        console.error("Error cancelling request:", error);
+        console.error("Error updating request status:", error);
+        alert(error.message || "Could not update request status");
       } else {
-        setInquiry({ ...inquiry, status: "cancelled" });
+        setInquiry({ ...inquiry, status });
       }
     } catch (error) {
       console.error("Error:", error);
+      alert("Could not update request status");
+    } finally {
+      setUpdatingStatus(null);
     }
   };
 
@@ -305,7 +279,7 @@ export default function RequestDetailPage() {
     );
   }
 
-  const StatusIcon = statusIcons[inquiry.status as keyof typeof statusIcons] || Clock3;
+  const StatusIcon = jobStatusIcons[inquiry.status as keyof typeof jobStatusIcons] || Clock3;
   const acceptedBid = bids.find((bid) => bid.status === "accepted") || null;
   const acceptedBreakdown = acceptedBid ? calculateBookingTokenBreakdown(Number(acceptedBid.amount)) : null;
 
@@ -328,11 +302,9 @@ export default function RequestDetailPage() {
             </h1>
             
             <div className="flex items-center gap-3">
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-                statusColors[inquiry.status as keyof typeof statusColors] || "bg-gray-100 text-gray-800"
-              }`}>
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${getJobStatusColor(inquiry.status)}`}>
                 <StatusIcon className="w-4 h-4" />
-                {statusLabels[inquiry.status as keyof typeof statusLabels] || inquiry.status}
+                {getJobStatusLabel(inquiry.status)}
               </div>
             </div>
           </div>
@@ -490,11 +462,12 @@ export default function RequestDetailPage() {
               {inquiry.status === "submitted" || inquiry.status === "pending" ? (
                 <>
                   <button
-                    onClick={handleCancelRequest}
+                    disabled={updatingStatus === "cancelled"}
+                    onClick={() => updateRequestStatus("cancelled")}
                     className="w-full flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-red-700 transition-colors"
                   >
                     <XCircle className="w-5 h-5" />
-                    Cancel Request
+                    {updatingStatus === "cancelled" ? "Cancelling..." : "Cancel Request"}
                   </button>
                   <button className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">
                     <MessageSquare className="w-5 h-5" />
@@ -507,6 +480,28 @@ export default function RequestDetailPage() {
                     <MessageSquare className="w-5 h-5" />
                     Message Provider
                   </button>
+                  {inquiry.status === "bid_accepted" || inquiry.status === "confirmed" ? (
+                    <button
+                      type="button"
+                      disabled={updatingStatus === "in_progress"}
+                      onClick={() => updateRequestStatus("in_progress")}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-60"
+                    >
+                      <Clock3 className="w-5 h-5" />
+                      {updatingStatus === "in_progress" ? "Starting..." : "Mark In Progress"}
+                    </button>
+                  ) : null}
+                  {inquiry.status === "in_progress" ? (
+                    <button
+                      type="button"
+                      disabled={updatingStatus === "completed"}
+                      onClick={() => updateRequestStatus("completed")}
+                      className="w-full flex items-center justify-center gap-2 bg-green-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-green-700 transition-colors disabled:opacity-60"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                      {updatingStatus === "completed" ? "Completing..." : "Mark Completed"}
+                    </button>
+                  ) : null}
                   <button className="w-full flex items-center justify-center gap-2 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl font-medium hover:bg-gray-200 transition-colors">
                     <UserIcon className="w-5 h-5" />
                     View Provider Profile

@@ -1,9 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BriefcaseBusiness, Clock3, Download, Eye, FileText, MapPin, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
+import { BriefcaseBusiness, CheckCircle2, Clock3, Download, Eye, FileQuestion, FileText, MapPin, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
 
 import type { AdminLiveJob } from "./admin-data";
+import { getJobStatusLabel } from "@/lib/job-status";
 
 type JobTab = AdminLiveJob["tabStatus"] | "all";
 
@@ -12,6 +13,8 @@ const tabs: Array<{ key: JobTab; label: string; icon: typeof BriefcaseBusiness; 
   { key: "expired", label: "Expired (7d idle)", icon: Clock3, tone: "text-slate-600" },
   { key: "awaiting_buyer", label: "No response from buyer", icon: TimerReset, tone: "text-amber-700" },
   { key: "no_quotes", label: "No quotes from assessors", icon: XCircle, tone: "text-red-700" },
+  { key: "completed", label: "Completed", icon: FileText, tone: "text-emerald-700" },
+  { key: "cancelled", label: "Cancelled", icon: XCircle, tone: "text-red-700" },
   { key: "all", label: "All jobs", icon: FileText, tone: "text-blue-700" },
 ];
 
@@ -35,9 +38,29 @@ function includesQuery(job: AdminLiveJob, query: string) {
 
 function statusClass(job: AdminLiveJob) {
   if (job.tabStatus === "expired") return "bg-slate-100 text-slate-700";
+  if (job.tabStatus === "completed") return "bg-emerald-50 text-emerald-700";
+  if (job.tabStatus === "cancelled") return "bg-red-100 text-red-700";
   if (job.tabStatus === "no_quotes") return "bg-red-50 text-red-700";
   if (job.tabStatus === "awaiting_buyer") return "bg-amber-50 text-amber-700";
   return "bg-green-50 text-green-700";
+}
+
+function tabLabel(job: AdminLiveJob) {
+  if (job.tabStatus === "live") return "Live";
+  if (job.tabStatus === "expired") return "Expired";
+  if (job.tabStatus === "completed") return "Completed";
+  if (job.tabStatus === "cancelled") return "Cancelled";
+  if (job.tabStatus === "awaiting_buyer") return "Waiting";
+  return "No quotes";
+}
+
+function tabStatusForRawStatus(status?: string): AdminLiveJob["tabStatus"] {
+  const normalized = String(status || "").toLowerCase();
+  if (normalized === "completed" || normalized === "converted") return "completed";
+  if (normalized === "cancelled") return "cancelled";
+  if (normalized === "expired") return "expired";
+  if (normalized === "needs_more_info") return "awaiting_buyer";
+  return "live";
 }
 
 export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
@@ -54,9 +77,11 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     const expired = rows.filter((job) => job.tabStatus === "expired").length;
     const awaitingBuyer = rows.filter((job) => job.tabStatus === "awaiting_buyer").length;
     const noQuotes = rows.filter((job) => job.tabStatus === "no_quotes").length;
+    const completed = rows.filter((job) => job.tabStatus === "completed").length;
+    const cancelled = rows.filter((job) => job.tabStatus === "cancelled").length;
     const totalQuotes = rows.reduce((sum, job) => sum + job.quotes, 0);
 
-    return { total: rows.length, live, expired, awaitingBuyer, noQuotes, totalQuotes };
+    return { total: rows.length, live, expired, awaitingBuyer, noQuotes, completed, cancelled, totalQuotes };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -72,16 +97,29 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     expired: summary.expired,
     awaiting_buyer: summary.awaitingBuyer,
     no_quotes: summary.noQuotes,
+    completed: summary.completed,
+    cancelled: summary.cancelled,
     all: summary.total,
   };
 
-  async function runJobAction(action: "refresh" | "expire", job: AdminLiveJob) {
+  async function runJobAction(action: "refresh" | "approve" | "request_info" | "mark_live" | "start" | "complete" | "cancel" | "expire", job: AdminLiveJob) {
+    const requestMessage = action === "request_info"
+      ? window.prompt(
+          "What information should the buyer add?",
+          "Please add more details, photos, timing, budget, or access instructions so providers can quote accurately."
+        )
+      : null;
+
+    if (action === "request_info" && requestMessage === null) {
+      return;
+    }
+
     setPendingJob(`${action}:${job.id}`);
     setMessage(null);
     const response = await fetch("/api/admin/jobs/actions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, jobId: job.id }),
+      body: JSON.stringify({ action, jobId: job.id, message: requestMessage }),
     });
     const payload = await response.json().catch(() => ({}));
     setPendingJob(null);
@@ -89,8 +127,14 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
       setMessage(payload.error || "Job update failed");
       return;
     }
-    if (action === "expire") {
-      setRows((current) => current.map((item) => item.id === job.id ? { ...item, status: "expired", tabStatus: "expired", lastActivity: "Now", idleDays: 0 } : item));
+    if (payload.status) {
+      setRows((current) =>
+        current.map((item) =>
+          item.id === job.id
+            ? { ...item, status: payload.status, tabStatus: tabStatusForRawStatus(payload.status), lastActivity: "Now", idleDays: 0 }
+            : item
+        )
+      );
     } else {
       setRows((current) => current.map((item) => item.id === job.id ? { ...item, lastActivity: "Now", idleDays: 0 } : item));
     }
@@ -142,7 +186,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
       </section>
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <nav className="grid border-b border-slate-200 bg-white xl:grid-cols-5">
+        <nav className="grid border-b border-slate-200 bg-white xl:grid-cols-7">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -155,7 +199,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
               >
                 <Icon className={`h-4 w-4 ${active ? tab.tone : "text-slate-500"}`} />
                 <span className="min-w-0 truncate">{tab.label}</span>
-                <span className={`ml-auto rounded-full px-2.5 py-1 text-xs font-bold text-white ${tab.key === "live" ? "bg-green-500" : tab.key === "expired" ? "bg-slate-500" : tab.key === "awaiting_buyer" ? "bg-amber-500" : tab.key === "no_quotes" ? "bg-red-500" : "bg-blue-500"}`}>
+                <span className={`ml-auto rounded-full px-2.5 py-1 text-xs font-bold text-white ${tab.key === "live" ? "bg-green-500" : tab.key === "expired" ? "bg-slate-500" : tab.key === "awaiting_buyer" ? "bg-amber-500" : tab.key === "completed" ? "bg-emerald-500" : tab.key === "no_quotes" || tab.key === "cancelled" ? "bg-red-500" : "bg-blue-500"}`}>
                   {tabCounts[tab.key]}
                 </span>
               </button>
@@ -213,7 +257,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
             <col className="w-[120px]" />
             <col className="w-[90px]" />
             <col className="w-[120px]" />
-            <col className="w-[190px]" />
+            <col className="w-[330px]" />
           </colgroup>
           <thead className="bg-slate-50">
             <tr>
@@ -233,8 +277,9 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                 </td>
                 <td className="px-4 py-4">
                   <span className={`rounded-lg px-3 py-1.5 text-xs font-black uppercase ${statusClass(job)}`}>
-                    {job.tabStatus === "live" ? "Live" : job.tabStatus === "expired" ? "Expired" : job.tabStatus === "awaiting_buyer" ? "Waiting" : "No quotes"}
+                    {tabLabel(job)}
                   </span>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{getJobStatusLabel(job.status)}</p>
                 </td>
                 <td className="px-4 py-4">
                   <p className="truncate text-sm font-black text-slate-950" title={job.customer}>{job.customer}</p>
@@ -266,6 +311,54 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                     >
                       <RefreshCw className="h-4 w-4" />
                     </button>
+                    {job.status === "submitted" ? (
+                      <span className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-green-200 bg-green-50 px-3 text-xs font-black text-green-700">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Approved
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        title="Approve job and make it live for providers"
+                        disabled={pendingJob === `approve:${job.id}`}
+                        onClick={() => runJobAction("approve", job)}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-green-200 px-3 text-xs font-black text-green-700 hover:bg-green-50 disabled:opacity-60"
+                      >
+                        Approve
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      title="Ask buyer for more information"
+                      disabled={pendingJob === `request_info:${job.id}`}
+                      onClick={() => runJobAction("request_info", job)}
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-amber-200 px-3 text-xs font-black text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                    >
+                      <FileQuestion className="h-4 w-4" />
+                      Request info
+                    </button>
+                    {job.status === "bid_accepted" || job.status === "confirmed" ? (
+                      <button
+                        type="button"
+                        title="Mark in progress"
+                        disabled={pendingJob === `start:${job.id}`}
+                        onClick={() => runJobAction("start", job)}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-blue-200 px-3 text-xs font-black text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                      >
+                        Start
+                      </button>
+                    ) : null}
+                    {job.status === "in_progress" ? (
+                      <button
+                        type="button"
+                        title="Mark completed"
+                        disabled={pendingJob === `complete:${job.id}`}
+                        onClick={() => runJobAction("complete", job)}
+                        className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-200 px-3 text-xs font-black text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                      >
+                        Done
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       title="Expire job"
@@ -274,6 +367,15 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash2 className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      title="Cancel job"
+                      disabled={pendingJob === `cancel:${job.id}` || job.tabStatus === "cancelled"}
+                      onClick={() => runJobAction("cancel", job)}
+                      className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-black text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Cancel
                     </button>
                   </div>
                 </td>

@@ -234,7 +234,7 @@ export async function getAdminJobs() {
   const [inquiries, bids] = await Promise.all([
     maybeRows<AnyRecord>(
       "service_inquiries",
-      "id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,status,created_at,updated_at,submitted_at",
+      "id,user_id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,status,created_at,updated_at,submitted_at",
       100
     ),
     maybeRows<AnyRecord>("bids", "id,inquiry_id,status,amount,created_at,updated_at", 500),
@@ -263,12 +263,28 @@ export async function getAdminJobs() {
     const idleDays = lastActivityAt ? Math.max(Math.floor((Date.now() - new Date(lastActivityAt).getTime()) / 86400000), 0) : 0;
     const quoteCount = jobBids.length;
     const acceptedQuote = jobBids.some((bid) => String(bid.status || "").toLowerCase() === "accepted");
-    const awaitingBuyer = quoteCount > 0 && !acceptedQuote && ["submitted", "open", "pending"].includes(status.toLowerCase());
+    const normalizedStatus = status.toLowerCase();
+    const awaitingBuyer = quoteCount > 0 && !acceptedQuote && ["submitted", "open", "pending"].includes(normalizedStatus);
     const noQuotes = quoteCount === 0;
     const expired = idleDays >= 7 && !acceptedQuote;
+    const tabStatus =
+      normalizedStatus === "completed" || normalizedStatus === "converted"
+        ? "completed"
+        : normalizedStatus === "cancelled"
+          ? "cancelled"
+          : normalizedStatus === "expired"
+            ? "expired"
+            : expired
+              ? "expired"
+              : noQuotes
+                ? "no_quotes"
+                : awaitingBuyer
+                  ? "awaiting_buyer"
+                  : "live";
 
     return {
       id,
+      userId: String(job.user_id || ""),
       shortId: id.slice(0, 8),
       datePosted: createdAt,
       postedLabel: createdAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(createdAt)) : "Unknown",
@@ -287,7 +303,7 @@ export async function getAdminJobs() {
       quotes: quoteCount,
       lastActivity: lastActivityAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(lastActivityAt)) : "Unknown",
       lastActivityAt,
-      tabStatus: expired ? "expired" : noQuotes ? "no_quotes" : awaitingBuyer ? "awaiting_buyer" : "live",
+      tabStatus,
     };
   });
 
