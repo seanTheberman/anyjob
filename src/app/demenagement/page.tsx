@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const MOVING_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const MOVING_SUBCATEGORIES = [
     },
 ];
 
-const MOVING_PROVIDERS = [
-    {
-        id: "1",
-        slug: "maxandre-movers",
-        name: "Maxandre",
-        category: "Movers",
-        rate: 22,
-        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d",
-        isNew: true,
-        tags: ["Strong", "Efficient", "Insured"],
-    },
-    {
-        id: "2",
-        slug: "pierre-mover",
-        name: "Pierre",
-        category: "Heavy Lifting",
-        rate: 25,
-        image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2",
-        isNew: true,
-        tags: ["Professional", "Careful", "Experienced"],
-    },
-    {
-        id: "3",
-        slug: "marie-packers",
-        name: "Marie",
-        category: "Packing Specialist",
-        rate: 20,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Detail-oriented", "Organized", "Fast"],
-    },
-    {
-        id: "4",
-        slug: "lucas-driver",
-        name: "Lucas",
-        category: "Driver",
-        rate: 28,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Licensed", "Safe driver", "Reliable"],
-    },
-];
 
-export default function DemenagementPage() {
+export default async function DemenagementPage() {
+    const providers = await getProviderCards("demenagement");
+
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function DemenagementPage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our professional movers are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {MOVING_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our professional movers are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

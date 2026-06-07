@@ -41,28 +41,31 @@ function statusClass(job: AdminLiveJob) {
 }
 
 export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
+  const [rows, setRows] = useState(jobs);
   const [activeTab, setActiveTab] = useState<JobTab>("live");
   const [query, setQuery] = useState("");
   const [county, setCounty] = useState("all");
+  const [message, setMessage] = useState<string | null>(null);
+  const [pendingJob, setPendingJob] = useState<string | null>(null);
 
-  const counties = useMemo(() => Array.from(new Set(jobs.map((job) => job.county).filter(Boolean))).sort(), [jobs]);
+  const counties = useMemo(() => Array.from(new Set(rows.map((job) => job.county).filter(Boolean))).sort(), [rows]);
   const summary = useMemo(() => {
-    const live = jobs.filter((job) => job.tabStatus === "live").length;
-    const expired = jobs.filter((job) => job.tabStatus === "expired").length;
-    const awaitingBuyer = jobs.filter((job) => job.tabStatus === "awaiting_buyer").length;
-    const noQuotes = jobs.filter((job) => job.tabStatus === "no_quotes").length;
-    const totalQuotes = jobs.reduce((sum, job) => sum + job.quotes, 0);
+    const live = rows.filter((job) => job.tabStatus === "live").length;
+    const expired = rows.filter((job) => job.tabStatus === "expired").length;
+    const awaitingBuyer = rows.filter((job) => job.tabStatus === "awaiting_buyer").length;
+    const noQuotes = rows.filter((job) => job.tabStatus === "no_quotes").length;
+    const totalQuotes = rows.reduce((sum, job) => sum + job.quotes, 0);
 
-    return { total: jobs.length, live, expired, awaitingBuyer, noQuotes, totalQuotes };
-  }, [jobs]);
+    return { total: rows.length, live, expired, awaitingBuyer, noQuotes, totalQuotes };
+  }, [rows]);
 
   const filtered = useMemo(() => {
-    return jobs.filter((job) => {
+    return rows.filter((job) => {
       const tabMatch = activeTab === "all" || job.tabStatus === activeTab;
       const countyMatch = county === "all" || job.county === county;
       return tabMatch && countyMatch && includesQuery(job, query);
     });
-  }, [activeTab, county, jobs, query]);
+  }, [activeTab, county, rows, query]);
 
   const tabCounts: Record<JobTab, number> = {
     live: summary.live,
@@ -71,6 +74,28 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     no_quotes: summary.noQuotes,
     all: summary.total,
   };
+
+  async function runJobAction(action: "refresh" | "expire", job: AdminLiveJob) {
+    setPendingJob(`${action}:${job.id}`);
+    setMessage(null);
+    const response = await fetch("/api/admin/jobs/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, jobId: job.id }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    setPendingJob(null);
+    if (!response.ok) {
+      setMessage(payload.error || "Job update failed");
+      return;
+    }
+    if (action === "expire") {
+      setRows((current) => current.map((item) => item.id === job.id ? { ...item, status: "expired", tabStatus: "expired", lastActivity: "Now", idleDays: 0 } : item));
+    } else {
+      setRows((current) => current.map((item) => item.id === job.id ? { ...item, lastActivity: "Now", idleDays: 0 } : item));
+    }
+    setMessage(payload.message || "Job updated.");
+  }
 
   return (
     <div className="space-y-4">
@@ -84,7 +109,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <a href="/admin/reports" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800">
+            <a href="/api/admin/export?kind=jobs" className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-slate-950 px-3 text-sm font-semibold text-white hover:bg-slate-800">
               <Download className="h-4 w-4" />
               Export
             </a>
@@ -113,6 +138,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
             </div>
           ))}
         </div>
+        {message ? <div className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
       </section>
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -231,10 +257,22 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                       <Eye className="h-4 w-4" />
                       View
                     </a>
-                    <button type="button" title="Refresh job" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50">
+                    <button
+                      type="button"
+                      title="Refresh job"
+                      disabled={pendingJob === `refresh:${job.id}`}
+                      onClick={() => runJobAction("refresh", job)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-60"
+                    >
                       <RefreshCw className="h-4 w-4" />
                     </button>
-                    <button type="button" title="Remove job" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50">
+                    <button
+                      type="button"
+                      title="Expire job"
+                      disabled={pendingJob === `expire:${job.id}` || job.tabStatus === "expired"}
+                      onClick={() => runJobAction("expire", job)}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>

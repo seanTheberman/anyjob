@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Computer, Wifi, Monitor } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const IT_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const IT_SUBCATEGORIES = [
     },
 ];
 
-const IT_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marc-tech",
-        name: "Marc",
-        category: "IT Specialist",
-        rate: 35,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Certified", "Hardware expert", "Fast service"],
-    },
-    {
-        id: "2",
-        slug: "sophie-support",
-        name: "Sophie",
-        category: "Tech Support",
-        rate: 30,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Patient", "Problem solver", "Remote support"],
-    },
-    {
-        id: "3",
-        slug: "pierre-network",
-        name: "Pierre",
-        category: "Network Engineer",
-        rate: 40,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Cisco certified", "Security expert", "Efficient"],
-    },
-    {
-        id: "4",
-        slug: "lucie-data",
-        name: "Lucie",
-        category: "Data Recovery",
-        rate: 45,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["Data expert", "Confidential", "High success rate"],
-    },
-];
 
-export default function InformatiquePage() {
+export default async function InformatiquePage() {
+    const providers = await getProviderCards("informatique");
+
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function InformatiquePage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our IT experts are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {IT_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our IT experts are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

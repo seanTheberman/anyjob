@@ -106,7 +106,7 @@ export default function AdminDashboard() {
       description="Monitor demand, supply, revenue, disputes, support load, and trust queues from one operations console."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=profiles">
             <Download className="h-4 w-4" />
             Export report
           </AdminButtonLink>

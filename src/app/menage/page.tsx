@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Sparkles, Home, Droplets } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const CLEANING_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const CLEANING_SUBCATEGORIES = [
     },
 ];
 
-const CLEANING_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marie-cleaner",
-        name: "Marie",
-        category: "House Cleaner",
-        rate: 18,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["Thorough", "Experienced", "Eco-friendly products"],
-    },
-    {
-        id: "2",
-        slug: "sophie-cleaner",
-        name: "Sophie",
-        category: "Professional Cleaner",
-        rate: 20,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Detail-oriented", "Fast", "Reliable"],
-    },
-    {
-        id: "3",
-        slug: "pierre-cleaner",
-        name: "Pierre",
-        category: "Deep Cleaning Specialist",
-        rate: 22,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Professional equipment", "Thorough", "Efficient"],
-    },
-    {
-        id: "4",
-        slug: "lucie-cleaner",
-        name: "Lucie",
-        category: "Eco Cleaner",
-        rate: 19,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Green products", "Child-safe", "Pet-friendly"],
-    },
-];
 
-export default function MenagePage() {
+export default async function MenagePage() {
+    const providers = await getProviderCards("menage");
+
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function MenagePage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our cleaning professionals are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {CLEANING_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our cleaning professionals are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

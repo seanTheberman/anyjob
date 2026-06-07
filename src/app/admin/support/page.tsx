@@ -39,7 +39,7 @@ export default function AdminSupportPage() {
       description="Triage client and provider tickets, refund requests, document problems, booking changes, and SLA breaches."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=history">
             <Headphones className="h-4 w-4" />
             Support report
           </AdminButtonLink>

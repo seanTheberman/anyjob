@@ -57,6 +57,7 @@ export type AdminProvider = {
   kycStatus: string;
   documents: string;
   docsSubmitted: boolean;
+  documentStatus: string;
   rating: string;
   jobs: number;
   accountStatus: string;
@@ -128,7 +129,7 @@ export const settingsGroups = [
 
 export const controlSummary = [
   { label: "Live database reads", value: "Enabled server-side with Supabase service role", icon: Activity },
-  { label: "Visible admin routes", value: "11 route-backed pages", icon: LayoutDashboard },
-  { label: "Write controls", value: "UI-ready; mutations still need audited endpoints", icon: Settings },
-  { label: "Auth protection", value: "Opt-in via ROUTE_GUARDS_ENABLED", icon: ShieldCheck },
+  { label: "Visible admin routes", value: "15 route-backed pages", icon: LayoutDashboard },
+  { label: "Write controls", value: "Audited APIs enabled for moderation, exports, settings, reports, and jobs", icon: Settings },
+  { label: "Auth protection", value: "Dedicated admin login with server role checks", icon: ShieldCheck },
 ];

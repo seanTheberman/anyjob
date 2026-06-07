@@ -20,7 +20,7 @@ export default function AdminBusinessesPage() {
       description="Review business registration numbers and documents before unlocking business job and shift posting."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=businesses">
             <Download className="h-4 w-4" />
             Export businesses
           </AdminButtonLink>

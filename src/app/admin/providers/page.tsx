@@ -25,7 +25,7 @@ export default function AdminProvidersPage() {
       description="Manage seller verification, categories, coverage areas, ratings, service listings, suspensions, and document checks."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=providers">
             <Download className="h-4 w-4" />
             Export providers
           </AdminButtonLink>

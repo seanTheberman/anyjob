@@ -1,9 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Snowflake, Home, Car, Heart, TreePine } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const WINTER_SUBCATEGORIES = [
     {
@@ -44,50 +46,10 @@ const WINTER_SUBCATEGORIES = [
     },
 ];
 
-const WINTER_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marie-babysitter",
-        name: "Marie",
-        category: "Babysitter",
-        rate: 15,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Childcare certified", "Patient", "Creative activities"],
-    },
-    {
-        id: "2",
-        slug: "pierre-petsitter",
-        name: "Pierre",
-        category: "Pet-sitter",
-        rate: 18,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Animal lover", "Experienced", "First aid trained"],
-    },
-    {
-        id: "3",
-        slug: "sophie-housekeeper",
-        name: "Sophie",
-        category: "Housekeeper",
-        rate: 20,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Trustworthy", "Detail-oriented", "Flexible"],
-    },
-    {
-        id: "4",
-        slug: "lucas-handyman",
-        name: "Lucas",
-        category: "Handyman",
-        rate: 25,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Winter maintenance", "Quick response", "Reliable"],
-    },
-];
 
-export default function HiverPage() {
+export default async function HiverPage() {
+    const providers = await getProviderCards("hiver");
+
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container - Wider than the rest, but constrained */}
@@ -186,60 +148,7 @@ export default function HiverPage() {
                 <EmergencyJobsSection />
 
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our winter providers are ready to help
-                        </h2>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        {WINTER_PROVIDERS.map((provider) => (
-                            <Link
-                                key={provider.id}
-                                href={`/providers/${provider.slug}`}
-                                className="group cursor-pointer flex flex-col border border-transparent hover:border-gray-200 rounded-2xl p-1 transition-colors"
-                            >
-                                <div className="relative w-full aspect-square rounded-2xl overflow-hidden mb-4 shadow-sm">
-                                    <Image
-                                        src={provider.image}
-                                        alt={provider.name}
-                                        fill
-                                        className="object-cover"
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0"></div>
-                                </div>
-
-                                <div className="flex justify-between items-start mb-1">
-                                    <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                                        {provider.name}
-                                    </h3>
-                                    <span className="font-bold text-gray-900 dark:text-white text-lg">
-                                        {provider.rate} $<span className="text-xs font-normal text-gray-500">/h</span>
-                                    </span>
-                                </div>
-
-                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{provider.category}</p>
-
-                                {provider.isNew && (
-                                    <div className="mb-3">
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-bold font-mono tracking-wider">
-                                            ✨ New
-                                        </span>
-                                    </div>
-                                )}
-
-                                <div className="flex items-center flex-wrap gap-1.5 mt-auto">
-                                    {provider.tags.map((tag, i) => (
-                                        <span key={i} className="px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800/80 dark:text-gray-300 text-[11px] font-medium whitespace-nowrap">
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                </section>
+                <RealProvidersSection title="Our winter providers are ready to help" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

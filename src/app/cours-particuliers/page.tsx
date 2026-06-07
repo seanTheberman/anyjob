@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, BookOpen, GraduationCap } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const TUTORING_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const TUTORING_SUBCATEGORIES = [
     },
 ];
 
-const TUTORING_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marie-math-tutor",
-        name: "Marie",
-        category: "Math Tutor",
-        rate: 25,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["Math degree", "10 years experience", "Patient"],
-    },
-    {
-        id: "2",
-        slug: "sophie-language-teacher",
-        name: "Sophie",
-        category: "Language Teacher",
-        rate: 30,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Native speaker", "5 languages", "Interactive method"],
-    },
-    {
-        id: "3",
-        slug: "pierre-music-teacher",
-        name: "Pierre",
-        category: "Music Teacher",
-        rate: 35,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Conservatory graduate", "Multiple instruments", "Performance"],
-    },
-    {
-        id: "4",
-        slug: "lucie-art-teacher",
-        name: "Lucie",
-        category: "Art Teacher",
-        rate: 28,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Fine arts degree", "Creative", "All levels"],
-    },
-];
 
-export default function CoursParticuliersPage() {
+export default async function CoursParticuliersPage() {
+    const providers = await getProviderCards("cours-particuliers");
+
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function CoursParticuliersPage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our private tutors are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {TUTORING_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our private tutors are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

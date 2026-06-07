@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
-import { Mail, ShieldAlert, ShieldCheck, UserX } from "lucide-react";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { BriefcaseBusiness, ChevronDown, ChevronUp, CreditCard, Mail, ShieldAlert, ShieldCheck, Star, UserRound, UserX } from "lucide-react";
 import { StatusBadge } from "./AdminPrimitives";
 import type { AdminBusiness, AdminProvider, AdminUser, KycReview } from "./admin-data";
 
@@ -50,30 +50,390 @@ function TruncatedCell({ children, className = "" }: { children: React.ReactNode
   );
 }
 
+type UserDetails = {
+  profile: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    role: string;
+    city: string;
+    postalCode: string;
+    bio: string;
+    joined: string;
+    updated: string;
+  };
+  verification: {
+    profileExists: boolean;
+    buyerProfileExists: boolean;
+    emailVerified: string;
+    platformKyc: string;
+    stripeCustomerOrAccount: string;
+  };
+  commercial: {
+    totalSpent: string;
+    bookings: number;
+    paidBookings: number;
+    completedBookings: number;
+    openRequests: number;
+    averageGivenRating: string;
+    preferredServices: string[];
+  };
+  risk: {
+    status: string;
+    riskOverride: string;
+    note: string;
+    updated: string;
+  };
+  recentJobs: Array<{ id: string; service: string; description: string; status: string; city: string; budget: string; posted: string }>;
+  recentPayments: Array<{ id: string; amount: string; status: string; paid: string; city: string; date: string }>;
+  recentReviews: Array<{ id: string; rating: string; comment: string; date: string }>;
+  support: {
+    conversations: number;
+    activeConversations: number;
+    unreadNotifications: number;
+    latestNotification: string;
+  };
+};
+
+type ProviderDetails = {
+  profile: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    city: string;
+    country: string;
+    serviceCategory: string;
+    experience: string;
+    hourlyRate: string;
+    description: string;
+    joined: string;
+    updated: string;
+  };
+  verification: {
+    sellerRow: boolean;
+    profileRow: boolean;
+    status: string;
+    profileVerified: string;
+    emailVerified: string;
+    phoneVerified: string;
+    idDocument: string;
+    selfieVideo: string;
+    insurance: string;
+    backgroundCheck: string;
+    siret: string;
+  };
+  commercial: {
+    totalEarnings: string;
+    bookings: number;
+    listedJobs: number;
+    completedBookings: number;
+    paidBookings: number;
+    bids: number;
+    acceptedBids: number;
+    activeServices: number;
+    averageRating: string;
+    reviewCount: number;
+    badges: number;
+  };
+  services: Array<{ id: string; title: string; description: string; rate: string; meta: string; status: string }>;
+  recentBookings: Array<{ id: string; primary: string; secondary: string; meta: string; status: string }>;
+  recentBids: Array<{ id: string; primary: string; secondary: string; meta: string; status: string }>;
+  recentReviews: Array<{ id: string; primary: string; secondary: string; meta: string }>;
+  support: {
+    conversations: number;
+    activeConversations: number;
+    latestConversation: string;
+  };
+  badges: Array<{ id: string; primary: string; secondary: string; meta: string }>;
+};
+
+function DetailMetric({ label, value, icon: Icon }: { label: string; value: string | number; icon: React.ComponentType<{ className?: string }> }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-3">
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <Icon className="h-4 w-4" />
+        {label}
+      </div>
+      <p className="mt-2 text-lg font-semibold text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+function DetailList({
+  title,
+  empty,
+  items,
+}: {
+  title: string;
+  empty: string;
+  items: Array<{ id: string; primary: string; secondary: string; meta: string; status?: string }>;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <h3 className="text-sm font-semibold text-slate-950">{title}</h3>
+      <div className="mt-3 space-y-3">
+        {items.length ? items.map((item) => (
+          <div key={`${title}-${item.id}`} className="min-w-0 rounded-lg bg-slate-50 p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="truncate text-sm font-medium text-slate-900">{item.primary}</p>
+              {item.status ? <StatusBadge value={item.status} /> : null}
+            </div>
+            <p className="mt-1 line-clamp-2 text-sm text-slate-600">{item.secondary}</p>
+            <p className="mt-2 text-xs font-medium text-slate-500">{item.meta}</p>
+          </div>
+        )) : (
+          <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-500">{empty}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UserDetailsPanel({ details }: { details: UserDetails }) {
+  return (
+    <div className="space-y-4 rounded-lg border border-red-100 bg-red-50/30 p-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <DetailMetric label="Total spent" value={details.commercial.totalSpent} icon={CreditCard} />
+        <DetailMetric label="Bookings" value={details.commercial.bookings} icon={BriefcaseBusiness} />
+        <DetailMetric label="Open requests" value={details.commercial.openRequests} icon={ShieldAlert} />
+        <DetailMetric label="Avg rating given" value={details.commercial.averageGivenRating} icon={Star} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Buyer profile</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Phone:</span> {details.profile.phone}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Role:</span> {details.profile.role}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Location:</span> {details.profile.city} · {details.profile.postalCode}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Joined:</span> {details.profile.joined}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Profile row:</span> {details.verification.profileExists ? "Added" : "Not added"}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Buyer row:</span> {details.verification.buyerProfileExists ? "Added" : "Not added"}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Email:</span> {details.verification.emailVerified}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">KYC:</span> {details.verification.platformKyc}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Payment profile:</span> {details.verification.stripeCustomerOrAccount}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Updated:</span> {details.profile.updated}</p>
+          </div>
+          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{details.profile.bio}</p>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Risk and service signals</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Admin status:</span> {details.risk.status}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Risk override:</span> {details.risk.riskOverride}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Paid bookings:</span> {details.commercial.paidBookings}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Completed:</span> {details.commercial.completedBookings}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Support threads:</span> {details.support.conversations}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Unread notices:</span> {details.support.unreadNotifications}</p>
+          </div>
+          <div className="mt-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Preferred services</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {details.commercial.preferredServices.map((service) => <StatusBadge key={service} value={service} />)}
+            </div>
+          </div>
+          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{details.risk.note}</p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DetailList
+          title="Recent job posts"
+          empty="No buyer job posts found."
+          items={details.recentJobs.map((job) => ({
+            id: job.id,
+            primary: job.service,
+            secondary: job.description,
+            meta: `${job.city} · ${job.budget} · ${job.posted}`,
+            status: job.status,
+          }))}
+        />
+        <DetailList
+          title="Recent payments"
+          empty="No booking payments found."
+          items={details.recentPayments.map((payment) => ({
+            id: payment.id,
+            primary: `${payment.amount} · ${payment.paid}`,
+            secondary: `${payment.city} booking`,
+            meta: payment.date,
+            status: payment.status,
+          }))}
+        />
+        <DetailList
+          title="Recent reviews given"
+          empty="No reviews given yet."
+          items={details.recentReviews.map((review) => ({
+            id: review.id,
+            primary: `${review.rating} star rating`,
+            secondary: review.comment,
+            meta: review.date,
+          }))}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ProviderDetailsPanel({ details }: { details: ProviderDetails }) {
+  return (
+    <div className="space-y-4 rounded-lg border border-red-100 bg-red-50/30 p-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <DetailMetric label="Total earnings" value={details.commercial.totalEarnings} icon={CreditCard} />
+        <DetailMetric label="Bookings" value={details.commercial.bookings} icon={BriefcaseBusiness} />
+        <DetailMetric label="Bids" value={`${details.commercial.acceptedBids}/${details.commercial.bids} accepted`} icon={ShieldCheck} />
+        <DetailMetric label="Rating" value={details.commercial.averageRating} icon={Star} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Provider profile</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Email:</span> {details.profile.email}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Phone:</span> {details.profile.phone}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Location:</span> {details.profile.city} · {details.profile.country}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Category:</span> {details.profile.serviceCategory}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Experience:</span> {details.profile.experience}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Hourly rate:</span> {details.profile.hourlyRate}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Joined:</span> {details.profile.joined}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Updated:</span> {details.profile.updated}</p>
+          </div>
+          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">{details.profile.description}</p>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">KYC and trust</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Seller row:</span> {details.verification.sellerRow ? "Added" : "Not added"}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Profile row:</span> {details.verification.profileRow ? "Added" : "Not added"}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Status:</span> {details.verification.status}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Profile KYC:</span> {details.verification.profileVerified}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Email:</span> {details.verification.emailVerified}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Phone:</span> {details.verification.phoneVerified}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">ID:</span> {details.verification.idDocument}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Selfie video:</span> {details.verification.selfieVideo}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Insurance:</span> {details.verification.insurance}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Background:</span> {details.verification.backgroundCheck}</p>
+            <p className="text-sm text-slate-600 sm:col-span-2"><span className="font-medium text-slate-900">SIRET:</span> {details.verification.siret}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DetailList
+          title="Services listed"
+          empty="No provider services found."
+          items={details.services.map((service) => ({
+            id: service.id,
+            primary: `${service.title} · ${service.rate}`,
+            secondary: service.description,
+            meta: service.meta,
+            status: service.status,
+          }))}
+        />
+        <DetailList title="Recent bookings" empty="No provider bookings found." items={details.recentBookings} />
+        <DetailList title="Recent bids" empty="No provider bids found." items={details.recentBids} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DetailList title="Recent reviews received" empty="No reviews received yet." items={details.recentReviews} />
+        <DetailList title="Badges awarded" empty="No badges awarded yet." items={details.badges} />
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Support and operations</h3>
+          <div className="mt-3 grid gap-3">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Support threads:</span> {details.support.conversations}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Active threads:</span> {details.support.activeConversations}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Latest conversation:</span> {details.support.latestConversation}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Active services:</span> {details.commercial.activeServices}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Listed jobs:</span> {details.commercial.listedJobs}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Reviews:</span> {details.commercial.reviewCount}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Badges:</span> {details.commercial.badges}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function UsersWorklist({ users }: { users: AdminUser[] }) {
+  const router = useRouter();
+  const [rows, setRows] = useState(users);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<FilterOption>("all");
   const [risk, setRisk] = useState<FilterOption>("all");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [detailsByUser, setDetailsByUser] = useState<Record<string, UserDetails>>({});
+  const [loadingDetails, setLoadingDetails] = useState<string | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
-    return users.filter((user) => {
+    return rows.filter((user) => {
       const statusMatch = status === "all" || user.status === status;
       const riskMatch = risk === "all" || user.risk === risk;
       return statusMatch && riskMatch && includesQuery(Object.values(user), query);
     });
-  }, [query, risk, status, users]);
+  }, [query, risk, rows, status]);
 
   const allVisibleSelected = filtered.length > 0 && filtered.every((user) => selected.has(user.id));
-  const runBulkAction = (action: string) => {
-    setMessage(`${action} queued for ${selected.size} selected user${selected.size === 1 ? "" : "s"}.`);
-    window.setTimeout(() => setMessage(null), 3500);
-  };
-  const openUser = (user: AdminUser) => {
-    setMessage(`Opened admin review panel for ${user.name}.`);
-    window.setTimeout(() => setMessage(null), 3500);
-  };
+
+  useEffect(() => {
+    setRows(users);
+  }, [users]);
+
+  async function runBulkAction(action: "message" | "watchlist" | "block" | "open", userIds = Array.from(selected)) {
+    if (!userIds.length) return;
+    setMessage(null);
+    const response = await fetch("/api/admin/users/actions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, userIds }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      setMessage(payload.error || "User action failed");
+      return;
+    }
+
+    if (payload.status) {
+      setRows((current) => current.map((user) => {
+        if (!userIds.includes(user.id)) return user;
+        if (payload.status === "blocked") return { ...user, status: "Blocked", risk: "High" };
+        if (payload.status === "watchlisted") return { ...user, status: "Watchlisted", risk: "Medium" };
+        return { ...user, status: "Active", risk: "Low" };
+      }));
+    }
+    setSelected(new Set());
+    setMessage(payload.message || `${action} completed.`);
+    router.refresh();
+    window.setTimeout(() => setMessage(null), 4500);
+  }
+
+  async function openUser(user: AdminUser) {
+    if (expandedUserId === user.id) {
+      setExpandedUserId(null);
+      return;
+    }
+
+    setExpandedUserId(user.id);
+    setDetailsError(null);
+    if (detailsByUser[user.id]) return;
+
+    setLoadingDetails(user.id);
+    const response = await fetch(`/api/admin/users/details?id=${encodeURIComponent(user.id)}`);
+    const payload = await response.json().catch(() => ({}));
+    setLoadingDetails(null);
+
+    if (!response.ok) {
+      setDetailsError(payload.error || "Failed to load user details");
+      return;
+    }
+    setDetailsByUser((current) => ({ ...current, [user.id]: payload as UserDetails }));
+  }
 
   function toggleAll() {
     setSelected((current) => {
@@ -122,47 +482,83 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
       </div>
 
       <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
-        <button type="button" onClick={() => runBulkAction("Message")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button type="button" onClick={() => runBulkAction("message")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <Mail className="h-4 w-4" /> Message
         </button>
-        <button type="button" onClick={() => runBulkAction("Watchlist")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button type="button" onClick={() => runBulkAction("watchlist")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <ShieldAlert className="h-4 w-4" /> Watchlist
         </button>
-        <button type="button" onClick={() => runBulkAction("Block")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+        <button type="button" onClick={() => runBulkAction("block")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <UserX className="h-4 w-4" /> Block
         </button>
       </BulkBar>
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+          <table className="w-full min-w-[1120px] table-fixed divide-y divide-slate-200">
+            <colgroup>
+              <col className="w-12" />
+              <col className="w-[330px]" />
+              <col className="w-[130px]" />
+              <col className="w-[105px]" />
+              <col className="w-[105px]" />
+              <col className="w-[120px]" />
+              <col className="w-[145px]" />
+              <col className="w-[120px]" />
+              <col className="w-[113px]" />
+            </colgroup>
             <thead className="bg-slate-50">
               <tr>
                 <th className="w-12 px-4 py-3">
                   <input aria-label="Select all users" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
                 {["User", "City", "Bookings", "Spend", "Risk", "Status", "Last seen", "Action"].map((column) => (
-                  <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
+                  <th key={column} className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 ${column === "Action" ? "text-right" : ""}`}>{column}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4"><input aria-label={`Select ${user.name}`} type="checkbox" checked={selected.has(user.id)} onChange={() => toggleOne(user.id)} /></td>
-                  <td className="px-4 py-4">
-                    <p className="text-sm font-medium text-slate-950">{user.name}</p>
-                    <p className="text-xs text-slate-500">{user.email}</p>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{user.city}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{user.bookings}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{user.spend}</td>
-                  <td className="px-4 py-4"><StatusBadge value={user.risk} /></td>
-                  <td className="px-4 py-4"><StatusBadge value={user.status} /></td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{user.lastSeen}</td>
-                  <td className="px-4 py-4"><button type="button" onClick={() => openUser(user)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Open</button></td>
-                </tr>
+                <Fragment key={user.id}>
+                  <tr key={user.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-4"><input aria-label={`Select ${user.name}`} type="checkbox" checked={selected.has(user.id)} onChange={() => toggleOne(user.id)} /></td>
+                    <td className="px-4 py-4">
+                      <p title={user.name} className="truncate text-sm font-medium text-slate-950">{user.name}</p>
+                      <p title={user.email} className="truncate text-xs text-slate-500">{user.email}</p>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-slate-700"><div title={user.city} className="truncate">{user.city}</div></td>
+                    <td className="px-4 py-4 text-sm text-slate-700">{user.bookings}</td>
+                    <td className="px-4 py-4 text-sm text-slate-700">{user.spend}</td>
+                    <td className="px-4 py-4"><StatusBadge value={user.risk} /></td>
+                    <td className="px-4 py-4"><StatusBadge value={user.status} /></td>
+                    <td className="px-4 py-4 text-sm text-slate-700">{user.lastSeen}</td>
+                    <td className="px-4 py-4 text-right">
+                      <button type="button" onClick={() => openUser(user)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                        {expandedUserId === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {expandedUserId === user.id ? "Close" : "Open"}
+                      </button>
+                    </td>
+                  </tr>
+                  {expandedUserId === user.id ? (
+                    <tr key={`${user.id}-details`}>
+                      <td colSpan={9} className="bg-slate-50 p-0">
+                        <div className="w-full px-4 py-4">
+                        {loadingDetails === user.id ? (
+                          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                            <UserRound className="h-4 w-4 animate-pulse" />
+                            Loading full buyer profile, jobs, payments, and risk data...
+                          </div>
+                        ) : detailsError ? (
+                          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{detailsError}</div>
+                        ) : detailsByUser[user.id] ? (
+                          <UserDetailsPanel details={detailsByUser[user.id]} />
+                        ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -181,6 +577,10 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [expandedProviderId, setExpandedProviderId] = useState<string | null>(null);
+  const [detailsByProvider, setDetailsByProvider] = useState<Record<string, ProviderDetails>>({});
+  const [loadingProviderDetails, setLoadingProviderDetails] = useState<string | null>(null);
+  const [providerDetailsError, setProviderDetailsError] = useState<string | null>(null);
 
   const services = Array.from(new Set(providers.map((provider) => provider.service)));
   const filtered = useMemo(() => {
@@ -219,9 +619,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
         .filter((provider) => providerIds.includes(provider.id) && provider.accountStatus === "Active")
         .map((provider) => provider.id);
     }
-    if (action === "request_docs") {
-      return providers.filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted).map((provider) => provider.id);
-    }
+    if (action === "request_docs") return providerIds;
     return providers
       .filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted && provider.accountStatus !== "Active")
       .map((provider) => provider.id);
@@ -229,7 +627,10 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
 
   async function runKycAction(action: "approve" | "request_docs" | "reject" | "suspend", providerIds = Array.from(selected)) {
     providerIds = eligibleProviderIds(providerIds, action);
-    if (!providerIds.length) return;
+    if (!providerIds.length) {
+      setMessage(`${action === "suspend" ? "Suspend" : action === "approve" ? "Approve" : "Reject"} needs an eligible provider in the current view.`);
+      return;
+    }
     setPendingAction(action);
     setMessage(null);
 
@@ -249,6 +650,28 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
     setSelected(new Set());
     setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.`);
     router.refresh();
+  }
+
+  async function openProvider(provider: AdminProvider) {
+    if (expandedProviderId === provider.id) {
+      setExpandedProviderId(null);
+      return;
+    }
+
+    setExpandedProviderId(provider.id);
+    setProviderDetailsError(null);
+    if (detailsByProvider[provider.id]) return;
+
+    setLoadingProviderDetails(provider.id);
+    const response = await fetch(`/api/admin/providers/details?id=${encodeURIComponent(provider.id)}`);
+    const payload = await response.json().catch(() => ({}));
+    setLoadingProviderDetails(null);
+
+    if (!response.ok) {
+      setProviderDetailsError(payload.error || "Failed to load provider details");
+      return;
+    }
+    setDetailsByProvider((current) => ({ ...current, [provider.id]: payload as ProviderDetails }));
   }
 
   return (
@@ -291,49 +714,89 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
       </BulkBar>
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+          <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200">
+            <colgroup>
+              <col className="w-12" />
+              <col className="w-[260px]" />
+              <col className="w-[150px]" />
+              <col className="w-[130px]" />
+              <col className="w-[150px]" />
+              <col className="w-[145px]" />
+              <col className="w-[120px]" />
+              <col className="w-[190px]" />
+            </colgroup>
             <thead className="bg-slate-50">
               <tr>
                 <th className="w-12 px-4 py-3">
                   <input aria-label="Select all providers" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Provider", "Service", "City", "KYC", "Docs submitted", "Documents", "Rating", "Jobs", "Account", "Action"].map((column) => (
-                  <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
+                {["Provider", "Service", "City", "KYC", "Document status", "Account", "Action"].map((column) => (
+                  <th key={column} className={`px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 ${column === "Action" ? "text-right" : ""}`}>{column}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((provider) => (
-                <tr key={provider.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4"><input aria-label={`Select ${provider.name}`} type="checkbox" checked={selected.has(provider.id)} onChange={() => toggleOne(provider.id)} /></td>
-                  <td className="px-4 py-4">
-                    <p className="text-sm font-medium text-slate-950">{provider.name}</p>
-                    <p className="text-xs text-slate-500">{provider.id}</p>
-                  </td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{provider.service}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{provider.city}</td>
-                  <td className="px-4 py-4"><StatusBadge value={provider.kycStatus} /></td>
-                  <td className="px-4 py-4"><StatusBadge value={provider.docsSubmitted ? "Submitted" : "Not submitted"} /></td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{provider.documents}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{provider.rating}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{provider.jobs}</td>
-                  <td className="px-4 py-4"><StatusBadge value={provider.accountStatus} /></td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-nowrap gap-2 whitespace-nowrap">
-                      {provider.accountStatus === "Active" ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("suspend", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Suspend</button>
-                      ) : provider.docsSubmitted ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
-                      ) : null}
-                      <button disabled={Boolean(pendingAction) || !provider.docsSubmitted} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100">Docs</button>
-                      {provider.docsSubmitted && provider.accountStatus !== "Active" ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
+                <Fragment key={provider.id}>
+                  <tr className="hover:bg-slate-50">
+                    <td className="px-4 py-4"><input aria-label={`Select ${provider.name}`} type="checkbox" checked={selected.has(provider.id)} onChange={() => toggleOne(provider.id)} /></td>
+                    <td className="px-4 py-4">
+                      <a
+                        href={`/providers/${provider.id}`}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          openProvider(provider);
+                        }}
+                        className="inline-flex max-w-full items-center gap-1.5 text-sm font-semibold text-red-700 underline-offset-4 hover:underline"
+                        aria-expanded={expandedProviderId === provider.id}
+                      >
+                        <span title={provider.name} className="truncate">{provider.name}</span>
+                        {expandedProviderId === provider.id ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                      </a>
+                      <p title={provider.id} className="truncate text-xs text-slate-500">{provider.id}</p>
+                    </td>
+                    <td className="px-4 py-4 text-sm text-slate-700"><div title={provider.service} className="truncate">{provider.service}</div></td>
+                    <td className="px-4 py-4 text-sm text-slate-700"><div title={provider.city} className="truncate">{provider.city}</div></td>
+                    <td className="px-4 py-4"><StatusBadge value={provider.kycStatus} /></td>
+                    <td className="px-4 py-4"><StatusBadge value={provider.documentStatus} /></td>
+                    <td className="px-4 py-4"><StatusBadge value={provider.accountStatus} /></td>
+                    <td className="px-4 py-4 text-right">
+                      <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
+                        {provider.accountStatus === "Active" ? (
+                          <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("suspend", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Suspend</button>
+                        ) : provider.docsSubmitted ? (
+                          <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                        ) : null}
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [provider.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                          {provider.docsSubmitted ? "Review docs" : "Request docs"}
+                        </button>
+                        {provider.docsSubmitted && provider.accountStatus !== "Active" ? (
+                          <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedProviderId === provider.id ? (
+                    <tr>
+                      <td colSpan={8} className="bg-slate-50 p-0">
+                        <div className="w-full px-4 py-4">
+                          {loadingProviderDetails === provider.id ? (
+                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                              <ShieldCheck className="h-4 w-4 animate-pulse" />
+                              Loading provider profile, KYC, services, bookings, bids, and review data...
+                            </div>
+                          ) : providerDetailsError ? (
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{providerDetailsError}</div>
+                          ) : detailsByProvider[provider.id] ? (
+                            <ProviderDetailsPanel details={detailsByProvider[provider.id]} />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -569,16 +1032,17 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
   }
 
   function eligibleReviewIds(reviewIds: string[], action: "approve" | "request_docs" | "reject") {
-    if (action === "request_docs") {
-      return reviews.filter((review) => reviewIds.includes(review.id) && review.docsSubmitted).map((review) => review.id);
-    }
+    if (action === "request_docs") return reviewIds;
     return reviews.filter((review) => reviewIds.includes(review.id) && review.docsSubmitted).map((review) => review.id);
   }
 
   async function runKycAction(action: "approve" | "request_docs" | "reject", reviewIds = Array.from(selected)) {
     reviewIds = eligibleReviewIds(reviewIds, action);
     const providerIds = providerIdsFor(reviewIds);
-    if (!providerIds.length) return;
+    if (!providerIds.length) {
+      setMessage(`${action === "approve" ? "Approve" : "Reject"} needs a review with submitted documents.`);
+      return;
+    }
     setPendingAction(action);
     setMessage(null);
 
@@ -670,7 +1134,9 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
                       {review.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
                       ) : null}
-                      <button disabled={Boolean(pendingAction) || !review.docsSubmitted} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100">Docs</button>
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                        {review.docsSubmitted ? "Review docs" : "Request docs"}
+                      </button>
                       {review.docsSubmitted ? (
                         <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
                       ) : null}

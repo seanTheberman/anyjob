@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Baby, Heart, BookOpen, Gamepad2 } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const CHILDREN_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const CHILDREN_SUBCATEGORIES = [
     },
 ];
 
-const CHILDREN_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marie-babysitter",
-        name: "Marie",
-        category: "Babysitter",
-        rate: 15,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["First aid certified", "5 years experience", "Creative activities"],
-    },
-    {
-        id: "2",
-        slug: "sophie-tutor",
-        name: "Sophie",
-        category: "Tutor",
-        rate: 20,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Education degree", "Patient", "Bilingual"],
-    },
-    {
-        id: "3",
-        slug: "pierre-caregiver",
-        name: "Pierre",
-        category: "Childcare Specialist",
-        rate: 18,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Background checked", "Energetic", "Responsible"],
-    },
-    {
-        id: "4",
-        slug: "lucie-educator",
-        name: "Lucie",
-        category: "Educator",
-        rate: 22,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Early childhood", "Creative", "Structured"],
-    },
-];
 
-export default function EnfantsPage() {
+export default async function EnfantsPage() {
+    const providers = await getProviderCards("enfants");
+
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function EnfantsPage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our early childhood professionals are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {CHILDREN_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our early childhood professionals are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

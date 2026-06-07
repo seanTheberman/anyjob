@@ -1,6 +1,7 @@
 import { Download, UserPlus } from "lucide-react";
 import { Suspense } from "react";
 import { AdminShell } from "../_components/AdminShell";
+import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminButtonLink } from "../_components/AdminPrimitives";
 import { UsersWorklist } from "../_components/AdminSelectableTables";
 import { getAdminUsers } from "../_lib/admin-live-data";
@@ -21,14 +22,14 @@ export default function AdminUsersPage() {
       description="Search clients, inspect booking history, identify risky accounts, resend invites, and prepare account actions."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=users">
             <Download className="h-4 w-4" />
             Export users
           </AdminButtonLink>
-          <AdminButtonLink href="/admin/settings">
+          <AdminActionButton label="Invite user" context="admin user invitation">
             <UserPlus className="h-4 w-4" />
             Invite user
-          </AdminButtonLink>
+          </AdminActionButton>
         </>
       }
     >

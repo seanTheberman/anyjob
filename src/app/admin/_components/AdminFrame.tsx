@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Bell, LogOut, Search, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 import { adminNavItems } from "./admin-data";
 
 function AdminPendingContent({ path }: { path: string }) {
@@ -59,6 +61,7 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
   const pathname = usePathname();
   const router = useRouter();
   const [optimisticPath, setOptimisticPath] = useState(pathname);
+  const [adminSearch, setAdminSearch] = useState("");
 
   useEffect(() => {
     setOptimisticPath(pathname);
@@ -67,6 +70,47 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
   useEffect(() => {
     adminNavItems.forEach((item) => router.prefetch(item.href));
   }, [router]);
+
+  async function handleLogout() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/admin-login");
+    router.refresh();
+  }
+
+  function handleAdminSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const query = String(formData.get("adminSearch") || adminSearch).trim().toLowerCase();
+    if (!query) return;
+
+    const target = query.includes("provider") || query.includes("seller") || query.includes("kyc")
+      ? "/admin/providers"
+      : query.includes("badge")
+        ? "/admin/badges"
+        : query.includes("business")
+          ? "/admin/businesses"
+          : query.includes("blog")
+            ? "/admin/blog"
+            : query.includes("job") || query.includes("booking")
+              ? "/admin/jobs"
+              : query.includes("report") || query.includes("export")
+                ? "/admin/reports"
+                : query.includes("payment") || query.includes("refund")
+                  ? "/admin/payments"
+                  : query.includes("support") || query.includes("ticket")
+                    ? "/admin/support"
+                    : query.includes("history") || query.includes("audit")
+                      ? "/admin/history"
+                      : query.includes("setting") || query.includes("rule")
+                        ? "/admin/settings"
+                        : query.includes("notification")
+                          ? "/admin/notifications"
+                          : "/admin/users";
+
+    setOptimisticPath(target);
+    window.location.href = target;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950">
@@ -110,7 +154,7 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
           <div className="rounded-lg bg-white/5 p-3">
             <p className="text-sm font-medium">Live data mode</p>
             <p className="mt-1 text-xs leading-5 text-slate-400">
-              Tables read Supabase server-side. Write actions need audited admin mutation endpoints before production use.
+              Supabase reads and audited admin write actions are enabled for operations.
             </p>
           </div>
         </div>
@@ -122,14 +166,17 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
             <Link href="/admin" className="text-xl font-bold text-red-600 lg:hidden">
               AnyJob
             </Link>
-            <div className="relative hidden flex-1 md:block">
+            <form onSubmit={handleAdminSearch} className="relative hidden flex-1 md:block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 aria-label="Search admin"
+                name="adminSearch"
+                value={adminSearch}
+                onChange={(event) => setAdminSearch(event.target.value)}
                 placeholder="Search users, providers, jobs, tickets..."
                 className="h-10 w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100"
               />
-            </div>
+            </form>
             <Link aria-label="Admin settings" href="/admin/settings" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
               <Settings className="h-4 w-4" />
             </Link>
@@ -139,9 +186,9 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
                 <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500" />
               ) : null}
             </Link>
-            <Link aria-label="Log out" href="/login" className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
+            <button type="button" aria-label="Log out" onClick={handleLogout} className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50">
               <LogOut className="h-4 w-4" />
-            </Link>
+            </button>
           </div>
         </header>
 

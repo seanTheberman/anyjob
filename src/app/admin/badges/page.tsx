@@ -8,6 +8,7 @@ import {
   badgeIconOptions,
   badgeMetricLabels,
   badgeOperatorLabels,
+  badgeSchemaReady,
   createBadgeDefinition,
   getAdminBadges,
   type BadgeDefinition,
@@ -98,10 +99,16 @@ function formatRule(rule: BadgeDefinition["rules"][number]) {
 }
 
 async function BadgeDataPanel() {
-  const { badges, providerCount, totalAwards } = await getAdminBadges();
+  const { badges, providerCount, schemaReady, totalAwards } = await getAdminBadges();
 
   return (
     <div className="space-y-4">
+      {!schemaReady ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          Badge automation tables are not available in Supabase yet. Apply `supabase/migrations/20260606_create_badge_rules.sql` to enable badge creation and auto-awards.
+        </div>
+      ) : null}
+
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
           <p className="text-sm font-medium text-slate-500">Badge definitions</p>
@@ -182,7 +189,9 @@ function BadgeDataFallback() {
   );
 }
 
-export default function AdminBadgesPage() {
+export default async function AdminBadgesPage() {
+  const schemaReady = await badgeSchemaReady();
+
   return (
     <AdminShell
       title="Badges"
@@ -201,9 +210,14 @@ export default function AdminBadgesPage() {
             <p className="mt-1 text-sm leading-6 text-slate-600">
               Rules are evaluated with AND logic. A provider must satisfy every filled rule to receive the badge.
             </p>
+            {!schemaReady ? (
+              <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+                Badge creation is disabled until the badge migration is applied to Supabase.
+              </p>
+            ) : null}
           </div>
 
-          <div className="mt-5 space-y-4">
+          <fieldset disabled={!schemaReady} className="mt-5 space-y-4 disabled:opacity-60">
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Badge name</span>
               <input
@@ -256,7 +270,7 @@ export default function AdminBadgesPage() {
             >
               Create badge and run auto-awards
             </button>
-          </div>
+          </fieldset>
         </form>
 
         <Suspense fallback={<BadgeDataFallback />}>

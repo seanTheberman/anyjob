@@ -26,7 +26,7 @@ export default function AdminPaymentsPage() {
       description="Review booking tokens, refunds, subscriptions, failed charges, and direct-payment reconciliation."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=payments">
             <Download className="h-4 w-4" />
             Export ledger
           </AdminButtonLink>

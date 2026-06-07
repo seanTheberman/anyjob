@@ -82,17 +82,8 @@ export function StatusBadge({ value }: { value: string }) {
 
 export function Toolbar({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm md:flex-row md:items-center md:justify-between">
-      <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-        <input className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" placeholder="Search this view" />
-        <select className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100">
-          <option>All statuses</option>
-          <option>Needs review</option>
-          <option>Active</option>
-          <option>Blocked</option>
-        </select>
-      </div>
-      <div className="flex gap-2">{children}</div>
+    <div className="mb-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:justify-end">
+      <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
 }

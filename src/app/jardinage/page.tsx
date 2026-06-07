@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, TreePine, Flower2, Scissors, Leaf } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const GARDENING_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const GARDENING_SUBCATEGORIES = [
     },
 ];
 
-const GARDENING_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marc-gardener",
-        name: "Marc",
-        category: "Gardener",
-        rate: 18,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["10 years experience", "Organic methods", "Seasonal expert"],
-    },
-    {
-        id: "2",
-        slug: "sophie-landscaper",
-        name: "Sophie",
-        category: "Landscaper",
-        rate: 25,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Design specialist", "Creative solutions", "Sustainable"],
-    },
-    {
-        id: "3",
-        slug: "pierre-arborist",
-        name: "Pierre",
-        category: "Arborist",
-        rate: 30,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Tree expert", "Certified", "Safety first"],
-    },
-    {
-        id: "4",
-        slug: "marie-gardener",
-        name: "Marie",
-        category: "Garden Maintenance",
-        rate: 16,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["Detail-oriented", "Reliable", "Eco-friendly"],
-    },
-];
 
-export default function JardinagePage() {
+export default async function JardinagePage() {
+    const providers = await getProviderCards("jardinage");
+
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function JardinagePage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our professional gardeners are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {GARDENING_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our professional gardeners are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

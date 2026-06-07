@@ -11,6 +11,7 @@ export function ConditionalFooter() {
   const isDashboardRoute = pathname?.startsWith('/dashboard') || 
                            pathname?.startsWith('/pro') || 
                            pathname?.startsWith('/admin') ||
+                           pathname === '/admin-login' ||
                            searchParams?.get('from_dashboard') === 'true';
   
   if (isDashboardRoute) {

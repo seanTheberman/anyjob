@@ -2,20 +2,16 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Star, MapPin, Sparkles } from "lucide-react";
+import { MapPin, Sparkles } from "lucide-react";
 
 interface Provider {
   id: string;
+  slug: string;
   name: string;
-  photo: string;
+  image?: string | null;
   rate: number;
-  currency: string;
-  unit: string;
-  rating: number;
-  reviewCount: number;
-  location: string;
-  distance: string;
-  isNew: boolean;
+  category: string;
+  isNew?: boolean;
 }
 
 interface ProviderCardProps {
@@ -23,19 +19,32 @@ interface ProviderCardProps {
 }
 
 export function ProviderCard({ provider }: ProviderCardProps) {
+  const initials = provider.name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+
   return (
     <Link
-      href={`/providers/${provider.id}`}
+      href={`/providers/${provider.slug}`}
       className="group block bg-white rounded-xl overflow-hidden border border-gray-200 hover:shadow-lg transition-all"
     >
       {/* Photo */}
       <div className="relative h-48 overflow-hidden">
-        <Image
-          src={provider.photo}
-          alt={provider.name}
-          fill
-          className="object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        {provider.image ? (
+          <Image
+            src={provider.image}
+            alt={provider.name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-100 to-gray-300 text-4xl font-extrabold text-gray-500">
+            {initials || provider.name[0]?.toUpperCase() || "P"}
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -52,32 +61,13 @@ export function ProviderCard({ provider }: ProviderCardProps) {
 
         {/* Rate */}
         <p className="text-lg font-bold text-gray-900 mb-1">
-          {provider.rate} {provider.currency}/{provider.unit}
+          ${provider.rate}/h
         </p>
 
-        {/* Rating */}
-        <div className="flex items-center gap-1 mb-2">
-          <div className="flex items-center gap-0.5">
-            {[...Array(5)].map((_, i) => (
-              <Star
-                key={i}
-                className={`w-4 h-4 ${
-                  i < Math.floor(provider.rating)
-                    ? "fill-yellow-400 text-yellow-400"
-                    : "text-gray-300"
-                }`}
-              />
-            ))}
-          </div>
-          <span className="text-sm text-gray-500">({provider.reviewCount})</span>
-        </div>
-
-        {/* Location */}
+        {/* Category */}
         <div className="flex items-center gap-1 text-sm text-gray-500">
           <MapPin className="w-4 h-4" />
-          <span>{provider.location}</span>
-          <span className="text-gray-400">•</span>
-          <span>{provider.distance}</span>
+          <span>{provider.category}</span>
         </div>
 
         {/* See more button */}

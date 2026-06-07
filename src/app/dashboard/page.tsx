@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { CategoryTabs } from "@/components/dashboard/CategoryTabs";
 import { PromoBanner } from "@/components/dashboard/PromoBanner";
@@ -164,48 +164,16 @@ const saveTimeServices = [
   },
 ];
 
-// Mock data for providers
-const providers = [
-  {
-    id: "1",
-    name: "Steven",
-    photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&face",
-    rate: 15,
-    currency: "£",
-    unit: "h",
-    rating: 4.5,
-    reviewCount: 24,
-    location: "Edinburgh",
-    distance: "6.8 miles",
-    isNew: true,
-  },
-  {
-    id: "2",
-    name: "James",
-    photo: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&face",
-    rate: 16,
-    currency: "£",
-    unit: "h",
-    rating: 4.8,
-    reviewCount: 42,
-    location: "Edinburgh",
-    distance: "6.8 miles",
-    isNew: true,
-  },
-  {
-    id: "3",
-    name: "Oscar",
-    photo: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&face",
-    rate: 17,
-    currency: "£",
-    unit: "h",
-    rating: 4.9,
-    reviewCount: 38,
-    location: "Edinburgh",
-    distance: "6.8 miles",
-    isNew: true,
-  },
-];
+type RealProvider = {
+  id: string;
+  slug: string;
+  name: string;
+  category: string;
+  rate: number;
+  image?: string | null;
+  isNew?: boolean;
+  tags: string[];
+};
 
 const practicalCategories = [
   {
@@ -239,6 +207,24 @@ const childrenCategories = [
 
 export default function DashboardPage() {
   const [activeCategory, setActiveCategory] = useState("for-you");
+  const [providers, setProviders] = useState<RealProvider[]>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch("/api/providers")
+      .then((response) => (response.ok ? response.json() : { providers: [] }))
+      .then((data) => {
+        if (isMounted) setProviders(Array.isArray(data.providers) ? data.providers : []);
+      })
+      .catch(() => {
+        if (isMounted) setProviders([]);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Filter services and content based on active category
   const filteredContent = useMemo(() => {
@@ -273,8 +259,9 @@ export default function DashboardPage() {
       ...movingServices.filter(s => s.href.includes(activeCategory))
     ];
 
-    // Filter providers (in real app, this would be based on provider specialties)
-    const categoryProviders = providers.slice(0, 2); // Show some providers
+    const categoryProviders = providers.filter((provider) =>
+      provider.category.toLowerCase().includes(activeCategory.toLowerCase()),
+    );
 
     return {
       title: category.name,
@@ -284,7 +271,7 @@ export default function DashboardPage() {
       showAllSections: false,
       category: category
     };
-  }, [activeCategory]);
+  }, [activeCategory, providers]);
 
   const content = filteredContent;
 

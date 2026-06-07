@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Home, Heart, HandHelping, Utensils } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const HOME_HELP_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const HOME_HELP_SUBCATEGORIES = [
     },
 ];
 
-const HOME_HELP_PROVIDERS = [
-    {
-        id: "1",
-        slug: "marie-caregiver",
-        name: "Marie",
-        category: "Caregiver",
-        rate: 20,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["First aid certified", "5 years experience", "Compassionate"],
-    },
-    {
-        id: "2",
-        slug: "sophie-companion",
-        name: "Sophie",
-        category: "Companion",
-        rate: 18,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Patient", "Good listener", "Reliable"],
-    },
-    {
-        id: "3",
-        slug: "pierre-helper",
-        name: "Pierre",
-        category: "Home Helper",
-        rate: 16,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Strong", "Helpful", "Trustworthy"],
-    },
-    {
-        id: "4",
-        slug: "lucie-cook",
-        name: "Lucie",
-        category: "Meal Preparer",
-        rate: 22,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Nutrition knowledge", "Creative cooking", "Clean"],
-    },
-];
 
-export default function AideDomicilePage() {
+export default async function AideDomicilePage() {
+    const providers = await getProviderCards("aide-domicile");
+
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function AideDomicilePage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our home helpers are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {HOME_HELP_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our home helpers are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

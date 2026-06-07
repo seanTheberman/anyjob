@@ -13,7 +13,7 @@ interface ProviderCardProps extends React.HTMLAttributes<HTMLDivElement> {
     name: string;
     category: string;
     rate: number;
-    image: string;
+    image?: string | null;
     isNew?: boolean;
     tags: string[];
   };
@@ -22,6 +22,12 @@ interface ProviderCardProps extends React.HTMLAttributes<HTMLDivElement> {
 const ProviderCard = React.forwardRef<HTMLDivElement, ProviderCardProps>(
   ({ className, provider, ...props }, ref) => {
     const themeColor = "220 20% 35%"; // A nice blue-gray color that matches the Anyjob theme
+    const initials = provider.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join("");
     
     return (
       <div
@@ -44,11 +50,17 @@ const ProviderCard = React.forwardRef<HTMLDivElement, ProviderCardProps>(
           }}
         >
           {/* Background Image with Parallax Zoom */}
-          <div
-            className="absolute inset-0 bg-cover bg-center 
-                       transition-transform duration-500 ease-in-out group-hover:scale-110"
-            style={{ backgroundImage: `url(${provider.image})` }}
-          />
+          {provider.image ? (
+            <div
+              className="absolute inset-0 bg-cover bg-center 
+                         transition-transform duration-500 ease-in-out group-hover:scale-110"
+              style={{ backgroundImage: `url(${provider.image})` }}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-gray-700 via-gray-800 to-gray-950 text-6xl font-extrabold text-white/30">
+              {initials || provider.name[0]?.toUpperCase() || "P"}
+            </div>
+          )}
 
           {/* Themed Gradient Overlay */}
           <div
@@ -112,4 +124,3 @@ const ProviderCard = React.forwardRef<HTMLDivElement, ProviderCardProps>(
 ProviderCard.displayName = "ProviderCard";
 
 export { ProviderCard };
-

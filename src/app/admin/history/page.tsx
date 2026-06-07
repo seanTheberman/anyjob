@@ -26,7 +26,7 @@ export default function AdminHistoryPage() {
       description="Audit admin actions, user history, provider moderation, payment events, support events, and trust-rule triggers."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=history">
             <History className="h-4 w-4" />
             Export audit log
           </AdminButtonLink>

@@ -1,11 +1,11 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Heart, PawPrint } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderSlider } from "@/components/ui/provider-slider";
-import { ProviderCard } from "@/components/ui/provider-card";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const PETS_SUBCATEGORIES = [
     {
@@ -46,50 +46,10 @@ const PETS_SUBCATEGORIES = [
     },
 ];
 
-const PETS_PROVIDERS = [
-    {
-        id: "1",
-        slug: "pierre-dogwalker",
-        name: "Pierre",
-        category: "Dog Walker",
-        rate: 15,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e",
-        isNew: true,
-        tags: ["Dog lover", "Experienced", "Reliable"],
-    },
-    {
-        id: "2",
-        slug: "marie-petsitter",
-        name: "Marie",
-        category: "Pet Sitter",
-        rate: 18,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
-        isNew: true,
-        tags: ["Animal care certified", "Patient", "Trustworthy"],
-    },
-    {
-        id: "3",
-        slug: "sophie-groomer",
-        name: "Sophie",
-        category: "Pet Groomer",
-        rate: 25,
-        image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80",
-        isNew: true,
-        tags: ["Professional", "Gentle", "Mobile service"],
-    },
-    {
-        id: "4",
-        slug: "lucas-trainer",
-        name: "Lucas",
-        category: "Pet Trainer",
-        rate: 30,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6",
-        isNew: true,
-        tags: ["Certified trainer", "Positive methods", "Results"],
-    },
-];
 
-export default function AnimauxPage() {
+export default async function AnimauxPage() {
+    const providers = await getProviderCards("animaux");
+
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container */}
@@ -186,21 +146,8 @@ export default function AnimauxPage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our pet specialists are available
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {PETS_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our pet specialists are available" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

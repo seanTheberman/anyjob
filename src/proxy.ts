@@ -39,7 +39,7 @@ export async function proxy(request: NextRequest) {
         }
     )
 
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user } } = await supabase.auth.getUser()
 
     // Define protected routes and their required roles
     const protectedRoutes = {
@@ -60,20 +60,22 @@ export async function proxy(request: NextRequest) {
         }
     }
 
-    // If route is protected and no session, redirect to login
-    if (isProtected && !session) {
-        return NextResponse.redirect(new URL('/login', request.url))
+    const loginUrl = isAdminRoute ? '/admin-login' : '/login'
+
+    // If route is protected and no session, redirect to the correct login surface.
+    if (isProtected && !user) {
+        return NextResponse.redirect(new URL(loginUrl, request.url))
     }
 
     // If session exists, check user role
-    if (session && isProtected && requiredRole) {
+    if (user && isProtected && requiredRole) {
         let userRole: string | null = null
 
         // Check eloo_profiles first
         const { data: profile } = await supabase
             .from('eloo_profiles')
             .select('role')
-            .eq('id', session.user.id)
+            .eq('id', user.id)
             .single()
 
         if (profile?.role) {
@@ -83,7 +85,7 @@ export async function proxy(request: NextRequest) {
             const { data: seller } = await supabase
                 .from('sellers')
                 .select('id')
-                .eq('id', session.user.id)
+                .eq('id', user.id)
                 .single()
 
             if (seller) {
@@ -102,7 +104,7 @@ export async function proxy(request: NextRequest) {
             } else if (effectiveRole === 'admin') {
                 return NextResponse.redirect(new URL('/admin', request.url))
             } else {
-                return NextResponse.redirect(new URL('/login', request.url))
+                return NextResponse.redirect(new URL(loginUrl, request.url))
             }
         }
     }

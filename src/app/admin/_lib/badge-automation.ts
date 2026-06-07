@@ -108,6 +108,25 @@ async function rows(table: string, select = "*", limit = 1000) {
   }
 }
 
+async function tableReady(table: string) {
+  try {
+    const { error } = await adminClient().from(table).select("*").limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+export async function badgeSchemaReady() {
+  const checks = await Promise.all([
+    tableReady("badge_definitions"),
+    tableReady("badge_rules"),
+    tableReady("provider_badges"),
+  ]);
+
+  return checks.every(Boolean);
+}
+
 function compare(value: number, operator: BadgeOperator, threshold: number) {
   if (operator === "gte") return value >= threshold;
   if (operator === "lte") return value <= threshold;
@@ -246,7 +265,8 @@ export async function syncAutomaticBadges() {
 }
 
 export async function getAdminBadges() {
-  const [definitions, rules, awards, providerCount] = await Promise.all([
+  const [schemaReady, definitions, rules, awards, providerCount] = await Promise.all([
+    badgeSchemaReady(),
     rows("badge_definitions", "id,name,description,icon,color,is_active,created_at", 100),
     rows("badge_rules", "id,badge_id,metric,operator,threshold,created_at", 300),
     rows("provider_badges", "id,badge_id,created_at", 500),
@@ -290,6 +310,7 @@ export async function getAdminBadges() {
   });
 
   return {
+    schemaReady,
     badges,
     providerCount,
     totalAwards: awards.length,

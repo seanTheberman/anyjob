@@ -24,11 +24,10 @@ export default async function AdminNotificationsPage() {
         <form action={markAllAdminNotificationsRead}>
           <button
             type="submit"
-            disabled={unreadCount === 0}
-            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent bg-slate-950 px-3 text-sm font-medium text-white transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-transparent bg-slate-950 px-3 text-sm font-medium text-white transition-colors hover:bg-slate-800"
           >
             <MailOpen className="h-4 w-4" />
-            Mark all read
+            {unreadCount === 0 ? "Refresh read state" : "Mark all read"}
           </button>
         </form>
       }

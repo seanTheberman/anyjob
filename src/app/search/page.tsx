@@ -1,12 +1,12 @@
-"use client";
-
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, ShieldCheck, ThumbsUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
-import { ProviderCard } from "@/components/ui/provider-card";
-import { ProviderSlider } from "@/components/ui/provider-slider";
+import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
+import { getProviderCards } from "@/lib/real-providers";
+
+export const dynamic = "force-dynamic";
 
 const WINTER_SERVICES = [
     {
@@ -50,50 +50,10 @@ const SPRING_SERVICES = [
     },
 ];
 
-const MOCK_PROVIDERS = [
-    {
-        id: "1",
-        slug: "volodymyr-handyman",
-        name: "Volodymyr",
-        category: "Handyman",
-        rate: 10,
-        image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Honesty and integrity", "Impeccable result", "Careful work"],
-    },
-    {
-        id: "2",
-        slug: "maxandre-movers",
-        name: "Maxandre",
-        category: "Movers",
-        rate: 19,
-        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Careful work"],
-    },
-    {
-        id: "3",
-        slug: "marc-petsitter",
-        name: "Marc",
-        category: "Pet-sitter",
-        rate: 15,
-        image: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Animal lovers", "Vigilant and attentive", "Calm and patient"],
-    },
-    {
-        id: "4",
-        slug: "celestine-babysitter",
-        name: "Célestine",
-        category: "Babysitter",
-        rate: 15,
-        image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?q=80&w=400&auto=format&fit=crop",
-        isNew: true,
-        tags: ["Vigilant and attentive", "Punctuality and reliability", "Flexible and adaptable"],
-    },
-];
 
-export default function CataloguePage() {
+export default async function CataloguePage() {
+    const providers = await getProviderCards();
+
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container - Wider than the rest, but constrained */}
@@ -231,21 +191,8 @@ export default function CataloguePage() {
                     </div>
                 </section>
                 <EmergencyJobsSection />
-
                 {/* Providers Grid */}
-                <section>
-                    <div className="text-center mb-10">
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 dark:text-white">
-                            Our providers are here for you all February
-                        </h2>
-                    </div>
-
-                    <ProviderSlider>
-                        {MOCK_PROVIDERS.map((provider) => (
-                            <ProviderCard key={provider.id} provider={provider} />
-                        ))}
-                    </ProviderSlider>
-                </section>
+                <RealProvidersSection title="Our providers are here for you all February" providers={providers} />
 
                 {/* Selection Criteria / Trust Footer */}
                 <section className="pt-16 pb-8 border-t border-gray-100 dark:border-gray-800">

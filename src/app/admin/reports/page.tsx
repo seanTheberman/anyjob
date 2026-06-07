@@ -20,7 +20,7 @@ export default function AdminReportsPage() {
       description="Schedule and export marketplace, trust, account limitation, support, and category supply reports for operations review."
       actions={
         <>
-          <AdminButtonLink href="/admin/reports">
+          <AdminButtonLink href="/api/admin/export?kind=profiles">
             <FileDown className="h-4 w-4" />
             Download latest
           </AdminButtonLink>

@@ -62,7 +62,8 @@ export default function LoginPage() {
         if (userRole === 'provider' || userRole === 'seller') {
             router.push("/pro");
         } else if (userRole === 'admin') {
-            router.push("/admin");
+            await supabase.auth.signOut();
+            router.push("/admin-login");
         } else {
             // Default to client dashboard
             router.push("/dashboard");
