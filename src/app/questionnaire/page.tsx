@@ -44,6 +44,7 @@ import { enUS } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { CategoryIcon, SubcategoryIcon } from "@/components/shared/CategoryIcon";
+import type { User } from "@supabase/supabase-js";
 
 // Types
 interface Category {
@@ -320,6 +321,7 @@ function ServiceQuestionnaireContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [stepKey, setStepKey] = useState(1);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const isTaskrabbitSelection = searchParams.get("source") === "taskrabbit";
   const selectedCustomJobName = formData.category_slug === "custom" ? formData.custom_tags[0] : "";
 
@@ -353,6 +355,39 @@ function ServiceQuestionnaireContent() {
       setStepKey(nextStep);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadCurrentUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!mounted) return;
+      setCurrentUser(user);
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from("eloo_profiles")
+          .select("first_name,last_name,email,phone")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        if (!mounted) return;
+        setFormData((prev) => ({
+          ...prev,
+          first_name: prev.first_name || profile?.first_name || user.user_metadata?.first_name || "",
+          last_name: prev.last_name || profile?.last_name || user.user_metadata?.last_name || "",
+          email: prev.email || profile?.email || user.email || "",
+          phone: prev.phone || profile?.phone || "",
+          isNewUser: false,
+        }));
+      }
+    }
+
+    loadCurrentUser();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase]);
 
   const updateFormData = (field: keyof FormData, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -391,6 +426,9 @@ function ServiceQuestionnaireContent() {
       case 8:
         return true; // Image upload step - always valid (optional)
       case 9:
+        if (currentUser) {
+          return true;
+        }
         if (formData.isNewUser) {
           return !!formData.email && 
                  formData.email.includes("@") && 
@@ -409,17 +447,21 @@ function ServiceQuestionnaireContent() {
     setSubmitError(null);
 
     try {
-      // First, check if user exists or create new account
-      const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
-        email: formData.email,
-        password: formData.password || '',
-      });
+      let userId = currentUser?.id;
 
-      if (signInError && signInError.message !== 'Invalid login credentials') {
-        throw signInError;
+      if (!userId) {
+        // First, check if user exists or create new account
+        const { data: { user }, error: signInError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password || '',
+        });
+
+        if (signInError && signInError.message !== 'Invalid login credentials') {
+          throw signInError;
+        }
+
+        userId = user?.id;
       }
-
-      let userId = user?.id;
 
       // If user doesn't exist, create new account
       if (!userId) {
@@ -478,7 +520,7 @@ function ServiceQuestionnaireContent() {
         .from("service_inquiries")
         .insert({
           user_id: userId, // Link to the authenticated user
-          email: formData.email,
+          email: formData.email || currentUser?.email,
           phone: formData.phone,
           first_name: formData.first_name,
           last_name: formData.last_name,
@@ -507,7 +549,7 @@ function ServiceQuestionnaireContent() {
           budget_range_max: budgetOption?.max || 999999,
           materials_provided: formData.materials_provided,
           equipment_needed: formData.equipment_needed,
-          status: "submitted",
+          status: "pending",
           session_id: sessionId,
           submitted_at: new Date().toISOString(),
         })
@@ -519,21 +561,21 @@ function ServiceQuestionnaireContent() {
       // Upload images if any were provided
       if (formData.work_images.length > 0) {
         try {
-          const { uploadToCloudinary } = await import('@/lib/cloudinary');
-          
           for (const file of formData.work_images) {
-            const uploadResult = await uploadToCloudinary(file, 'anyjob/work-images');
-            
-            // Store image reference in database
-            await supabase
-              .from('user_images')
-              .insert({
-                inquiry_id: inquiry.id,
-                image_url: uploadResult.secure_url,
-                public_id: uploadResult.public_id,
-                image_type: 'work_image',
-                created_at: new Date().toISOString(),
-              });
+            const uploadFormData = new FormData();
+            uploadFormData.append("file", file);
+            uploadFormData.append("image_type", "work_image");
+            uploadFormData.append("inquiry_id", inquiry.id);
+
+            const uploadResponse = await fetch("/api/upload", {
+              method: "POST",
+              body: uploadFormData,
+            });
+
+            if (!uploadResponse.ok) {
+              const uploadError = await uploadResponse.json().catch(() => ({}));
+              throw new Error(uploadError.error || "Image upload failed");
+            }
           }
         } catch (imageError) {
           console.error('Image upload error:', imageError);
@@ -643,6 +685,8 @@ function ServiceQuestionnaireContent() {
             onPrevious={handlePrevious}
             isSubmitting={isSubmitting}
             error={submitError}
+            isLoggedIn={Boolean(currentUser)}
+            displayEmail={currentUser?.email || formData.email}
           />
         );
       default:
@@ -1689,6 +1733,8 @@ function Step9Contact({
   onPrevious,
   isSubmitting,
   error,
+  isLoggedIn,
+  displayEmail,
 }: {
   formData: FormData;
   updateFormData: (field: keyof FormData, value: unknown) => void;
@@ -1696,8 +1742,12 @@ function Step9Contact({
   onPrevious: () => void;
   isSubmitting: boolean;
   error: string | null;
+  isLoggedIn: boolean;
+  displayEmail: string;
 }) {
   const validateStep = (): boolean => {
+    if (isLoggedIn) return true;
+
     if (formData.isNewUser) {
       return !!formData.email && 
              formData.email.includes("@") && 
@@ -1720,7 +1770,7 @@ function Step9Contact({
           Last step!
         </h2>
         <p className="text-gray-600 dark:text-gray-400">
-          Create your account to submit your service request
+          {isLoggedIn ? "Review and submit your service request." : "Create your account to submit your service request"}
         </p>
       </div>
 
@@ -1732,39 +1782,45 @@ function Step9Contact({
       )}
 
       <div className="space-y-4">
-        {/* User Type Selection */}
-        <div>
-          <Label className="text-base font-medium">Do you have an account?</Label>
-          <div className="grid grid-cols-2 gap-3 mt-2">
-            <button
-              onClick={() => updateFormData("isNewUser", true)}
-              className={cn(
-                "p-3 rounded-xl border-2 text-center transition-all duration-200",
-                formData.isNewUser
-                  ? "border-red-600 bg-red-50 dark:bg-red-950/20"
-                  : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
-              )}
-            >
-              <div className="font-medium text-gray-900 dark:text-white">New User</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Create account</div>
-            </button>
-            <button
-              onClick={() => updateFormData("isNewUser", false)}
-              className={cn(
-                "p-3 rounded-xl border-2 text-center transition-all duration-200",
-                !formData.isNewUser
-                  ? "border-red-600 bg-red-50 dark:bg-red-950/20"
-                  : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
-              )}
-            >
-              <div className="font-medium text-gray-900 dark:text-white">Existing User</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">I have an account</div>
-            </button>
+        {isLoggedIn ? (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4">
+            <p className="text-sm font-semibold text-green-900">Posting from your signed-in account</p>
+            <p className="mt-1 text-sm text-green-800">{displayEmail}</p>
           </div>
-        </div>
+        ) : (
+          <div>
+            <Label className="text-base font-medium">Do you have an account?</Label>
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                onClick={() => updateFormData("isNewUser", true)}
+                className={cn(
+                  "p-3 rounded-xl border-2 text-center transition-all duration-200",
+                  formData.isNewUser
+                    ? "border-red-600 bg-red-50 dark:bg-red-950/20"
+                    : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
+                )}
+              >
+                <div className="font-medium text-gray-900 dark:text-white">New User</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">Create account</div>
+              </button>
+              <button
+                onClick={() => updateFormData("isNewUser", false)}
+                className={cn(
+                  "p-3 rounded-xl border-2 text-center transition-all duration-200",
+                  !formData.isNewUser
+                    ? "border-red-600 bg-red-50 dark:bg-red-950/20"
+                    : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
+                )}
+              >
+                <div className="font-medium text-gray-900 dark:text-white">Existing User</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">I have an account</div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Name Fields */}
-        <div className="grid grid-cols-2 gap-4">
+        {!isLoggedIn && <div className="grid grid-cols-2 gap-4">
           <div>
             <Label>First name</Label>
             <Input
@@ -1783,10 +1839,10 @@ function Step9Contact({
               required
             />
           </div>
-        </div>
+        </div>}
 
         {/* Email Field */}
-        <div>
+        {!isLoggedIn && <div>
           <Label>Email *</Label>
           <Input
             type="email"
@@ -1795,10 +1851,10 @@ function Step9Contact({
             onChange={(e) => updateFormData("email", e.target.value)}
             required
           />
-        </div>
+        </div>}
 
         {/* Password Field (only for new users) */}
-        {formData.isNewUser && (
+        {!isLoggedIn && formData.isNewUser && (
           <div>
             <Label>Password *</Label>
             <Input
@@ -1816,7 +1872,7 @@ function Step9Contact({
         )}
 
         {/* Phone Field */}
-        <div>
+        {!isLoggedIn && <div>
           <Label>Phone (optional)</Label>
           <Input
             type="tel"
@@ -1824,7 +1880,7 @@ function Step9Contact({
             value={formData.phone}
             onChange={(e) => updateFormData("phone", e.target.value)}
           />
-        </div>
+        </div>}
       </div>
 
       {/* Request Summary */}
@@ -1870,7 +1926,7 @@ function Step9Contact({
             </>
           ) : (
             <>
-              {formData.isNewUser ? "Create Account & Submit Request" : "Submit Request"} <ArrowRight className="w-4 h-4 ml-2" />
+              {isLoggedIn ? "Post Job" : formData.isNewUser ? "Create Account & Submit Request" : "Submit Request"} <ArrowRight className="w-4 h-4 ml-2" />
             </>
           )}
         </Button>

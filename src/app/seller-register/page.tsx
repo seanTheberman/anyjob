@@ -84,6 +84,8 @@ export default function SellerRegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadedDocumentDataUrl, setUploadedDocumentDataUrl] = useState<string>("");
+  const [selfieVideoFile, setSelfieVideoFile] = useState<File | null>(null);
+  const [selfieVideoPreviewUrl, setSelfieVideoPreviewUrl] = useState<string>("");
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
@@ -179,6 +181,36 @@ export default function SellerRegisterPage() {
     }
   };
 
+  const handleSelfieVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validTypes = ["video/mp4", "video/webm", "video/quicktime"];
+    if (!validTypes.includes(file.type)) {
+      setErrors(prev => ({ ...prev, selfieVideoUrl: "Invalid video format. MP4, WebM or MOV required." }));
+      return;
+    }
+
+    if (file.size > 100 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, selfieVideoUrl: "Selfie video must be under 100MB." }));
+      return;
+    }
+
+    if (selfieVideoPreviewUrl) {
+      URL.revokeObjectURL(selfieVideoPreviewUrl);
+    }
+
+    setSelfieVideoFile(file);
+    setSelfieVideoPreviewUrl(URL.createObjectURL(file));
+    setErrors(prev => ({ ...prev, selfieVideoUrl: "" }));
+  };
+
+  useEffect(() => {
+    return () => {
+      if (selfieVideoPreviewUrl) URL.revokeObjectURL(selfieVideoPreviewUrl);
+    };
+  }, [selfieVideoPreviewUrl]);
+
   const validateStep = (step: number): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -208,7 +240,7 @@ export default function SellerRegisterPage() {
     } else if (step === 3) {
       if (!formData.siret.trim()) newErrors.siret = "Le numéro SIRET est requis";
       if (!uploadedFile && !formData.documentUrl.trim()) newErrors.document = "Le document est requis";
-      if (!formData.selfieVideoUrl.trim()) newErrors.selfieVideoUrl = "Selfie video URL is required";
+      if (!formData.selfieVideoUrl.trim() && !selfieVideoFile) newErrors.selfieVideoUrl = "Selfie video is required";
       if (formData.insurance === "yes" && !formData.insuranceDocumentUrl.trim()) {
         newErrors.insuranceDocumentUrl = "Insurance document URL is required";
       }
@@ -287,6 +319,23 @@ export default function SellerRegisterPage() {
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token,
           });
+
+          if (selfieVideoFile) {
+            const uploadData = new FormData();
+            uploadData.append("file", selfieVideoFile);
+            uploadData.append("image_type", "selfie_video");
+
+            const uploadResponse = await fetch("/api/upload", {
+              method: "POST",
+              body: uploadData,
+            });
+
+            if (!uploadResponse.ok) {
+              const uploadError = await uploadResponse.json().catch(() => ({}));
+              setSubmitError(uploadError.error || "Your account was created, but selfie video upload failed. Please upload it from your profile.");
+              return;
+            }
+          }
           
           // Redirect to seller dashboard (/pro)
           router.push('/pro');
@@ -604,14 +653,12 @@ export default function SellerRegisterPage() {
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
-                      type="text"
-                      inputMode="numeric"
+                      type="date"
                       value={formData.birthDate}
                       onChange={(e) => handleInputChange("birthDate", e.target.value)}
                       className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.birthDate ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="1990-01-01"
                     />
                     {errors.birthDate && (
                       <p className="text-red-500 text-xs mt-1">{errors.birthDate}</p>
@@ -928,17 +975,49 @@ export default function SellerRegisterPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Selfie video URL *
+                    Selfie video *
                   </label>
-                  <input
-                    type="url"
-                    value={formData.selfieVideoUrl}
-                    onChange={(e) => handleInputChange("selfieVideoUrl", e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                      errors.selfieVideoUrl ? "border-red-500" : "border-gray-300"
-                    }`}
-                    placeholder="https://example.com/selfie-video.mp4"
-                  />
+                  <div className={`rounded-lg border border-dashed p-4 ${errors.selfieVideoUrl ? "border-red-500 bg-red-50" : "border-gray-300 bg-gray-50"}`}>
+                    {selfieVideoPreviewUrl ? (
+                      <div className="space-y-3">
+                        <video src={selfieVideoPreviewUrl} controls className="max-h-56 w-full rounded-lg bg-black object-contain" />
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold text-gray-900">{selfieVideoFile?.name}</p>
+                            <p className="text-xs text-gray-500">Ready to upload after account creation</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (selfieVideoPreviewUrl) URL.revokeObjectURL(selfieVideoPreviewUrl);
+                              setSelfieVideoFile(null);
+                              setSelfieVideoPreviewUrl("");
+                            }}
+                            className="rounded-full border border-gray-200 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-white"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-white p-5 text-center hover:bg-blue-50">
+                        <Upload className="h-6 w-6 text-blue-600" />
+                        <span className="text-sm font-semibold text-gray-900">Upload selfie video</span>
+                        <span className="text-xs text-gray-500">MP4, WebM or MOV up to 100MB</span>
+                        <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={handleSelfieVideoUpload} />
+                      </label>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <label className="block text-xs font-semibold text-gray-500">Or paste a selfie video URL</label>
+                    <input
+                      type="url"
+                      value={formData.selfieVideoUrl}
+                      onChange={(e) => handleInputChange("selfieVideoUrl", e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                      placeholder="https://example.com/selfie-video.mp4"
+                    />
+                  </div>
                   {errors.selfieVideoUrl && (
                     <p className="text-red-500 text-xs mt-1">{errors.selfieVideoUrl}</p>
                   )}

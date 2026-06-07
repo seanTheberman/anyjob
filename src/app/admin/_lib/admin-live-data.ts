@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import type { AdminBusiness, AdminLiveJob, AdminProvider, AdminUser, KycReview } from "../_components/admin-data";
 
 type AnyRecord = Record<string, unknown>;
@@ -25,6 +26,11 @@ function daysAgo(value?: string | null) {
   const hours = Math.floor(minutes / 60);
   if (hours < 48) return `${hours}h ago`;
   return `${Math.floor(hours / 24)}d ago`;
+}
+
+function compactDateTime(value?: string | null) {
+  if (!value) return "Unknown";
+  return new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 async function maybeRows<T = AnyRecord>(table: string, select = "*", limit = 100): Promise<T[]> {
@@ -231,13 +237,23 @@ export async function getKycReviews(): Promise<KycReview[]> {
 }
 
 export async function getAdminJobs() {
-  const [inquiries, bids] = await Promise.all([
+  const [inquiries, bids, businessPosts, shiftApplications, businesses, profiles, conversations, messages] = await Promise.all([
     maybeRows<AnyRecord>(
       "service_inquiries",
-      "id,user_id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,status,created_at,updated_at,submitted_at",
-      100
+      "id,user_id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,preferred_time_start,preferred_time_end,flexible_timing,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,specific_requirements,equipment_needed,materials_provided,status,created_at,updated_at,submitted_at",
+      500
     ),
-    maybeRows<AnyRecord>("bids", "id,inquiry_id,status,amount,created_at,updated_at", 500),
+    maybeRows<AnyRecord>("bids", "*", 1000),
+    maybeRows<AnyRecord>(
+      "business_work_posts",
+      "id,business_id,owner_user_id,work_type,industry,niche,role_title,description,location_name,address,city,postal_code,starts_at,ends_at,headcount,business_preferred_hourly_rate,business_preferred_day_rate,contact_name,contact_phone,status,created_at,updated_at",
+      500
+    ),
+    maybeRows<AnyRecord>("shift_applications", "id,business_work_post_id,status,created_at,updated_at", 1000),
+    maybeRows<AnyRecord>("business_profiles", "id,business_name,contact_name,contact_email,contact_phone,city,status,created_at,updated_at", 500),
+    maybeRows<AnyRecord>("eloo_profiles", "*", 1000),
+    maybeRows<AnyRecord>("eloo_conversations", "*", 1000),
+    maybeRows<AnyRecord>("eloo_messages", "id,conversation_id,sender_id,content,is_read,created_at", 2000),
   ]);
 
   const bidsByInquiry = new Map<string, AnyRecord[]>();
@@ -249,10 +265,88 @@ export async function getAdminJobs() {
     bidsByInquiry.set(inquiryId, current);
   }
 
-  const jobs: AdminLiveJob[] = inquiries.map((job) => {
+  const applicationsByPost = new Map<string, AnyRecord[]>();
+  for (const application of shiftApplications) {
+    const postId = String(application.business_work_post_id || "");
+    if (!postId) continue;
+    const current = applicationsByPost.get(postId) || [];
+    current.push(application);
+    applicationsByPost.set(postId, current);
+  }
+
+  const businessesById = new Map(businesses.map((business) => [String(business.id), business]));
+  const profilesById = new Map(profiles.map((profile) => [String(profile.id), profile]));
+  const conversationsByBidId = new Map<string, AnyRecord[]>();
+  for (const conversation of conversations) {
+    const bidId = String(conversation.bid_id || "");
+    if (!bidId) continue;
+    conversationsByBidId.set(bidId, [...(conversationsByBidId.get(bidId) || []), conversation]);
+  }
+
+  const messagesByConversationId = new Map<string, AnyRecord[]>();
+  for (const message of messages) {
+    const conversationId = String(message.conversation_id || "");
+    if (!conversationId) continue;
+    messagesByConversationId.set(conversationId, [...(messagesByConversationId.get(conversationId) || []), message]);
+  }
+
+  const quoteDetailsForBids = (jobBids: AnyRecord[]) =>
+    jobBids.map((bid) => {
+      const provider = profilesById.get(String(bid.provider_id || "")) || {};
+      const amount = Number(bid.amount || 0);
+      const breakdown = calculateBookingTokenBreakdown(amount);
+
+      return {
+        id: String(bid.id || ""),
+        providerId: String(bid.provider_id || ""),
+        providerName: fullName(provider) || "Provider",
+        providerEmail: String(provider.email || ""),
+        providerPhone: String(provider.phone || ""),
+        status: String(bid.status || "pending"),
+        sellerQuote: money(breakdown.sellerQuote),
+        anyJobFee: money(breakdown.bookingToken),
+        buyerTotal: money(breakdown.buyerTotal),
+        message: String(bid.message || "No quote note added."),
+        estimatedDuration: bid.estimated_duration_hours ? `${bid.estimated_duration_hours}h` : "Not provided",
+        availableDate: bid.available_date ? compactDateTime(String(bid.available_date)) : "Not provided",
+        createdLabel: compactDateTime(String(bid.created_at || "")),
+        updatedLabel: compactDateTime(String(bid.updated_at || bid.created_at || "")),
+      };
+    });
+
+  const chatMessagesForBids = (jobBids: AnyRecord[]) => {
+    const acceptedBid = jobBids.find((bid) => String(bid.status || "").toLowerCase() === "accepted");
+    if (!acceptedBid) return [];
+    const conversation = (conversationsByBidId.get(String(acceptedBid.id || "")) || [])[0];
+    if (!conversation) return [];
+
+    return (messagesByConversationId.get(String(conversation.id || "")) || [])
+      .sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")))
+      .map((message) => {
+        const senderId = String(message.sender_id || "");
+        const sender = profilesById.get(senderId) || {};
+        const role = senderId === String(conversation.client_id || "")
+          ? "Buyer"
+          : senderId === String(conversation.provider_id || "")
+            ? "Provider"
+            : "Participant";
+
+        return {
+          id: String(message.id || ""),
+          senderId,
+          senderName: fullName(sender),
+          senderRole: role,
+          content: String(message.content || ""),
+          createdLabel: compactDateTime(String(message.created_at || "")),
+          isRead: Boolean(message.is_read),
+        };
+      });
+  };
+
+  const inquiryJobs: AdminLiveJob[] = inquiries.map((job) => {
     const id = String(job.id || "");
     const jobBids = bidsByInquiry.get(id) || [];
-    const status = String(job.status || "submitted");
+    const status = String(job.status || "pending_for_review");
     const createdAt = String(job.submitted_at || job.created_at || "");
     const lastBidAt = jobBids
       .map((bid) => String(bid.updated_at || bid.created_at || ""))
@@ -264,16 +358,36 @@ export async function getAdminJobs() {
     const quoteCount = jobBids.length;
     const acceptedQuote = jobBids.some((bid) => String(bid.status || "").toLowerCase() === "accepted");
     const normalizedStatus = status.toLowerCase();
-    const awaitingBuyer = quoteCount > 0 && !acceptedQuote && ["submitted", "open", "pending"].includes(normalizedStatus);
+    const budgetLabel = job.budget_range_min || job.budget_range_max
+      ? `${money(Number(job.budget_range_min || 0))} - ${money(Number(job.budget_range_max || 0))}`
+      : "Budget not set";
+    const scheduleParts = [
+      job.preferred_date ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(String(job.preferred_date))) : "",
+      [job.preferred_time_start, job.preferred_time_end].filter(Boolean).join(" - "),
+      job.flexible_timing ? "Flexible timing" : "",
+    ].filter(Boolean);
+    const requirementParts = [
+      job.specific_requirements,
+      job.equipment_needed ? `Equipment: ${job.equipment_needed}` : "",
+      job.materials_provided ? "Materials provided by buyer" : "",
+    ].filter(Boolean);
+    const awaitingBuyer = quoteCount > 0 && !acceptedQuote && ["approved", "submitted", "open", "live"].includes(normalizedStatus);
     const noQuotes = quoteCount === 0;
-    const expired = idleDays >= 7 && !acceptedQuote;
+    const pendingReview = ["pending_for_review", "pending", "draft"].includes(normalizedStatus);
+    const moreInfoNeeded = ["more_info_needed", "needs_more_info"].includes(normalizedStatus);
+    const rejected = ["rejected", "cancelled"].includes(normalizedStatus);
+    const expired = idleDays >= 7 && !acceptedQuote && ["approved", "submitted"].includes(normalizedStatus);
     const tabStatus =
       normalizedStatus === "completed" || normalizedStatus === "converted"
         ? "completed"
-        : normalizedStatus === "cancelled"
+        : rejected
           ? "cancelled"
-          : normalizedStatus === "expired"
-            ? "expired"
+        : normalizedStatus === "expired"
+          ? "expired"
+          : pendingReview
+            ? "pending_review"
+          : moreInfoNeeded
+            ? "awaiting_buyer"
             : expired
               ? "expired"
               : noQuotes
@@ -284,12 +398,14 @@ export async function getAdminJobs() {
 
     return {
       id,
+      source: "service_inquiry",
       userId: String(job.user_id || ""),
       shortId: id.slice(0, 8),
       datePosted: createdAt,
       postedLabel: createdAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(createdAt)) : "Unknown",
       idleDays,
       status,
+      sourceLabel: "Buyer service request",
       customer: String([job.first_name, job.last_name].filter(Boolean).join(" ") || job.email || "Client"),
       email: String(job.email || ""),
       phone: String(job.phone || ""),
@@ -297,17 +413,123 @@ export async function getAdminJobs() {
       town: String(job.city || "Unknown"),
       county: String(job.city || "Unknown"),
       type: String(job.subcategory_slug || job.category_slug || job.service_type || "Service").replaceAll("-", " "),
+      description: String(job.job_description || ""),
+      schedule: scheduleParts.join(" · ") || "Schedule not set",
+      budget: budgetLabel,
+      requirements: requirementParts.join(" · ") || "No extra requirements recorded",
       size: job.estimated_duration_hours ? `${job.estimated_duration_hours}h est.` : "Not set",
       beds: job.number_of_people_needed ? String(job.number_of_people_needed) : "-",
       purpose: job.job_urgency ? String(job.job_urgency).replaceAll("_", " ") : job.budget_range_min || job.budget_range_max ? "Quoted budget" : "Service",
       quotes: quoteCount,
+      quoteDetails: quoteDetailsForBids(jobBids),
+      chatMessages: chatMessagesForBids(jobBids),
       lastActivity: lastActivityAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(lastActivityAt)) : "Unknown",
       lastActivityAt,
       tabStatus,
     };
   });
 
-  return jobs.sort((a, b) => (b.lastActivityAt || "").localeCompare(a.lastActivityAt || "")).slice(0, 100);
+  const businessJobs: AdminLiveJob[] = businessPosts.map((post) => {
+    const id = String(post.id || "");
+    const postApplications = applicationsByPost.get(id) || [];
+    const status = String(post.status || "pending_for_review");
+    const normalizedStatus = status.toLowerCase();
+    const business = businessesById.get(String(post.business_id || "")) || {};
+    const createdAt = String(post.created_at || "");
+    const lastApplicationAt = postApplications
+      .map((application) => String(application.updated_at || application.created_at || ""))
+      .filter(Boolean)
+      .sort()
+      .at(-1) || null;
+    const lastActivityAt = [String(post.updated_at || ""), lastApplicationAt || ""].filter(Boolean).sort().at(-1) || createdAt || null;
+    const idleDays = lastActivityAt ? Math.max(Math.floor((Date.now() - new Date(lastActivityAt).getTime()) / 86400000), 0) : 0;
+    const applicationCount = postApplications.length;
+    const acceptedApplication = postApplications.some((application) => String(application.status || "").toLowerCase() === "accepted");
+    const scheduleParts = [
+      post.starts_at ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(String(post.starts_at))) : "",
+      post.ends_at ? `to ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(String(post.ends_at)))}` : "",
+    ].filter(Boolean);
+    const rateParts = [
+      post.business_preferred_hourly_rate ? `${money(Number(post.business_preferred_hourly_rate))}/hr` : "",
+      post.business_preferred_day_rate ? `${money(Number(post.business_preferred_day_rate))}/day` : "",
+    ].filter(Boolean);
+    const requirementParts = [post.requirements, post.uniform ? `Uniform: ${post.uniform}` : "", post.break_policy ? `Break: ${post.break_policy}` : ""].filter(Boolean);
+    const pendingReview = ["pending_for_review", "pending", "draft"].includes(normalizedStatus);
+    const moreInfoNeeded = ["more_info_needed", "needs_more_info"].includes(normalizedStatus);
+    const rejected = ["rejected", "cancelled"].includes(normalizedStatus);
+    const expired = idleDays >= 7 && !acceptedApplication && ["approved", "submitted"].includes(normalizedStatus);
+    const tabStatus =
+      normalizedStatus === "completed" || normalizedStatus === "filled"
+        ? "completed"
+        : rejected
+          ? "cancelled"
+          : pendingReview
+            ? "pending_review"
+          : moreInfoNeeded
+            ? "awaiting_buyer"
+          : expired
+            ? "expired"
+            : applicationCount === 0
+              ? "no_quotes"
+              : !acceptedApplication && ["approved", "submitted"].includes(normalizedStatus)
+                ? "awaiting_buyer"
+                : "live";
+
+    return {
+      id,
+      source: "business_work_post",
+      userId: String(post.owner_user_id || ""),
+      shortId: id.slice(0, 8),
+      datePosted: createdAt,
+      postedLabel: createdAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(createdAt)) : "Unknown",
+      idleDays,
+      status,
+      sourceLabel: "Business shift/work post",
+      customer: String(business.business_name || post.contact_name || "Business"),
+      email: String(business.contact_email || ""),
+      phone: String(post.contact_phone || business.contact_phone || ""),
+      address: String(post.address || post.location_name || "Address not set"),
+      town: String(post.city || business.city || "Unknown"),
+      county: String(post.city || business.city || "Unknown"),
+      type: String(post.role_title || post.niche || post.industry || "Shift work").replaceAll("-", " "),
+      description: String(post.description || ""),
+      schedule: scheduleParts.join(" ") || "Schedule not set",
+      budget: rateParts.join(" · ") || "Rate not set",
+      requirements: requirementParts.join(" · ") || "No extra requirements recorded",
+      size: post.starts_at ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(String(post.starts_at))) : "Not set",
+      beds: post.headcount ? String(post.headcount) : "-",
+      purpose: String(post.work_type || "Business work").replaceAll("_", " "),
+      quotes: applicationCount,
+      quoteDetails: postApplications.map((application) => {
+        const providerId = String(application.provider_id || application.seller_id || application.worker_id || application.user_id || "");
+        const provider = profilesById.get(providerId) || {};
+        return {
+          id: String(application.id || ""),
+          providerId,
+          providerName: fullName(provider),
+          providerEmail: String(provider.email || ""),
+          providerPhone: String(provider.phone || ""),
+          status: String(application.status || "pending"),
+          sellerQuote: rateParts.join(" · ") || "Rate not set",
+          anyJobFee: "Shift wallet",
+          buyerTotal: rateParts.join(" · ") || "Rate not set",
+          message: String(application.message || application.cover_note || "No application note added."),
+          estimatedDuration: scheduleParts.join(" ") || "Shift schedule not set",
+          availableDate: application.created_at ? compactDateTime(String(application.created_at)) : "Not provided",
+          createdLabel: compactDateTime(String(application.created_at || "")),
+          updatedLabel: compactDateTime(String(application.updated_at || application.created_at || "")),
+        };
+      }),
+      chatMessages: [],
+      lastActivity: lastActivityAt ? new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short" }).format(new Date(lastActivityAt)) : "Unknown",
+      lastActivityAt,
+      tabStatus,
+    };
+  });
+
+  return [...inquiryJobs, ...businessJobs]
+    .sort((a, b) => (b.lastActivityAt || b.datePosted || "").localeCompare(a.lastActivityAt || a.datePosted || ""))
+    .slice(0, 300);
 }
 
 export async function getAdminOverview() {

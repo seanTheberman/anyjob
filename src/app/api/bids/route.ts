@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 async function hasBuyerKycForQuoteAcceptance(
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Amount must be positive" }, { status: 400 });
     }
 
-    // Verify the inquiry exists and is submitted (open for bids)
+    // Verify the inquiry exists and has been approved by admin (open for bids)
     const { data: inquiry, error: inquiryError } = await supabase
       .from("service_inquiries")
       .select("*")
@@ -82,6 +83,10 @@ export async function POST(request: NextRequest) {
 
     if (inquiryError || !inquiry) {
       return NextResponse.json({ error: "Service inquiry not found" }, { status: 404 });
+    }
+
+    if (!["approved", "submitted"].includes(String(inquiry.status || "").toLowerCase())) {
+      return NextResponse.json({ error: "This job is not approved for quotes yet" }, { status: 409 });
     }
 
     // Provider cannot bid on their own inquiry
@@ -172,18 +177,58 @@ export async function GET(request: NextRequest) {
 
     if (bidsError) throw bidsError;
 
-    // Fetch provider information for each bid
+    const admin = createAdminSupabaseClient() as never as { from(table: string): any };
+    const providerIds = Array.from(new Set((bids || []).map((bid) => String(bid.provider_id || "")).filter(Boolean)));
+    const [profilesResult, sellersResult, reviewsResult] = providerIds.length
+      ? await Promise.all([
+          admin
+            .from("eloo_profiles")
+            .select("id, first_name, last_name, profile_image_url")
+            .in("id", providerIds),
+          admin
+            .from("sellers")
+            .select("id, first_name, last_name, profile_image_url, rating, total_jobs, service_category, experience_level")
+            .in("id", providerIds),
+          admin
+            .from("eloo_reviews")
+            .select("reviewee_id, rating")
+            .in("reviewee_id", providerIds),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
+
+    const profilesById = new Map(((profilesResult.data || []) as Record<string, any>[]).map((profile) => [String(profile.id), profile]));
+    const sellersById = new Map(((sellersResult.data || []) as Record<string, any>[]).map((seller) => [String(seller.id), seller]));
+    const reviewsByProvider = new Map<string, Record<string, any>[]>();
+    for (const review of (reviewsResult.data || []) as Record<string, any>[]) {
+      const providerId = String(review.reviewee_id || "");
+      if (!providerId) continue;
+      reviewsByProvider.set(providerId, [...(reviewsByProvider.get(providerId) || []), review]);
+    }
+
     const bidsWithProviders = await Promise.all(
       (bids || []).map(async (bid) => {
-        const { data: provider } = await supabase
-          .from("eloo_profiles")
-          .select("id, first_name, last_name")
-          .eq("id", bid.provider_id)
-          .single();
+        const providerId = String(bid.provider_id || "");
+        const profile = profilesById.get(providerId) || {};
+        const seller = sellersById.get(providerId) || {};
+        const reviews = reviewsByProvider.get(providerId) || [];
+        const reviewRatings = reviews.map((review) => Number(review.rating || 0)).filter((rating) => rating > 0);
+        const averageRating = reviewRatings.length
+          ? Math.round((reviewRatings.reduce((sum, rating) => sum + rating, 0) / reviewRatings.length) * 10) / 10
+          : Number(seller.rating || 0);
 
         return {
           ...bid,
-          provider: provider || null,
+          provider: {
+            id: providerId,
+            first_name: seller.first_name || profile.first_name || "Provider",
+            last_name: seller.last_name || profile.last_name || "",
+            profile_image_url: seller.profile_image_url || profile.profile_image_url || null,
+            rating: averageRating,
+            total_jobs: Number(seller.total_jobs || 0),
+            review_count: reviews.length || Number(seller.total_jobs || 0),
+            service_category: seller.service_category || null,
+            experience_level: seller.experience_level || null,
+          },
         };
       })
     );

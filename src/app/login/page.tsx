@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,50 +19,75 @@ export default function LoginPage() {
     const [error, setError] = useState<string | null>(null);
     const [magicLinkSent, setMagicLinkSent] = useState(false);
 
+    useEffect(() => {
+        let mounted = true;
+        const supabase = createClient();
+
+        function goHomeIfSignedIn(userId?: string) {
+            if (mounted && userId) {
+                router.replace("/");
+            }
+        }
+
+        async function redirectSignedInUser() {
+            const { data: { session } } = await supabase.auth.getSession();
+            goHomeIfSignedIn(session?.user?.id);
+            if (!mounted || session?.user?.id) return;
+
+            const { data: { user } } = await supabase.auth.getUser();
+            goHomeIfSignedIn(user?.id);
+        }
+
+        redirectSignedInUser();
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            goHomeIfSignedIn(session?.user?.id);
+        });
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
+    }, [router]);
+
     async function handleLogin(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        const supabase = createClient();
-        const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password });
+        let payload: {
+            error?: string;
+            user?: {
+                role?: string | null;
+            };
+        } = {};
 
-        if (error) {
-            setError(error.message);
+        try {
+            const response = await fetch("/api/auth/login", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+            });
+
+            payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                setError(payload.error || "Login failed. Please check your email and password.");
+                setLoading(false);
+                return;
+            }
+        } catch {
+            setError("Login service is unavailable. Please check your connection and try again.");
             setLoading(false);
             return;
         }
 
-        // Get user role from profile or sellers table
-        let userRole = 'client'; // default
-        
-        // Check eloo_profiles first
-        const { data: profile } = await supabase
-            .from('eloo_profiles')
-            .select('role')
-            .eq('id', authData.user.id)
-            .single();
-        
-        if (profile?.role) {
-            userRole = profile.role.toLowerCase();
-        } else {
-            // Check if user is a seller
-            const { data: seller } = await supabase
-                .from('sellers')
-                .select('status')
-                .eq('id', authData.user.id)
-                .single();
-            
-            if (seller) {
-                userRole = 'seller';
-            }
-        }
+        const userRole = String(payload.user?.role || "client").toLowerCase();
 
         // Redirect based on user role
         if (userRole === 'provider' || userRole === 'seller') {
             router.push("/pro");
         } else if (userRole === 'admin') {
-            await supabase.auth.signOut();
+            await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
             router.push("/admin-login");
         } else {
             // Default to client dashboard

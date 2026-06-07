@@ -126,13 +126,31 @@ export default function BusinessDashboardPage() {
     return map;
   }, new Map<string, ShiftApplication[]>());
 
+  const explainerCards = [
+    {
+      title: "What “business” means",
+      body: "Use this if you are hiring on behalf of a company, shop, agency, property operation, venue, clinic, restaurant, warehouse, care provider, or any organisation that needs workers for business work.",
+      icon: Building2,
+    },
+    {
+      title: "What shift jobs are",
+      body: "Shift jobs are scheduled worker needs: a cleaner for Friday 9-5, a healthcare assistant for a day, event staff for a venue, retail cover, hospitality cover, logistics help, or recurring weekly support.",
+      icon: Clock,
+    },
+    {
+      title: "How payment works",
+      body: "For shift work, the business agrees the amount and pays AnyJob first. AnyJob holds the payment, then credits/releases the provider based on completed work.",
+      icon: WalletCards,
+    },
+  ];
+
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-6xl">
         <div className="mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-950">Business</h1>
-            <p className="text-sm text-gray-600">Register, get approved, then post freelance, day-wage, and shift work.</p>
+            <p className="text-sm text-gray-600">For companies and organisations that need workers, scheduled cover, or business service support.</p>
           </div>
         </div>
 
@@ -142,18 +160,64 @@ export default function BusinessDashboardPage() {
             Loading business workspace...
           </div>
         ) : !business ? (
-          <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
-            <Building2 className="mx-auto mb-4 h-10 w-10 text-red-600" />
-            <h2 className="text-xl font-bold text-gray-950">Business registration required</h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-gray-600">
-              Businesses must submit a registration number and document before admin can approve job posting.
-            </p>
-            <Link href="/register-business" className="mt-6 inline-flex rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
-              Start business registration
-            </Link>
+          <div className="space-y-6">
+            <div className="rounded-lg border border-gray-200 bg-white p-8">
+              <div className="mx-auto max-w-3xl text-center">
+                <Building2 className="mx-auto mb-4 h-10 w-10 text-red-600" />
+                <h2 className="text-xl font-bold text-gray-950">Business registration required</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-600">
+                  This area is not for normal home-service requests. It is for verified businesses that want to post work for providers, hire shift workers, or manage scheduled staffing through AnyJob.
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-4 md:grid-cols-3">
+                {explainerCards.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.title} className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-left">
+                      <Icon className="mb-3 h-5 w-5 text-red-600" />
+                      <h3 className="font-semibold text-gray-950">{item.title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-gray-600">{item.body}</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-8 rounded-lg border border-amber-200 bg-amber-50 p-5">
+                <h3 className="font-semibold text-amber-950">What you need to register</h3>
+                <div className="mt-3 grid gap-3 text-sm text-amber-900 md:grid-cols-2">
+                  <p><span className="font-semibold">Business name:</span> the legal or trading name customers/workers should see.</p>
+                  <p><span className="font-semibold">Registration number:</span> company number, SIRET, VAT, tax, or local business identifier.</p>
+                  <p><span className="font-semibold">Business document:</span> registration certificate, tax proof, insurance, or other document admin can verify.</p>
+                  <p><span className="font-semibold">Work details:</span> role, location, dates, times, rates, and what the worker must do.</p>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-col items-center gap-3 text-center">
+                <Link href="/register-business" className="inline-flex rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">
+                  Start business registration
+                </Link>
+                <p className="max-w-xl text-xs leading-5 text-gray-500">
+                  If you only need a cleaner, handyman, mover, tutor, pet carer, or other provider for your own personal request, use the normal booking flow instead of business registration.
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              {explainerCards.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div key={item.title} className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                    <Icon className="mb-3 h-5 w-5 text-red-600" />
+                    <h3 className="font-semibold text-gray-950">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-gray-600">{item.body}</p>
+                  </div>
+                );
+              })}
+            </div>
+
             <div className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>

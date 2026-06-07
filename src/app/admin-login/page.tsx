@@ -19,27 +19,27 @@ export default function AdminLoginPage() {
     setError(null);
     setLoading(true);
 
-    const supabase = createClient();
     const normalizedEmail = email.trim().toLowerCase();
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password,
-    });
 
-    if (signInError || !data.user) {
-      setError("Invalid admin credentials.");
+    const response = await fetch("/api/auth/login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: normalizedEmail, password }),
+    });
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || !payload.user) {
+      setError(payload.error || "Invalid admin credentials.");
       setLoading(false);
       return;
     }
 
-    const [{ data: elooProfile }, { data: userProfile }] = await Promise.all([
-      supabase.from("eloo_profiles").select("role").eq("id", data.user.id).single(),
-      supabase.from("user_profiles").select("role").eq("id", data.user.id).single(),
-    ]);
-
-    const role = String(elooProfile?.role || userProfile?.role || "").toLowerCase();
+    const role = String(payload.user.role || "").toLowerCase();
     if (role !== "admin") {
+      const supabase = createClient();
       await supabase.auth.signOut();
+      await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
       setError("This account is not authorized for the admin console.");
       setLoading(false);
       return;

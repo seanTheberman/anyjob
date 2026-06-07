@@ -12,6 +12,9 @@ type BidWithInquiry = {
   };
 };
 
+const PROVIDER_BOOKING_CONFIRMED_MESSAGE =
+  "Thank you for confirming the booking. Your AnyJob payment is complete, and I'm ready to coordinate the job with you here. Please send any final access details, preferred timing, photos, or special instructions, and I'll confirm the plan before arrival.";
+
 export async function acceptBidAndUnlockChat(
   supabase: SupabaseClient,
   bid: BidWithInquiry,
@@ -83,20 +86,19 @@ export async function acceptBidAndUnlockChat(
         .single();
 
   if (conversation) {
-    const content = "Hi! Thanks for accepting my bid. Chat is now unlocked so we can confirm the job details.";
     const { data: existingAutoMessage } = await supabase
       .from("eloo_messages")
       .select("id")
       .eq("conversation_id", conversation.id)
       .eq("sender_id", bid.provider_id)
-      .eq("content", content)
+      .eq("content", PROVIDER_BOOKING_CONFIRMED_MESSAGE)
       .maybeSingle();
 
     if (!existingAutoMessage) {
       await supabase.from("eloo_messages").insert({
         conversation_id: conversation.id,
         sender_id: bid.provider_id,
-        content,
+        content: PROVIDER_BOOKING_CONFIRMED_MESSAGE,
       });
     }
   }

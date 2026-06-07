@@ -91,6 +91,21 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" }).catch(() => null);
+        const sessionPayload = sessionResponse?.ok ? await sessionResponse.json().catch(() => null) : null;
+
+        if (sessionPayload?.user) {
+          setUser({
+            id: sessionPayload.user.id,
+            email: sessionPayload.user.email,
+            user_metadata: {
+              first_name: sessionPayload.user.displayName,
+              role: sessionPayload.user.role,
+            },
+          } as unknown as SupabaseUser);
+          return;
+        }
+
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
       } catch (error) {
@@ -112,6 +127,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
     router.push('/login');
     router.refresh();
   };
@@ -178,7 +194,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         <div className="flex items-center justify-between px-4 lg:px-6 h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
-            <Link href="/pro" className="flex items-center gap-2 group">
+            <Link href="/" className="flex items-center gap-2 group">
               <span className="text-2xl sm:text-3xl font-cursive font-bold transition-colors duration-300 text-red-600 hover:text-red-700">
                 AnyJob
               </span>
@@ -249,7 +265,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         <div className="flex items-center justify-between px-4 h-14">
           {/* Logo */}
           <div className="flex items-center gap-2">
-            <Link href="/pro" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <span className="text-xl font-cursive font-bold text-red-600">
                 AnyJob
               </span>

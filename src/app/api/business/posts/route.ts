@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
         break_policy: nullableText(body.breakPolicy),
         contact_name: nullableText(body.contactName) || business.contact_name,
         contact_phone: nullableText(body.contactPhone) || business.contact_phone,
-        status: "submitted",
+        status: "draft",
       })
       .select("*")
       .single();

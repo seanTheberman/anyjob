@@ -66,6 +66,7 @@ const profileMenuItems = [
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
@@ -75,7 +76,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
     router.push("/login");
+  };
+
+  const toggleDarkMode = () => {
+    setDarkMode((current) => {
+      const next = !current;
+      document.documentElement.classList.toggle("dark", next);
+      return next;
+    });
   };
 
   // Close dropdown when clicking outside
@@ -123,7 +133,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex items-center justify-between px-4 lg:px-6 h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="flex items-center gap-2 group">
+            <Link href="/" className="flex items-center gap-2 group">
               <span className="text-2xl sm:text-3xl font-cursive font-bold transition-colors duration-300 text-red-600 hover:text-red-700">
                 AnyJob
               </span>
@@ -143,10 +153,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Right side - Notifications & Profile */}
           <div className="flex items-center gap-3">
-            <button className="relative p-2 hover:bg-gray-100 rounded-full">
+            <Link href="/dashboard/account?tab=notifications" aria-label="Notifications" className="relative p-2 hover:bg-gray-100 rounded-full">
               <Bell className="w-5 h-5 text-gray-600" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            </Link>
             
             {/* Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
@@ -204,7 +214,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       <header className="fixed left-0 right-0 top-0 z-50 bg-white border-b border-gray-200 lg:hidden">
         <div className="flex items-center justify-between px-4 h-14">
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
             <span className="text-xl font-cursive font-bold text-red-600">
               AnyJob
             </span>
@@ -212,10 +222,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Right side - Notifications & Menu */}
           <div className="flex items-center gap-2">
-            <button className="relative p-2 hover:bg-gray-100 rounded-full">
+            <Link href="/dashboard/account?tab=notifications" aria-label="Notifications" className="relative p-2 hover:bg-gray-100 rounded-full">
               <Bell className="w-5 h-5 text-gray-600" />
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </button>
+            </Link>
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
               className="p-2 hover:bg-gray-100 rounded-full"
@@ -278,11 +288,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </div>
                   <span className="text-xs font-medium text-gray-700">New Request</span>
                 </Link>
-                <button className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                <button type="button" onClick={toggleDarkMode} className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors" aria-pressed={darkMode}>
                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
                     <Moon className="w-5 h-5 text-gray-600" />
                   </div>
-                  <span className="text-xs font-medium text-gray-700">Dark Mode</span>
+                  <span className="text-xs font-medium text-gray-700">{darkMode ? "Light Mode" : "Dark Mode"}</span>
                 </button>
               </div>
 

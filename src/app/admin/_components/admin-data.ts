@@ -91,12 +91,14 @@ export type KycReview = {
 
 export type AdminLiveJob = {
   id: string;
+  source: "service_inquiry" | "business_work_post";
   userId: string;
   shortId: string;
   datePosted: string;
   postedLabel: string;
   idleDays: number;
   status: string;
+  sourceLabel: string;
   customer: string;
   email: string;
   phone: string;
@@ -104,13 +106,42 @@ export type AdminLiveJob = {
   town: string;
   county: string;
   type: string;
+  description: string;
+  schedule: string;
+  budget: string;
+  requirements: string;
   size: string;
   beds: string;
   purpose: string;
   quotes: number;
+  quoteDetails: Array<{
+    id: string;
+    providerId: string;
+    providerName: string;
+    providerEmail: string;
+    providerPhone: string;
+    status: string;
+    sellerQuote: string;
+    anyJobFee: string;
+    buyerTotal: string;
+    message: string;
+    estimatedDuration: string;
+    availableDate: string;
+    createdLabel: string;
+    updatedLabel: string;
+  }>;
+  chatMessages: Array<{
+    id: string;
+    senderId: string;
+    senderName: string;
+    senderRole: string;
+    content: string;
+    createdLabel: string;
+    isRead: boolean;
+  }>;
   lastActivity: string;
   lastActivityAt: string | null;
-  tabStatus: "live" | "expired" | "awaiting_buyer" | "no_quotes" | "completed" | "cancelled" | "all";
+  tabStatus: "pending_review" | "live" | "expired" | "awaiting_buyer" | "no_quotes" | "completed" | "cancelled" | "all";
 };
 
 export const settingsGroups = [

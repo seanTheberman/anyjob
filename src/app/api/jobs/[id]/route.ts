@@ -1,10 +1,19 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { NextRequest, NextResponse } from "next/server";
 
 function coarsePostalCode(postalCode?: string | null) {
   const prefix = postalCode?.trim().slice(0, 3);
   return prefix ? `${prefix} area` : "";
+}
+
+type LooseRow = Record<string, any>;
+
+function average(rows: LooseRow[], field = "rating") {
+  const values = rows.map((row) => Number(row[field] || 0)).filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return 0;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
 // GET: Fetch details for a specific job
@@ -27,6 +36,8 @@ export async function GET(
     // Await params since Next.js 15
     const resolvedParams = await params;
     const jobId = resolvedParams.id;
+
+    const adminSupabase = createAdminSupabaseClient() as any;
 
     // Check if user has already bid on this job (only if user is authenticated)
     let myBid = null;
@@ -54,8 +65,7 @@ export async function GET(
       .maybeSingle();
 
     let job = visibleJob;
-    if (!job && user && myBid) {
-      const adminSupabase = createAdminSupabaseClient() as any;
+    if (!job) {
       const { data: adminJob, error: adminJobError } = await adminSupabase
         .from('service_inquiries')
         .select('*')
@@ -82,15 +92,114 @@ export async function GET(
       .select('*', { count: 'exact', head: true })
       .eq('inquiry_id', jobId);
 
-    // Get work images count and actual images
-    const { data: images, error: imagesError } = await supabase
+    // Get work images with the admin client because providers should be able
+    // to inspect job photos even when image rows are protected by owner RLS.
+    const { data: images, error: imagesError } = await adminSupabase
       .from('user_images')
       .select('id, image_url, public_id, created_at')
       .eq('inquiry_id', jobId)
       .eq('image_type', 'work_image')
       .order('created_at', { ascending: true });
 
+    if (imagesError) {
+      console.error('Work image fetch error:', imagesError);
+    }
+
     const imageCount = images?.length || 0;
+
+    const [{ data: bids }, { data: buyerJobs }, { data: buyerReviewsGiven }] = await Promise.all([
+      adminSupabase
+        .from("bids")
+        .select("id,inquiry_id,provider_id,amount,message,estimated_duration_hours,available_date,status,created_at")
+        .eq("inquiry_id", jobId)
+        .order("created_at", { ascending: false }),
+      job.user_id
+        ? adminSupabase
+            .from("service_inquiries")
+            .select("id,status")
+            .eq("user_id", job.user_id)
+            .limit(1000)
+        : Promise.resolve({ data: [] }),
+      job.user_id
+        ? adminSupabase
+            .from("eloo_reviews")
+            .select("rating")
+            .eq("reviewer_id", job.user_id)
+            .limit(1000)
+        : Promise.resolve({ data: [] }),
+    ]);
+
+    const providerIds = Array.from(new Set(((bids || []) as LooseRow[]).map((bid) => String(bid.provider_id || "")).filter(Boolean)));
+    const [{ data: providerProfiles }, { data: providerSellers }, { data: providerReviews }] = providerIds.length
+      ? await Promise.all([
+          adminSupabase
+            .from("eloo_profiles")
+            .select("id,first_name,last_name,profile_image_url")
+            .in("id", providerIds),
+          adminSupabase
+            .from("sellers")
+            .select("id,first_name,last_name,profile_image_url,rating,total_jobs,service_category,experience_level")
+            .in("id", providerIds),
+          adminSupabase
+            .from("eloo_reviews")
+            .select("reviewee_id,rating")
+            .in("reviewee_id", providerIds),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
+
+    const profilesById = new Map(((providerProfiles || []) as LooseRow[]).map((profile) => [String(profile.id), profile]));
+    const sellersById = new Map(((providerSellers || []) as LooseRow[]).map((seller) => [String(seller.id), seller]));
+    const reviewsByProvider = new Map<string, LooseRow[]>();
+    for (const review of (providerReviews || []) as LooseRow[]) {
+      const providerId = String(review.reviewee_id || "");
+      if (!providerId) continue;
+      reviewsByProvider.set(providerId, [...(reviewsByProvider.get(providerId) || []), review]);
+    }
+
+    const offerDetails = ((bids || []) as LooseRow[]).map((bid) => {
+      const providerId = String(bid.provider_id || "");
+      const profile = profilesById.get(providerId) || {};
+      const seller = sellersById.get(providerId) || {};
+      const reviews = reviewsByProvider.get(providerId) || [];
+      const rating = average(reviews) || Number(seller.rating || 0);
+      const reviewCount = reviews.length || Number(seller.total_jobs || 0);
+      const totalJobs = Number(seller.total_jobs || 0);
+      const completionRate = totalJobs > 0 ? 100 : 0;
+
+      return {
+        id: String(bid.id),
+        providerId,
+        amount: Number(bid.amount || 0),
+        buyerTotal: calculateBookingTokenBreakdown(Number(bid.amount || 0)).buyerTotal,
+        message: String(bid.message || ""),
+        estimatedDurationHours: bid.estimated_duration_hours ? Number(bid.estimated_duration_hours) : null,
+        availableDate: bid.available_date || null,
+        status: String(bid.status || "pending"),
+        createdAt: bid.created_at,
+        provider: {
+          name: [seller.first_name || profile.first_name, seller.last_name || profile.last_name].filter(Boolean).join(" ") || "Provider",
+          avatar: seller.profile_image_url || profile.profile_image_url || null,
+          rating,
+          reviewCount,
+          totalJobs,
+          completionRate,
+          serviceCategory: seller.service_category || null,
+          experienceLevel: seller.experience_level || null,
+        },
+      };
+    });
+
+    const buyerRows = (buyerJobs || []) as LooseRow[];
+    const hiredStatuses = new Set(["bid_accepted", "confirmed", "in_progress", "completed", "converted"]);
+    const buyerPostedJobs = buyerRows.length;
+    const buyerHiredJobs = buyerRows.filter((row) => hiredStatuses.has(String(row.status || "").toLowerCase())).length;
+    const buyerStats = {
+      jobsPosted: buyerPostedJobs,
+      hires: buyerHiredJobs,
+      hireRate: buyerPostedJobs ? Math.round((buyerHiredJobs / buyerPostedJobs) * 100) : 0,
+      averageRatingGiven: average((buyerReviewsGiven || []) as LooseRow[]),
+      ratingsGiven: ((buyerReviewsGiven || []) as LooseRow[]).length,
+    };
 
     const showContact = myBid?.status === 'accepted';
     const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(', ');
@@ -138,7 +247,9 @@ export async function GET(
       bid_count: bidCount || 0,
       my_bid: myBid,
       work_image_count: imageCount,
-      work_images: images || []
+      work_images: images || [],
+      offers: offerDetails,
+      buyerStats
     };
 
     return NextResponse.json({ job: transformedJob });

@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { BriefcaseBusiness, CheckCircle2, Clock3, Download, Eye, FileQuestion, FileText, MapPin, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
+import { Fragment, useMemo, useState } from "react";
+import { BriefcaseBusiness, ChevronDown, CheckCircle2, Clock3, Download, Eye, FileQuestion, FileText, MapPin, MessageCircle, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
 
 import type { AdminLiveJob } from "./admin-data";
 import { getJobStatusLabel } from "@/lib/job-status";
@@ -9,6 +9,7 @@ import { getJobStatusLabel } from "@/lib/job-status";
 type JobTab = AdminLiveJob["tabStatus"] | "all";
 
 const tabs: Array<{ key: JobTab; label: string; icon: typeof BriefcaseBusiness; tone: string }> = [
+  { key: "pending_review", label: "Pending review", icon: FileQuestion, tone: "text-yellow-700" },
   { key: "live", label: "Live jobs", icon: BriefcaseBusiness, tone: "text-green-700" },
   { key: "expired", label: "Expired (7d idle)", icon: Clock3, tone: "text-slate-600" },
   { key: "awaiting_buyer", label: "No response from buyer", icon: TimerReset, tone: "text-amber-700" },
@@ -30,6 +31,7 @@ function includesQuery(job: AdminLiveJob, query: string) {
     job.town,
     job.county,
     job.type,
+    job.description,
     job.purpose,
     job.status,
     job.shortId,
@@ -37,6 +39,7 @@ function includesQuery(job: AdminLiveJob, query: string) {
 }
 
 function statusClass(job: AdminLiveJob) {
+  if (job.tabStatus === "pending_review") return "bg-yellow-100 text-yellow-800";
   if (job.tabStatus === "expired") return "bg-slate-100 text-slate-700";
   if (job.tabStatus === "completed") return "bg-emerald-50 text-emerald-700";
   if (job.tabStatus === "cancelled") return "bg-red-100 text-red-700";
@@ -46,6 +49,7 @@ function statusClass(job: AdminLiveJob) {
 }
 
 function tabLabel(job: AdminLiveJob) {
+  if (job.tabStatus === "pending_review") return "Review";
   if (job.tabStatus === "live") return "Live";
   if (job.tabStatus === "expired") return "Expired";
   if (job.tabStatus === "completed") return "Completed";
@@ -57,23 +61,32 @@ function tabLabel(job: AdminLiveJob) {
 function tabStatusForRawStatus(status?: string): AdminLiveJob["tabStatus"] {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "completed" || normalized === "converted") return "completed";
-  if (normalized === "cancelled") return "cancelled";
+  if (normalized === "cancelled" || normalized === "rejected") return "cancelled";
   if (normalized === "expired") return "expired";
-  if (normalized === "needs_more_info") return "awaiting_buyer";
+  if (normalized === "needs_more_info" || normalized === "more_info_needed") return "awaiting_buyer";
+  if (normalized === "pending_for_review" || normalized === "pending" || normalized === "draft") return "pending_review";
   return "live";
+}
+
+function canApproveJob(job: AdminLiveJob) {
+  return ["pending_for_review", "pending", "draft", "more_info_needed", "needs_more_info", "rejected", "expired"].includes(String(job.status || "").toLowerCase());
 }
 
 export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
   const [rows, setRows] = useState(jobs);
-  const [activeTab, setActiveTab] = useState<JobTab>("live");
+  const [activeTab, setActiveTab] = useState<JobTab>("pending_review");
   const [query, setQuery] = useState("");
   const [county, setCounty] = useState("all");
   const [message, setMessage] = useState<string | null>(null);
   const [pendingJob, setPendingJob] = useState<string | null>(null);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [chatJobId, setChatJobId] = useState<string | null>(null);
 
   const counties = useMemo(() => Array.from(new Set(rows.map((job) => job.county).filter(Boolean))).sort(), [rows]);
   const summary = useMemo(() => {
     const live = rows.filter((job) => job.tabStatus === "live").length;
+    const pendingReview = rows.filter((job) => job.tabStatus === "pending_review").length;
     const expired = rows.filter((job) => job.tabStatus === "expired").length;
     const awaitingBuyer = rows.filter((job) => job.tabStatus === "awaiting_buyer").length;
     const noQuotes = rows.filter((job) => job.tabStatus === "no_quotes").length;
@@ -81,7 +94,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     const cancelled = rows.filter((job) => job.tabStatus === "cancelled").length;
     const totalQuotes = rows.reduce((sum, job) => sum + job.quotes, 0);
 
-    return { total: rows.length, live, expired, awaitingBuyer, noQuotes, completed, cancelled, totalQuotes };
+    return { total: rows.length, live, pendingReview, expired, awaitingBuyer, noQuotes, completed, cancelled, totalQuotes };
   }, [rows]);
 
   const filtered = useMemo(() => {
@@ -93,6 +106,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
   }, [activeTab, county, rows, query]);
 
   const tabCounts: Record<JobTab, number> = {
+    pending_review: summary.pendingReview,
     live: summary.live,
     expired: summary.expired,
     awaiting_buyer: summary.awaitingBuyer,
@@ -101,8 +115,9 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     cancelled: summary.cancelled,
     all: summary.total,
   };
+  const chatJob = rows.find((job) => job.id === chatJobId) || null;
 
-  async function runJobAction(action: "refresh" | "approve" | "request_info" | "mark_live" | "start" | "complete" | "cancel" | "expire", job: AdminLiveJob) {
+  async function runJobAction(action: "refresh" | "approve" | "request_info" | "mark_live" | "start" | "complete" | "reject" | "cancel" | "expire", job: AdminLiveJob) {
     const requestMessage = action === "request_info"
       ? window.prompt(
           "What information should the buyer add?",
@@ -119,7 +134,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     const response = await fetch("/api/admin/jobs/actions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, jobId: job.id, message: requestMessage }),
+      body: JSON.stringify({ action, jobId: job.id, source: job.source, message: requestMessage }),
     });
     const payload = await response.json().catch(() => ({}));
     setPendingJob(null);
@@ -168,9 +183,10 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
           </div>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-5">
+        <div className="mt-5 grid gap-3 md:grid-cols-6">
           {[
             ["Total jobs", summary.total, "bg-slate-50 text-slate-950"],
+            ["Pending review", summary.pendingReview, "bg-yellow-50 text-yellow-700"],
             ["Live", summary.live, "bg-green-50 text-green-700"],
             ["Awaiting buyer", summary.awaitingBuyer, "bg-amber-50 text-amber-700"],
             ["No quotes", summary.noQuotes, "bg-red-50 text-red-700"],
@@ -185,8 +201,8 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
         {message ? <div className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <nav className="grid border-b border-slate-200 bg-white xl:grid-cols-7">
+      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <nav className="grid border-b border-slate-200 bg-white xl:grid-cols-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.key;
@@ -199,7 +215,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
               >
                 <Icon className={`h-4 w-4 ${active ? tab.tone : "text-slate-500"}`} />
                 <span className="min-w-0 truncate">{tab.label}</span>
-                <span className={`ml-auto rounded-full px-2.5 py-1 text-xs font-bold text-white ${tab.key === "live" ? "bg-green-500" : tab.key === "expired" ? "bg-slate-500" : tab.key === "awaiting_buyer" ? "bg-amber-500" : tab.key === "completed" ? "bg-emerald-500" : tab.key === "no_quotes" || tab.key === "cancelled" ? "bg-red-500" : "bg-blue-500"}`}>
+                <span className={`ml-auto rounded-full px-2.5 py-1 text-xs font-bold text-white ${tab.key === "pending_review" ? "bg-yellow-500" : tab.key === "live" ? "bg-green-500" : tab.key === "expired" ? "bg-slate-500" : tab.key === "awaiting_buyer" ? "bg-amber-500" : tab.key === "completed" ? "bg-emerald-500" : tab.key === "no_quotes" || tab.key === "cancelled" ? "bg-red-500" : "bg-blue-500"}`}>
                   {tabCounts[tab.key]}
                 </span>
               </button>
@@ -235,7 +251,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
             onClick={() => {
               setQuery("");
               setCounty("all");
-              setActiveTab("live");
+              setActiveTab("pending_review");
             }}
             className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
@@ -243,25 +259,19 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
           </button>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1180px] table-fixed divide-y divide-slate-200">
+        <div className="overflow-visible">
+          <table className="w-full table-fixed divide-y divide-slate-200">
           <colgroup>
             <col className="w-[120px]" />
-            <col className="w-[110px]" />
-            <col className="w-[220px]" />
-            <col className="w-[130px]" />
-            <col className="w-[130px]" />
             <col className="w-[140px]" />
-            <col className="w-[100px]" />
-            <col className="w-[80px]" />
-            <col className="w-[120px]" />
-            <col className="w-[90px]" />
-            <col className="w-[120px]" />
-            <col className="w-[330px]" />
+            <col />
+            <col className="w-[260px]" />
+            <col className="w-[150px]" />
+            <col className="w-[130px]" />
           </colgroup>
           <thead className="bg-slate-50">
             <tr>
-              {["Date", "Status", "Customer", "Town", "County", "Type", "Sq. Mt.", "Beds", "Purpose", "Quotes", "Last", "Actions"].map((column) => (
+              {["Date", "Status", "Job", "Customer / location", "Activity", "Actions"].map((column) => (
                 <th key={column} className="px-4 py-3 text-left text-sm font-black text-slate-700">
                   {column}
                 </th>
@@ -270,69 +280,104 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
             {filtered.map((job) => (
-              <tr key={job.id} className="hover:bg-slate-50">
+              <Fragment key={job.id}>
+              <tr className="hover:bg-slate-50">
                 <td className="px-4 py-4">
                   <p className="text-sm font-bold text-slate-800">{job.postedLabel}</p>
                   <p className="text-xs font-black text-amber-600">{job.idleDays}d idle</p>
                 </td>
                 <td className="px-4 py-4">
                   <span className={`rounded-lg px-3 py-1.5 text-xs font-black uppercase ${statusClass(job)}`}>
-                    {tabLabel(job)}
+                    {getJobStatusLabel(job.status)}
                   </span>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">{getJobStatusLabel(job.status)}</p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500">{tabLabel(job)}</p>
+                </td>
+                <td className="px-4 py-4">
+                  <p className="truncate text-sm font-black capitalize text-slate-950" title={job.type}>{job.type}</p>
+                  <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600" title={job.description}>{job.description || "No job description recorded."}</p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase text-slate-600">{job.sourceLabel}</span>
+                    <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700">{job.shortId}</span>
+                  </div>
                 </td>
                 <td className="px-4 py-4">
                   <p className="truncate text-sm font-black text-slate-950" title={job.customer}>{job.customer}</p>
-                  <p className="truncate text-sm text-slate-500" title={job.email}>{job.email || job.phone || job.shortId}</p>
-                </td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-700">{job.town}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-700">{job.county}</td>
-                <td className="px-4 py-4 capitalize text-sm font-semibold text-slate-700">{job.type}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-700">{job.size}</td>
-                <td className="px-4 py-4 text-sm font-semibold text-slate-700">{job.beds}</td>
-                <td className="px-4 py-4 capitalize text-sm font-semibold text-slate-700">{job.purpose}</td>
-                <td className="px-4 py-4 text-base font-black text-slate-950">{job.quotes}</td>
-                <td className="px-4 py-4">
-                  <p className="text-sm font-semibold text-slate-700">{job.lastActivity}</p>
-                  <p className="text-xs font-bold text-slate-500">{job.idleDays}d idle</p>
+                  <p className="truncate text-sm text-slate-500" title={job.email}>{job.email || job.phone || "No contact saved"}</p>
+                  <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={[job.town, job.county].filter(Boolean).join(", ") || job.address}>
+                    {[job.town, job.county].filter(Boolean).join(", ") || job.address || "Location not set"}
+                  </p>
                 </td>
                 <td className="px-4 py-4">
-                  <div className="flex items-center gap-2">
-                    <a href={`/dashboard/requests/${job.id}`} className="inline-flex h-9 items-center gap-2 rounded-lg bg-green-700 px-4 text-sm font-black text-white hover:bg-green-800">
+                  <p className="text-base font-black text-slate-950">{job.quotes}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{job.source === "business_work_post" ? "applications" : "quotes"}</p>
+                  <p className="mt-2 text-sm font-semibold text-slate-700">{job.lastActivity}</p>
+                </td>
+                <td className="relative px-4 py-4">
+                  <button
+                    type="button"
+                    aria-expanded={openActionMenuId === job.id}
+                    onClick={() => setOpenActionMenuId((current) => current === job.id ? null : job.id)}
+                    className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                  >
+                    Actions
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                  {openActionMenuId === job.id ? (
+                    <div className="absolute right-4 top-14 z-30 w-56 rounded-lg border border-slate-200 bg-white p-1.5 shadow-xl">
+                    <button
+                      type="button"
+                      aria-expanded={expandedJobId === job.id}
+                      onClick={() => {
+                        setExpandedJobId((current) => current === job.id ? null : job.id);
+                        setOpenActionMenuId(null);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-slate-800 hover:bg-slate-50"
+                    >
                       <Eye className="h-4 w-4" />
-                      View
-                    </a>
+                      {expandedJobId === job.id ? "Hide" : "View"}
+                    </button>
                     <button
                       type="button"
                       title="Refresh job"
                       disabled={pendingJob === `refresh:${job.id}`}
-                      onClick={() => runJobAction("refresh", job)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-amber-200 text-amber-600 hover:bg-amber-50 disabled:opacity-60"
+                      onClick={() => {
+                        setOpenActionMenuId(null);
+                        runJobAction("refresh", job);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
                     >
                       <RefreshCw className="h-4 w-4" />
+                      Refresh
                     </button>
-                    {job.status === "submitted" ? (
-                      <span className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-green-200 bg-green-50 px-3 text-xs font-black text-green-700">
+                    {["approved", "submitted"].includes(String(job.status || "").toLowerCase()) ? (
+                      <span className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-bold text-green-700">
                         <CheckCircle2 className="h-4 w-4" />
                         Approved
                       </span>
-                    ) : (
+                    ) : canApproveJob(job) ? (
                       <button
                         type="button"
                         title="Approve job and make it live for providers"
                         disabled={pendingJob === `approve:${job.id}`}
-                        onClick={() => runJobAction("approve", job)}
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-green-200 px-3 text-xs font-black text-green-700 hover:bg-green-50 disabled:opacity-60"
+                        onClick={() => {
+                          setOpenActionMenuId(null);
+                          runJobAction("approve", job);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-green-700 hover:bg-green-50 disabled:opacity-60"
                       >
+                        <CheckCircle2 className="h-4 w-4" />
                         Approve
                       </button>
-                    )}
+                    ) : null}
                     <button
                       type="button"
                       title="Ask buyer for more information"
                       disabled={pendingJob === `request_info:${job.id}`}
-                      onClick={() => runJobAction("request_info", job)}
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-lg border border-amber-200 px-3 text-xs font-black text-amber-700 hover:bg-amber-50 disabled:opacity-60"
+                      onClick={() => {
+                        setOpenActionMenuId(null);
+                        runJobAction("request_info", job);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-amber-700 hover:bg-amber-50 disabled:opacity-60"
                     >
                       <FileQuestion className="h-4 w-4" />
                       Request info
@@ -342,8 +387,11 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                         type="button"
                         title="Mark in progress"
                         disabled={pendingJob === `start:${job.id}`}
-                        onClick={() => runJobAction("start", job)}
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-blue-200 px-3 text-xs font-black text-blue-700 hover:bg-blue-50 disabled:opacity-60"
+                        onClick={() => {
+                          setOpenActionMenuId(null);
+                          runJobAction("start", job);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-blue-700 hover:bg-blue-50 disabled:opacity-60"
                       >
                         Start
                       </button>
@@ -353,8 +401,11 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                         type="button"
                         title="Mark completed"
                         disabled={pendingJob === `complete:${job.id}`}
-                        onClick={() => runJobAction("complete", job)}
-                        className="inline-flex h-9 items-center justify-center rounded-lg border border-emerald-200 px-3 text-xs font-black text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+                        onClick={() => {
+                          setOpenActionMenuId(null);
+                          runJobAction("complete", job);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
                       >
                         Done
                       </button>
@@ -363,23 +414,175 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                       type="button"
                       title="Expire job"
                       disabled={pendingJob === `expire:${job.id}` || job.tabStatus === "expired"}
-                      onClick={() => runJobAction("expire", job)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => {
+                        setOpenActionMenuId(null);
+                        runJobAction("expire", job);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash2 className="h-4 w-4" />
+                      Expire
                     </button>
                     <button
                       type="button"
                       title="Cancel job"
                       disabled={pendingJob === `cancel:${job.id}` || job.tabStatus === "cancelled"}
-                      onClick={() => runJobAction("cancel", job)}
-                      className="inline-flex h-9 items-center justify-center rounded-lg border border-red-200 px-3 text-xs font-black text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                      onClick={() => {
+                        setOpenActionMenuId(null);
+                        runJobAction("cancel", job);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
-                      Cancel
+                      <XCircle className="h-4 w-4" />
+                      Reject
                     </button>
-                  </div>
+                    </div>
+                  ) : null}
                 </td>
               </tr>
+              {expandedJobId === job.id ? (
+                <tr className="bg-slate-50">
+                  <td colSpan={6} className="px-4 py-5">
+                    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-700">{job.sourceLabel}</span>
+                            <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${statusClass(job)}`}>{getJobStatusLabel(job.status)}</span>
+                            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black uppercase text-blue-700">{tabLabel(job)}</span>
+                          </div>
+                          <h3 className="mt-3 text-lg font-black text-slate-950">{job.type}</h3>
+                          <p className="mt-2 max-w-5xl whitespace-pre-wrap text-sm leading-6 text-slate-700">{job.description || "No job description recorded."}</p>
+                        </div>
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                          <p className="font-black text-slate-950">{job.quotes}</p>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {job.source === "business_work_post" ? "Applications" : "Quotes"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+                                {job.source === "business_work_post" ? "Applications" : "Quotes and offers"}
+                              </p>
+                              <h4 className="mt-1 text-base font-black text-slate-950">
+                                {job.quoteDetails.length} {job.source === "business_work_post" ? "application" : "quote"}{job.quoteDetails.length === 1 ? "" : "s"} received
+                              </h4>
+                            </div>
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-black uppercase text-slate-600 ring-1 ring-slate-200">
+                              Admin view
+                            </span>
+                          </div>
+
+                          {job.quoteDetails.length ? (
+                            <div className="mt-4 space-y-3">
+                              {job.quoteDetails.map((quote) => (
+                                <div key={quote.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                    <div className="min-w-0">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-black text-slate-950">{quote.providerName}</p>
+                                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black uppercase ${quote.status === "accepted" ? "bg-green-50 text-green-700" : quote.status === "rejected" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-700"}`}>
+                                          {quote.status}
+                                        </span>
+                                      </div>
+                                      <p className="mt-1 break-words text-xs font-semibold text-slate-500">
+                                        {[quote.providerEmail, quote.providerPhone, quote.providerId].filter(Boolean).join(" · ") || "Provider contact not saved"}
+                                      </p>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 text-right text-xs">
+                                      <div>
+                                        <p className="font-black text-slate-950">{quote.sellerQuote}</p>
+                                        <p className="font-semibold uppercase text-slate-500">Provider</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-black text-slate-950">{quote.anyJobFee}</p>
+                                        <p className="font-semibold uppercase text-slate-500">AnyJob</p>
+                                      </div>
+                                      <div>
+                                        <p className="font-black text-slate-950">{quote.buyerTotal}</p>
+                                        <p className="font-semibold uppercase text-slate-500">Buyer sees</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <p className="mt-3 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">{quote.message}</p>
+                                  <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-500 md:grid-cols-4">
+                                    <span>Duration: {quote.estimatedDuration}</span>
+                                    <span>Available: {quote.availableDate}</span>
+                                    <span>Quoted: {quote.createdLabel}</span>
+                                    <span>Updated: {quote.updatedLabel}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="mt-4 rounded-lg border border-dashed border-slate-300 bg-white p-5 text-sm font-semibold text-slate-500">
+                              No provider quote or shift application has been submitted yet.
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">Accepted chat</p>
+                          <h4 className="mt-1 text-base font-black text-slate-950">Buyer and provider messages</h4>
+                          <button
+                            type="button"
+                            disabled={!job.chatMessages.length}
+                            onClick={() => setChatJobId(job.id)}
+                            className="mt-4 flex w-full items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-left transition hover:border-blue-200 hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:opacity-75"
+                          >
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white">
+                              <MessageCircle className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-black text-blue-950">
+                                {job.chatMessages.length ? `${job.chatMessages.length} message${job.chatMessages.length === 1 ? "" : "s"} in accepted chat` : "No accepted chat yet"}
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-sm leading-5 text-slate-600">
+                                {job.chatMessages.at(-1)?.content || "Chat appears here after a buyer accepts a quote and messages are sent."}
+                              </span>
+                              {job.chatMessages.length ? (
+                                <span className="mt-2 block text-xs font-bold uppercase tracking-wide text-blue-700">Open chat popup</span>
+                              ) : null}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        {[
+                          ["Customer / Business", job.customer],
+                          ["Email", job.email || "Not provided"],
+                          ["Phone", job.phone || "Not provided"],
+                          ["Location", [job.address, job.town, job.county].filter(Boolean).join(", ")],
+                          ["Schedule", job.schedule],
+                          ["Budget / Rate", job.budget],
+                          ["Duration / Date", job.size],
+                          ["People needed", job.beds],
+                          ["Purpose / Work type", job.purpose],
+                          ["Requirements", job.requirements],
+                          ["Posted", job.datePosted ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(job.datePosted)) : "Unknown"],
+                          ["Last activity", `${job.lastActivity} (${job.idleDays}d idle)`],
+                          ["Job ID", job.id],
+                          ["Short ID", job.shortId],
+                          ["User / Owner ID", job.userId || "Not linked"],
+                          ["Source table", job.source],
+                        ].map(([label, value]) => (
+                          <div key={label} className="rounded-lg border border-slate-200 bg-white p-3">
+                            <p className="text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</p>
+                            <p className="mt-1 break-words text-sm font-semibold leading-5 text-slate-900">{value || "Not set"}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              ) : null}
+              </Fragment>
             ))}
           </tbody>
         </table>
@@ -389,6 +592,51 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
           {filtered.length} jobs shown
         </div>
       </section>
+      {chatJob ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+          <div className="flex max-h-[86vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-wide text-blue-600">Admin chat transcript</p>
+                <h3 className="mt-1 text-xl font-black text-slate-950">{chatJob.type}</h3>
+                <p className="mt-1 text-sm font-semibold text-slate-500">{chatJob.customer} · {chatJob.chatMessages.length} message{chatJob.chatMessages.length === 1 ? "" : "s"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setChatJobId(null)}
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                aria-label="Close chat popup"
+              >
+                <XCircle className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-5">
+              {chatJob.chatMessages.map((message) => {
+                const isBuyer = message.senderRole.toLowerCase() === "buyer";
+                return (
+                  <div key={message.id} className={`flex ${isBuyer ? "justify-start" : "justify-end"}`}>
+                    <div className={`max-w-[82%] rounded-2xl px-4 py-3 shadow-sm ${isBuyer ? "rounded-tl-sm bg-white text-slate-800" : "rounded-tr-sm bg-blue-600 text-white"}`}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-black">{message.senderName}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${isBuyer ? "bg-slate-100 text-slate-600" : "bg-white/20 text-white"}`}>
+                          {message.senderRole}
+                        </span>
+                      </div>
+                      <p className={`mt-1 text-[11px] font-semibold ${isBuyer ? "text-slate-500" : "text-blue-100"}`}>
+                        {message.createdLabel} · {message.isRead ? "Read" : "Unread"}
+                      </p>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="border-t border-slate-200 bg-white px-5 py-3 text-xs font-semibold text-slate-500">
+              Read-only admin view. Admin can inspect the accepted buyer/provider conversation here.
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

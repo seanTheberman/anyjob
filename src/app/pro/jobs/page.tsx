@@ -2,7 +2,8 @@
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { useState, useEffect, useCallback } from "react";
-import { MapPin, Calendar, DollarSign, Clock, Search, Filter, Gavel, ImageIcon, ChevronDown, ChevronUp, Loader2, ShieldAlert } from "lucide-react";
+import Link from "next/link";
+import { MapPin, Calendar, DollarSign, Clock, Search, Filter, Gavel, ImageIcon, Loader2, ShieldAlert, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { BidForm } from "@/components/bids/BidForm";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
 import { useSellerVerification } from "@/hooks/useSellerVerification";
@@ -26,6 +27,7 @@ interface Job {
   bid_count: number;
   my_bid: { id: string; amount: number; status: string } | null;
   work_image_count: number;
+  work_images?: Array<{ id: string; image_url: string }>;
   custom_tags?: string[] | null;
   distance_km?: number | null;
 }
@@ -63,7 +65,7 @@ export default function BrowseJobsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchCity, setSearchCity] = useState("");
-  const [expandedJob, setExpandedJob] = useState<string | null>(null);
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [showBidForm, setShowBidForm] = useState<string | null>(null);
   const { verificationStatus, loading: verificationLoading } = useSellerVerification();
 
@@ -79,7 +81,9 @@ export default function BrowseJobsPage() {
       const res = await fetch(`/api/jobs?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setJobs(data.jobs || []);
+        const nextJobs = data.jobs || [];
+        setJobs(nextJobs);
+        setSelectedJobId((current) => current && nextJobs.some((job: Job) => job.id === current) ? current : nextJobs[0]?.id || null);
       }
     } catch (error) {
       console.error("Error fetching jobs:", error);
@@ -96,58 +100,76 @@ export default function BrowseJobsPage() {
     setShowBidForm(null);
     fetchJobs();
   };
+  const selectedJob = jobs.find((job) => job.id === selectedJobId) || jobs[0] || null;
+
+  const budgetLabel = (job: Job) => {
+    const min = Number(job.budget_range_min || 0);
+    const max = Number(job.budget_range_max || 0);
+    if (min && max) return `€${min} - €${max}`;
+    if (min) return `from €${min}`;
+    if (max) return `up to €${max}`;
+    return "Open budget";
+  };
+
+  const jobTitle = (job: Job) => {
+    const text = job.job_description?.trim();
+    if (!text) return categoryNames[job.category_slug] || "Service request";
+    return text.split(/[.!?]/)[0]?.slice(0, 74) || text.slice(0, 74);
+  };
 
   return (
     <ProviderLayout>
-      <div className="max-w-6xl mx-auto mt-4 lg:mt-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Browse Jobs</h1>
-          <p className="text-gray-600">Find jobs in your area and place competitive bids</p>
+      <div className="mx-auto max-w-7xl px-1 py-4 lg:py-6">
+        <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase tracking-wide text-blue-600">Provider work board</p>
+            <h1 className="mt-1 text-3xl font-black tracking-tight text-blue-950">Browse jobs</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">Pick a request, inspect the details, then send one clear total offer. Exact contact unlocks after the buyer accepts and pays the AnyJob fee.</p>
+          </div>
+          {!loading && (
+            <div className="rounded-full bg-white px-4 py-2 text-sm font-bold text-slate-600 ring-1 ring-slate-200">
+              {jobs.length} live job{jobs.length === 1 ? "" : "s"}
+            </div>
+          )}
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-xl p-4 border border-gray-200 mb-6">
-          <div className="flex flex-col md:flex-row gap-3">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <div className="mb-5 rounded-lg border border-slate-200 bg-white p-3">
+          <div className="grid gap-3 lg:grid-cols-[1fr_260px_auto]">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search by city..."
+                placeholder="Search by city or coarse area"
                 value={searchCity}
                 onChange={(e) => setSearchCity(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && fetchJobs()}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                className="h-11 w-full rounded-full border border-slate-200 pl-10 pr-4 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
               />
-            </div>
-            <div className="relative">
-              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </label>
+            <label className="relative block">
+              <Filter className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="pl-10 pr-8 py-2.5 border border-gray-200 rounded-xl text-sm appearance-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white"
+                className="h-11 w-full appearance-none rounded-full border border-slate-200 bg-white pl-10 pr-8 text-sm font-semibold text-slate-700 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">All Categories</option>
                 {Object.entries(categoryNames).map(([slug, name]) => (
                   <option key={slug} value={slug}>{name}</option>
                 ))}
               </select>
-            </div>
+            </label>
             <button
               onClick={fetchJobs}
-              className="px-6 py-2.5 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 transition-colors"
+              className="inline-flex h-11 items-center justify-center rounded-full bg-blue-600 px-6 text-sm font-bold text-white hover:bg-blue-700"
             >
               Search
             </button>
           </div>
         </div>
 
-        {/* Results count */}
-        {!loading && (
-          <p className="text-sm text-gray-500 mb-4">{jobs.length} job{jobs.length !== 1 ? "s" : ""} available</p>
-        )}
-
         {!canPlaceBid && (
-          <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <div className="mb-5 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
               <p className="font-semibold">
@@ -158,186 +180,206 @@ export default function BrowseJobsPage() {
           </div>
         )}
 
-        {/* Jobs List */}
         {loading ? (
-          <div className="flex items-center justify-center py-12">
+          <div className="flex min-h-[420px] items-center justify-center rounded-lg border border-slate-200 bg-white">
             <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
           </div>
         ) : jobs.length === 0 ? (
-          <div className="bg-white rounded-xl p-12 border border-gray-200 text-center">
+          <div className="rounded-lg border border-slate-200 bg-white p-12 text-center">
             <Search className="w-12 h-12 text-gray-300 mx-auto mb-3" />
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No jobs found</h3>
             <p className="text-gray-500">Try adjusting your filters or check back later</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {jobs.map((job) => (
-              <div key={job.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="p-5">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${categoryColors[job.category_slug] || "bg-gray-100 text-gray-700"}`}>
-                          {categoryNames[job.category_slug] || job.category_slug}
-                        </span>
-                        {job.bid_count > 0 && (
-                          <span className="flex items-center gap-1 text-xs text-gray-500">
-                            <Gavel className="w-3 h-3" />
-                            {job.bid_count} bid{job.bid_count !== 1 ? "s" : ""}
-                          </span>
-                        )}
-                        {job.work_image_count > 0 && (
-                          <span className="flex items-center gap-1 text-xs text-gray-500">
-                            <ImageIcon className="w-3 h-3" />
-                            {job.work_image_count} photo{job.work_image_count !== 1 ? "s" : ""}
-                          </span>
-                        )}
+          <div className="grid gap-5 lg:grid-cols-[430px_minmax(0,1fr)]">
+            <section className="space-y-3 lg:max-h-[calc(100vh-190px)] lg:overflow-y-auto lg:pr-1">
+              {jobs.map((job) => {
+                const active = selectedJob?.id === job.id;
+                return (
+                  <button
+                    key={job.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedJobId(job.id);
+                      setShowBidForm(null);
+                    }}
+                    className={`w-full rounded-lg border p-4 text-left transition ${active ? "border-blue-200 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:border-blue-100 hover:bg-slate-50"}`}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      {job.work_images?.[0] ? (
+                        <div className="h-20 w-24 shrink-0 overflow-hidden rounded-lg bg-slate-100">
+                          <img src={job.work_images[0].image_url} alt="" className="h-full w-full object-cover" />
+                        </div>
+                      ) : null}
+                      <div className="min-w-0">
+                        <h2 className="line-clamp-2 text-lg font-bold leading-6 text-blue-950">{jobTitle(job)}</h2>
+                        <div className="mt-3 space-y-1.5 text-sm font-semibold text-slate-500">
+                          <p className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4" />
+                            {job.address || job.city || "Approximate area"}
+                            {job.distance_km != null ? <span className="text-slate-400">· {job.distance_km} km</span> : null}
+                          </p>
+                          <p className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4" />
+                            {job.preferred_date ? new Date(job.preferred_date).toLocaleDateString() : "Flexible date"}
+                          </p>
+                        </div>
                       </div>
-                      {job.custom_tags && job.custom_tags.length > 0 && (
-                        <div className="mb-3 flex flex-wrap gap-2">
-                          {job.custom_tags.map((tag) => (
-                            <span key={tag} className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 ring-1 ring-red-100">
-                              {tag}
-                            </span>
+                      <p className="shrink-0 text-lg font-black text-blue-950">{budgetLabel(job)}</p>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${categoryColors[job.category_slug] || "bg-slate-100 text-slate-700"}`}>
+                        {categoryNames[job.category_slug] || job.category_slug}
+                      </span>
+                      <span className="inline-flex items-center gap-1 font-bold text-blue-600">
+                        <Gavel className="h-4 w-4" />
+                        {job.bid_count} offer{job.bid_count === 1 ? "" : "s"}
+                      </span>
+                      {job.work_image_count > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-slate-500">
+                          <ImageIcon className="h-4 w-4" />
+                          {job.work_image_count} photo{job.work_image_count === 1 ? "" : "s"}
+                        </span>
+                      ) : null}
+                    </div>
+                    {job.my_bid ? (
+                      <div className="mt-3 rounded-lg bg-white px-3 py-2 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+                        Your offer: {formatMoney(Number(job.my_bid.amount))} · {job.my_bid.status}
+                      </div>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </section>
+
+            {selectedJob ? (
+              <section className="rounded-lg border border-slate-200 bg-white p-6 lg:sticky lg:top-20 lg:self-start">
+                <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="rounded-full bg-green-100 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-green-800">Open</span>
+                      <span className={`rounded-full px-3 py-1 text-xs font-bold ${categoryColors[selectedJob.category_slug] || "bg-slate-100 text-slate-700"}`}>
+                        {categoryNames[selectedJob.category_slug] || selectedJob.category_slug}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-500">Posted {new Date(selectedJob.submitted_at).toLocaleDateString()}</span>
+                    </div>
+                    <h2 className="mt-6 text-4xl font-black leading-tight tracking-tight text-blue-950">{jobTitle(selectedJob)}</h2>
+
+                    <div className="mt-7 grid gap-5 md:grid-cols-3">
+                      <div className="flex gap-3">
+                        <MapPin className="mt-1 h-5 w-5 text-blue-950" />
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">Approx. location</p>
+                          <p className="font-semibold text-slate-800">{selectedJob.address || selectedJob.city || "Shared after acceptance"}</p>
+                          {selectedJob.distance_km != null ? <p className="text-sm text-slate-500">{selectedJob.distance_km} km away</p> : null}
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Calendar className="mt-1 h-5 w-5 text-blue-950" />
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">To be done</p>
+                          <p className="font-semibold text-slate-800">{selectedJob.preferred_date ? new Date(selectedJob.preferred_date).toLocaleDateString() : "Flexible date"}</p>
+                          <p className="text-sm text-slate-500">{selectedJob.preferred_time_start || "Anytime"}{selectedJob.preferred_time_end ? ` - ${selectedJob.preferred_time_end}` : ""}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <Clock className="mt-1 h-5 w-5 text-blue-950" />
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wide text-slate-500">Workload</p>
+                          <p className="font-semibold text-slate-800">{selectedJob.estimated_duration_hours ? `${selectedJob.estimated_duration_hours}h estimated` : "Duration not set"}</p>
+                          <p className="text-sm text-slate-500">{selectedJob.number_of_people_needed || 1} people needed</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {selectedJob.custom_tags && selectedJob.custom_tags.length > 0 && (
+                      <div className="mt-6 flex flex-wrap gap-2">
+                        {selectedJob.custom_tags.map((tag) => (
+                          <span key={tag} className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700 ring-1 ring-blue-100">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    <h3 className="mt-8 text-xl font-black text-blue-950">Details</h3>
+                    <p className="mt-3 whitespace-pre-wrap text-base leading-8 text-slate-700">{selectedJob.job_description || "No description provided."}</p>
+                    {selectedJob.work_images?.length ? (
+                      <div className="mt-8">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="h-5 w-5 text-blue-700" />
+                          <h3 className="text-xl font-black text-blue-950">Job photos</h3>
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
+                          {selectedJob.work_images.map((image, index) => (
+                            <a
+                              key={image.id}
+                              href={image.image_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="aspect-video overflow-hidden rounded-lg border border-slate-200 bg-slate-100"
+                            >
+                              <img src={image.image_url} alt={`Job photo ${index + 1}`} className="h-full w-full object-cover transition hover:scale-105" />
+                            </a>
                           ))}
                         </div>
-                      )}
-                      <p className="text-gray-800 text-sm leading-relaxed line-clamp-2">
-                        {job.job_description}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-lg font-bold text-gray-900">
-                        €{job.budget_range_min} - €{job.budget_range_max}
-                      </p>
-                      <p className="text-xs text-gray-500">Budget</p>
-                    </div>
+                      </div>
+                    ) : null}
                   </div>
 
-                  {/* Meta */}
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-500 mb-4">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {job.city}
-                    </span>
-                    {job.preferred_date && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {new Date(job.preferred_date).toLocaleDateString()}
-                      </span>
-                    )}
-                    {job.estimated_duration_hours && (
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        {job.estimated_duration_hours}h
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-400">
-                      Posted {new Date(job.submitted_at).toLocaleDateString()}
-                    </span>
-                  </div>
+                  <aside className="space-y-4">
+                    <div className="rounded-lg bg-slate-100 p-6 text-center">
+                      <p className="text-xs font-black uppercase tracking-wide text-slate-500">Task budget</p>
+                      <p className="mt-2 text-4xl font-black text-blue-950">{budgetLabel(selectedJob)}</p>
+                      <p className="mt-2 text-sm font-semibold text-slate-500">{selectedJob.bid_count} offer{selectedJob.bid_count === 1 ? "" : "s"} so far</p>
+                      <Link href={`/pro/jobs/${selectedJob.id}`} className="mt-5 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-sm font-bold text-blue-700 hover:bg-blue-50">
+                        Open full page
+                        <ArrowUpRight className="h-4 w-4" />
+                      </Link>
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    {job.my_bid ? (
-                      <div className="space-y-1">
-                        <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium ${
-                          job.my_bid.status === "accepted" ? "bg-green-100 text-green-700" :
-                          job.my_bid.status === "rejected" ? "bg-red-100 text-red-700" :
-                          job.my_bid.status === "withdrawn" ? "bg-gray-100 text-gray-500" :
-                          "bg-blue-100 text-blue-700"
-                        }`}>
-                          <Gavel className="w-4 h-4" />
-                          {job.my_bid.status === "pending" ? `Your quote: ${formatMoney(Number(job.my_bid.amount))}` :
-                           job.my_bid.status === "accepted" ? "Quote accepted" :
-                           job.my_bid.status === "rejected" ? "Quote declined" :
-                           "Quote withdrawn"}
+                    {selectedJob.my_bid ? (
+                      <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                        <div className="flex items-center gap-2 text-green-800">
+                          <CheckCircle2 className="h-5 w-5" />
+                          <p className="font-black">Your offer is sent</p>
                         </div>
-                        {job.my_bid.status === "pending" && (
-                          <p className="text-xs text-gray-500">
-                            Buyer sees total bid: {formatMoney(calculateBookingTokenBreakdown(Number(job.my_bid.amount)).buyerTotal)}
-                          </p>
+                        <p className="mt-2 text-sm font-semibold text-green-900">{formatMoney(Number(selectedJob.my_bid.amount))} · {selectedJob.my_bid.status}</p>
+                        {selectedJob.my_bid.status === "pending" && (
+                          <p className="mt-1 text-xs text-green-800">Buyer sees total bid: {formatMoney(calculateBookingTokenBreakdown(Number(selectedJob.my_bid.amount)).buyerTotal)}</p>
                         )}
+                      </div>
+                    ) : showBidForm === selectedJob.id ? (
+                      <div className="rounded-lg border border-slate-200 p-4">
+                        <BidForm
+                          inquiryId={selectedJob.id}
+                          budgetMin={selectedJob.budget_range_min}
+                          budgetMax={selectedJob.budget_range_max}
+                          onSubmit={handleBidSubmitted}
+                          onCancel={() => setShowBidForm(null)}
+                        />
                       </div>
                     ) : (
                       <button
                         disabled={!canPlaceBid}
-                        onClick={() => setShowBidForm(showBidForm === job.id ? null : job.id)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-xl text-sm font-medium hover:bg-red-700 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-500 transition-colors"
+                        onClick={() => setShowBidForm(selectedJob.id)}
+                        className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
                       >
-                        <DollarSign className="w-4 h-4" />
-                        {canPlaceBid ? "Place Bid" : "KYC Required"}
+                        <DollarSign className="h-4 w-4" />
+                        {canPlaceBid ? "Make an offer" : "KYC required"}
                       </button>
                     )}
-                    <button
-                      onClick={() => setExpandedJob(expandedJob === job.id ? null : job.id)}
-                      className="flex items-center gap-1 px-3 py-2 text-gray-500 hover:text-gray-700 text-sm"
-                    >
-                      {expandedJob === job.id ? (
-                        <>Less <ChevronUp className="w-4 h-4" /></>
-                      ) : (
-                        <>Details <ChevronDown className="w-4 h-4" /></>
-                      )}
-                    </button>
-                  </div>
+
+                    <div className="rounded-lg border border-slate-200 p-4">
+                      <p className="text-sm font-black text-blue-950">What you can see now</p>
+                      <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+                        <p>Approximate area only until acceptance.</p>
+                        <p>Buyer contact unlocks after paid acceptance.</p>
+                        <p>{selectedJob.work_image_count} photo{selectedJob.work_image_count === 1 ? "" : "s"} attached.</p>
+                      </div>
+                    </div>
+                  </aside>
                 </div>
-
-                {/* Expanded Details */}
-                {expandedJob === job.id && (
-                  <div className="px-5 pb-5 pt-0 border-t border-gray-100">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 text-sm">
-                      <div>
-                        <p className="text-gray-500">Subcategory</p>
-                        <p className="font-medium text-gray-900">
-                          {job.category_slug === "custom"
-                            ? "Flexible request"
-                            : job.subcategory_slug.startsWith("other-")
-                              ? "Other"
-                              : job.subcategory_slug}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Approx. area</p>
-                        <p className="font-medium text-gray-900">{job.address}</p>
-                        {job.distance_km != null && (
-                          <p className="text-xs text-gray-500">{job.distance_km} km away</p>
-                        )}
-                      </div>
-                      {job.preferred_time_start && (
-                        <div>
-                          <p className="text-gray-500">Time</p>
-                          <p className="font-medium text-gray-900">{job.preferred_time_start} - {job.preferred_time_end || "TBD"}</p>
-                        </div>
-                      )}
-                      {job.number_of_people_needed > 0 && (
-                        <div>
-                          <p className="text-gray-500">People Needed</p>
-                          <p className="font-medium text-gray-900">{job.number_of_people_needed}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-sm mb-1">Full Description</p>
-                      <p className="text-gray-800 text-sm leading-relaxed">{job.job_description}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bid Form */}
-                {showBidForm === job.id && !job.my_bid && (
-                  <div className="px-5 pb-5 border-t border-gray-100 pt-4">
-                    <BidForm
-                      inquiryId={job.id}
-                      budgetMin={job.budget_range_min}
-                      budgetMax={job.budget_range_max}
-                      onSubmit={handleBidSubmitted}
-                      onCancel={() => setShowBidForm(null)}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
+              </section>
+            ) : null}
           </div>
         )}
       </div>

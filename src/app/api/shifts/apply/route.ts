@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const business = post?.business as { status?: string } | null | undefined;
     const workerNiches = Array.isArray(workerProfile.niches) ? workerProfile.niches.map(String) : [];
 
-    if (!post || post.status !== "submitted" || business?.status !== "approved" || post.work_type === "freelance_service") {
+    if (!post || !["approved", "submitted"].includes(String(post.status || "").toLowerCase()) || business?.status !== "approved" || post.work_type === "freelance_service") {
       return NextResponse.json({ error: "This shift is not open for applications" }, { status: 409 });
     }
 

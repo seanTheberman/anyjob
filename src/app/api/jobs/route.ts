@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 function coarsePostalCode(postalCode?: string | null) {
@@ -24,6 +25,7 @@ function distanceKm(fromLat?: number | null, fromLng?: number | null, toLat?: nu
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
+    const admin = createAdminSupabaseClient() as never as { from(table: string): any };
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
     if (authError || !user) {
@@ -34,15 +36,14 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get("category");
     const city = searchParams.get("city");
 
-    // Fetch open inquiries for bidding. "submitted" is the canonical live status.
+    // Fetch approved/open inquiries for bidding. In the current Supabase enum,
+    // "submitted" is the live/admin-approved value and "pending" is review.
     let query = supabase
       .from("service_inquiries")
       .select("*")
-      .in("status", ["submitted", "live", "open", "pending"])
+      .eq("status", "submitted")
       .neq("user_id", user.id)
       .order("submitted_at", { ascending: false });
-
-    console.log("Jobs query:", query);
 
     if (category) {
       query = query.eq("category_slug", category);
@@ -75,12 +76,14 @@ export async function GET(request: NextRequest) {
           .eq("provider_id", user.id)
           .single();
 
-        // Get work images count
-        const { count: imageCount } = await supabase
+        // Use the admin client here because providers are allowed to inspect
+        // job photos even when storage rows are hidden by owner-only RLS.
+        const { data: workImages } = await admin
           .from("user_images")
-          .select("*", { count: "exact", head: true })
+          .select("id, image_url, created_at")
           .eq("inquiry_id", job.id)
-          .eq("image_type", "work_image");
+          .eq("image_type", "work_image")
+          .order("created_at", { ascending: true });
 
         const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(", ");
         const safeJob = { ...job };
@@ -104,7 +107,11 @@ export async function GET(request: NextRequest) {
           ),
           bid_count: bidCount || 0,
           my_bid: myBid || null,
-          work_image_count: imageCount || 0,
+          work_image_count: workImages?.length || 0,
+          work_images: (workImages || []).map((image: { id: string; image_url: string }) => ({
+            id: image.id,
+            image_url: image.image_url,
+          })),
         };
       })
     );

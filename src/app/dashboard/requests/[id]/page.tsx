@@ -57,6 +57,15 @@ interface Review {
   review_type: "buyer_to_seller" | "seller_to_buyer";
 }
 
+interface WorkImage {
+  id: string;
+  image_url: string;
+  public_id: string;
+  image_type: string;
+  title?: string;
+  description?: string;
+}
+
 // Helper function to get service name from slugs
 const getServiceName = (categorySlug: string, subcategorySlug: string) => {
   const categoryNames: { [key: string]: string } = {
@@ -103,6 +112,7 @@ export default function RequestDetailPage() {
   const [reviewFormType, setReviewFormType] = useState<"buyer_to_seller" | "seller_to_buyer">("buyer_to_seller");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [bids, setBids] = useState<Bid[]>([]);
+  const [workImages, setWorkImages] = useState<WorkImage[]>([]);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const supabase = createClient();
 
@@ -139,6 +149,19 @@ export default function RequestDetailPage() {
             if (bidsResponse.ok) {
               const bidsData = await bidsResponse.json();
               setBids(bidsData.bids || []);
+            }
+
+            const { data: imageData, error: imageError } = await supabase
+              .from("user_images")
+              .select("id,image_url,public_id,image_type,title,description")
+              .eq("inquiry_id", params.id)
+              .eq("image_type", "work_image")
+              .order("created_at", { ascending: true });
+
+            if (imageError) {
+              console.error("Error fetching work images:", imageError);
+            } else {
+              setWorkImages(imageData || []);
             }
           }
         }
@@ -374,6 +397,9 @@ export default function RequestDetailPage() {
                 imageType="work_image"
                 inquiryId={inquiry.id}
                 maxImages={8}
+                existingImages={workImages}
+                onUploadComplete={(image) => setWorkImages((current) => current.some((item) => item.id === image.id) ? current : [...current, image])}
+                onDeleteComplete={(imageId) => setWorkImages((current) => current.filter((image) => image.id !== imageId))}
                 compact
               />
             </div>
