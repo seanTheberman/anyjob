@@ -31,6 +31,7 @@ import {
   Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface ProviderLayoutProps {
   children: React.ReactNode;
@@ -68,6 +69,7 @@ const profileMenuItems = [
   { icon: Wrench, label: "My Services", href: "/pro/services", color: "text-gray-700" },
   { icon: DollarSign, label: "Earnings", href: "/pro/earnings", color: "text-gray-700" },
   { icon: Star, label: "Reviews & Ratings", href: "/pro/reviews", color: "text-gray-700" },
+  { icon: Bell, label: "Notifications", href: "/pro/notifications", color: "text-gray-700" },
   { icon: Award, label: "Badges & Achievements", href: "/pro/badges", color: "text-gray-700" },
   { icon: BarChart3, label: "Analytics", href: "/pro/analytics", color: "text-gray-700" },
   { icon: CreditCard, label: "Collection Settings", href: "/pro/earnings", color: "text-gray-700" },
@@ -206,10 +208,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
           {/* Right side - Notifications & Profile */}
           <div className="flex items-center gap-3">
-            <Link href="/pro/notifications" className="relative p-2 hover:bg-gray-100 rounded-full">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
+            <NotificationBell href="/pro/notifications" accent="green" />
             
             {/* Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
@@ -277,10 +276,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
           {/* Right side - Notifications & Menu */}
           <div className="flex items-center gap-2">
-            <Link href="/pro/notifications" className="relative p-2 hover:bg-gray-100 rounded-full">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
+            <NotificationBell href="/pro/notifications" accent="green" />
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
               className="p-2 hover:bg-gray-100 rounded-full"

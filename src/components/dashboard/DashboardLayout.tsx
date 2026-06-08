@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -56,7 +57,7 @@ const profileMenuItems = [
   { icon: Settings, label: "Account Settings", href: "/dashboard/account", color: "text-gray-700" },
   { icon: MapPin, label: "Addresses", href: "/dashboard/account?tab=addresses", color: "text-gray-700" },
   { icon: CreditCard, label: "Booking Token Payment", href: "/dashboard/account?tab=payment", color: "text-gray-700" },
-  { icon: Bell, label: "Notifications", href: "/dashboard/account?tab=notifications", color: "text-gray-700" },
+  { icon: Bell, label: "Notifications", href: "/dashboard/notifications", color: "text-gray-700" },
   { icon: Shield, label: "Security & Privacy", href: "/dashboard/account?tab=security", color: "text-gray-700" },
   { icon: FileText, label: "Terms & Policies", href: "/dashboard/help", color: "text-gray-700" },
   { icon: Moon, label: "Dark Mode", href: "#", color: "text-gray-700", isToggle: true },
@@ -153,10 +154,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Right side - Notifications & Profile */}
           <div className="flex items-center gap-3">
-            <Link href="/dashboard/account?tab=notifications" aria-label="Notifications" className="relative p-2 hover:bg-gray-100 rounded-full">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
+            <NotificationBell href="/dashboard/notifications" />
             
             {/* Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
@@ -222,10 +220,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Right side - Notifications & Menu */}
           <div className="flex items-center gap-2">
-            <Link href="/dashboard/account?tab=notifications" aria-label="Notifications" className="relative p-2 hover:bg-gray-100 rounded-full">
-              <Bell className="w-5 h-5 text-gray-600" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-            </Link>
+            <NotificationBell href="/dashboard/notifications" />
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
               className="p-2 hover:bg-gray-100 rounded-full"

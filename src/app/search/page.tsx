@@ -4,7 +4,9 @@ import { ArrowRight, ShieldCheck, ThumbsUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { BuyerProviderMarketplace } from "@/components/search/BuyerProviderMarketplace";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getMarketplaceProviders, getProviderCards, type ProviderCardData } from "@/lib/real-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -51,9 +53,53 @@ const SPRING_SERVICES = [
 ];
 
 
+async function getBuyerMarketplaceUser() {
+    const supabase = await createServerSupabaseClient();
+    const {
+        data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return null;
+
+    const [{ data: profile }, { data: seller }] = await Promise.all([
+        supabase
+            .from("eloo_profiles")
+            .select("role,first_name,last_name")
+            .eq("id", user.id)
+            .maybeSingle(),
+        supabase
+            .from("sellers")
+            .select("id,first_name,last_name")
+            .eq("id", user.id)
+            .maybeSingle(),
+    ]);
+
+    const role = String(profile?.role || user.user_metadata?.role || "client").toLowerCase();
+    if (seller || ["admin", "provider", "seller"].includes(role)) return null;
+
+    const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
+        || user.user_metadata?.first_name
+        || user.user_metadata?.full_name
+        || user.email?.split("@")[0]
+        || "there";
+
+    return { displayName };
+}
+
 export default async function CataloguePage() {
+    const buyer = await getBuyerMarketplaceUser();
+
+    if (buyer) {
+        const marketplaceProviders = await getMarketplaceProviders();
+        return <BuyerProviderMarketplace providers={marketplaceProviders} buyerName={buyer.displayName} />;
+    }
+
     const providers = await getProviderCards();
 
+    return <OriginalFindProviderPage providers={providers} />;
+}
+
+function OriginalFindProviderPage({ providers }: { providers: ProviderCardData[] }) {
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container - Wider than the rest, but constrained */}

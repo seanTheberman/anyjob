@@ -369,7 +369,7 @@ export function Header() {
                                                     <ClipboardList className="h-4 w-4" />
                                                     My requests
                                                 </Link>
-                                                <Link href="/dashboard/account?tab=notifications" onClick={() => setAccountMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                                                <Link href="/dashboard/notifications" onClick={() => setAccountMenuOpen(false)} className="flex items-center gap-2 px-4 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50">
                                                     <Bell className="h-4 w-4" />
                                                     Notifications
                                                 </Link>
@@ -520,13 +520,22 @@ export function Header() {
                                             Notifications
                                         </Link>
                                     ) : (
-                                        <Link
-                                            href="/dashboard/requests"
-                                            onClick={() => setMobileMenuOpen(false)}
-                                            className="block w-full rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700"
-                                        >
-                                            My requests
-                                        </Link>
+                                        <>
+                                            <Link
+                                                href="/dashboard/requests"
+                                                onClick={() => setMobileMenuOpen(false)}
+                                                className="block w-full rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700"
+                                            >
+                                                My requests
+                                            </Link>
+                                            <Link
+                                                href="/dashboard/notifications"
+                                                onClick={() => setMobileMenuOpen(false)}
+                                                className="block w-full rounded-xl border border-gray-200 px-4 py-3 text-center text-sm font-semibold text-gray-700"
+                                            >
+                                                Notifications
+                                            </Link>
+                                        </>
                                     )}
                                     <button
                                         type="button"

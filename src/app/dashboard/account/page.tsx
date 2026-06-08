@@ -31,7 +31,7 @@ const menuItems = [
   { icon: User, label: "Personal Information", href: "#personal" },
   { icon: MapPin, label: "Addresses", href: "#addresses" },
   { icon: CreditCard, label: "Booking Token Payment", href: "#payment" },
-  { icon: Bell, label: "Notifications", href: "#notifications" },
+  { icon: Bell, label: "Notifications", href: "/dashboard/notifications" },
   { icon: Shield, label: "Security", href: "#security" },
 ];
 
