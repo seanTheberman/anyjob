@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -32,6 +33,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { logoutClientSession } from "@/lib/auth/logout-client";
+import { InsuranceNotice } from "@/components/safety/InsuranceNotice";
 
 interface ProviderLayoutProps {
   children: React.ReactNode;
@@ -89,6 +92,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   const [loading, setLoading] = useState(true);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
+  const showDashboardInsuranceNotice = !pathname?.includes("/notifications");
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -128,9 +132,10 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   }, [supabase]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
-    router.push('/login');
+    setProfileDropdownOpen(false);
+    setUser(null);
+    await logoutClientSession();
+    router.replace('/login');
     router.refresh();
   };
 
@@ -197,9 +202,13 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
           {/* Logo */}
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2 group">
-              <span className="text-2xl sm:text-3xl font-cursive font-bold transition-colors duration-300 text-red-600 hover:text-red-700">
-                AnyJob
-              </span>
+              <Image
+                src="/anyjoblogo-removebg-preview.png"
+                alt="AnyJob"
+                width={120}
+                height={44}
+                className="h-10 w-auto"
+              />
             </Link>
             <span className="hidden sm:inline-flex items-center px-2.5 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
               Provider
@@ -265,9 +274,13 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
           {/* Logo */}
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl font-cursive font-bold text-red-600">
-                AnyJob
-              </span>
+              <Image
+                src="/anyjoblogo-removebg-preview.png"
+                alt="AnyJob"
+                width={104}
+                height={38}
+                className="h-9 w-auto"
+              />
             </Link>
             <span className="inline-flex items-center px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
               Pro
@@ -418,6 +431,11 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
         {/* Main Content */}
         <main className="flex-1 min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">
+          {showDashboardInsuranceNotice ? (
+            <div className="mb-4 lg:mb-6">
+              <InsuranceNotice accent="green" />
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

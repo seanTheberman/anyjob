@@ -1,10 +1,11 @@
 "use client";
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
-import { Edit2, Save, ShieldCheck } from "lucide-react";
-import { useMemo, useState, useEffect } from "react";
+import { Edit2, ExternalLink, Save, ShieldCheck } from "lucide-react";
+import { useState, useEffect } from "react";
 import { ImageUploader } from "@/components/upload/ImageUploader";
-import { createClient } from "@/lib/supabase/client";
+import { CATEGORIES } from "@/lib/categories";
+import { ProviderMediaManager } from "./ProviderMediaManager";
 
 interface UploadedFile {
   id: string;
@@ -21,9 +22,14 @@ type ProfileState = {
   email: string;
   phone: string;
   bio: string;
+  serviceCategory: string;
+  experienceLevel: string;
+  availabilityMode: string;
+  availabilityNote: string;
   address: string;
   city: string;
   postalCode: string;
+  country: string;
   hourlyRate: number;
   profileImageUrl: string;
   rating: number;
@@ -37,9 +43,14 @@ const emptyProfile: ProfileState = {
   email: "",
   phone: "",
   bio: "",
+  serviceCategory: "",
+  experienceLevel: "",
+  availabilityMode: "This week",
+  availabilityNote: "",
   address: "",
   city: "",
   postalCode: "",
+  country: "France",
   hourlyRate: 0,
   profileImageUrl: "",
   rating: 0,
@@ -47,70 +58,91 @@ const emptyProfile: ProfileState = {
   kycStatus: "not_started",
 };
 
+const availabilityOptions = ["Today", "This week", "Weekends", "Evenings", "Remote"];
+const experienceOptions = ["New provider", "Beginner", "Intermediate", "Experienced", "Expert", "Agency"];
+
+function availabilityFields(value: unknown) {
+  const data = value && typeof value === "object" ? value as { marketplaceAvailability?: unknown; note?: unknown } : {};
+  const marketplaceAvailability = typeof data.marketplaceAvailability === "string" && availabilityOptions.includes(data.marketplaceAvailability)
+    ? data.marketplaceAvailability
+    : "This week";
+
+  return {
+    availabilityMode: marketplaceAvailability,
+    availabilityNote: typeof data.note === "string" ? data.note : "",
+  };
+}
+
 export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false);
   const [profile, setProfile] = useState<ProfileState>(emptyProfile);
   const [savedProfile, setSavedProfile] = useState<ProfileState>(emptyProfile);
   const [kycFiles, setKycFiles] = useState<UploadedFile[]>([]);
+  const [portfolioFiles, setPortfolioFiles] = useState<UploadedFile[]>([]);
+  const [portfolioVideo, setPortfolioVideo] = useState<UploadedFile | null>(null);
+  const [providerId, setProviderId] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const loadProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      setProfileLoading(true);
+      try {
+        const response = await fetch("/api/provider/profile", { cache: "no-store" });
+        const payload = response.ok ? await response.json().catch(() => null) : null;
+        if (!response.ok || !payload?.user) {
+          setSaveError(payload?.error || "Could not load provider profile.");
+          return;
+        }
 
-      const { data: seller } = await supabase
-        .from("sellers")
-        .select("*")
-        .eq("id", user.id)
-        .single();
+        const user = payload.user as { id: string; email?: string };
+        const seller = payload.seller;
+        const files = (payload.files || []) as UploadedFile[];
 
-      if (seller) {
-        const nextProfile = {
-          firstName: seller.first_name || "",
-          lastName: seller.last_name || "",
-          email: seller.email || user.email || "",
-          phone: seller.phone || "",
-          bio: seller.description || "",
-          address: seller.address || "",
-          city: seller.city || "",
-          postalCode: seller.postal_code || "",
-          hourlyRate: seller.hourly_rate || 0,
-          profileImageUrl: seller.profile_image_url || "",
-          rating: seller.rating || 0,
-          totalJobs: seller.total_jobs || 0,
-          kycStatus: seller.verification_status || "not_started",
-        };
-        setProfile(nextProfile);
-        setSavedProfile(nextProfile);
+        setProviderId(user.id);
+
+        if (seller) {
+          const availability = availabilityFields(seller.availability);
+          const nextProfile = {
+            firstName: seller.first_name || "",
+            lastName: seller.last_name || "",
+            email: seller.email || user.email || "",
+            phone: seller.phone || "",
+            bio: seller.description || "",
+            serviceCategory: seller.service_category || "",
+            experienceLevel: seller.experience_level || "",
+            availabilityMode: availability.availabilityMode,
+            availabilityNote: availability.availabilityNote,
+            address: seller.address || "",
+            city: seller.city || "",
+            postalCode: seller.postal_code || "",
+            country: seller.country || "France",
+            hourlyRate: seller.hourly_rate || 0,
+            profileImageUrl: seller.profile_image_url || "",
+            rating: seller.rating || 0,
+            totalJobs: seller.total_jobs || 0,
+            kycStatus: seller.verification_status || "not_started",
+          };
+          setProfile(nextProfile);
+          setSavedProfile(nextProfile);
+        }
+
+        setKycFiles(files.filter((file) => ["id_document", "selfie_video"].includes(file.image_type)));
+        setPortfolioFiles(files.filter((file) => file.image_type === "portfolio"));
+        setPortfolioVideo(files.find((file) => file.image_type === "portfolio_video") || null);
+      } finally {
+        setProfileLoading(false);
       }
-
-      const { data: files } = await supabase
-        .from("user_images")
-        .select("id,image_url,public_id,image_type,title,description")
-        .eq("user_id", user.id)
-        .in("image_type", ["id_document", "selfie_video"])
-        .order("created_at", { ascending: false });
-
-      setKycFiles(files || []);
     };
     loadProfile();
-  }, [supabase]);
+  }, []);
 
   async function saveProfile() {
     setSaving(true);
     setSaveError(null);
     setSaveMessage(null);
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setSaving(false);
-      setSaveError("Sign in again before saving profile changes.");
-      return;
-    }
 
     const normalizedProfile = {
       ...profile,
@@ -119,9 +151,14 @@ export default function ProfilePage() {
       email: profile.email.trim().toLowerCase(),
       phone: profile.phone.trim(),
       bio: profile.bio.trim(),
+      serviceCategory: profile.serviceCategory.trim(),
+      experienceLevel: profile.experienceLevel.trim(),
+      availabilityMode: availabilityOptions.includes(profile.availabilityMode) ? profile.availabilityMode : "This week",
+      availabilityNote: profile.availabilityNote.trim(),
       address: profile.address.trim(),
       city: profile.city.trim(),
       postalCode: profile.postalCode.trim(),
+      country: profile.country.trim() || "France",
       hourlyRate: Number.isFinite(profile.hourlyRate) ? profile.hourlyRate : 0,
     };
 
@@ -137,39 +174,16 @@ export default function ProfilePage() {
       return;
     }
 
-    const sellerUpdate = {
-      first_name: normalizedProfile.firstName,
-      last_name: normalizedProfile.lastName,
-      email: normalizedProfile.email,
-      phone: normalizedProfile.phone,
-      description: normalizedProfile.bio || null,
-      address: normalizedProfile.address,
-      city: normalizedProfile.city,
-      postal_code: normalizedProfile.postalCode,
-      hourly_rate: normalizedProfile.hourlyRate,
-      profile_image_url: normalizedProfile.profileImageUrl || null,
-    };
+    const response = await fetch("/api/provider/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(normalizedProfile),
+    });
+    const payload = await response.json().catch(() => null);
 
-    const profileUpdate = {
-      first_name: normalizedProfile.firstName,
-      last_name: normalizedProfile.lastName,
-      email: normalizedProfile.email,
-      phone: normalizedProfile.phone,
-      bio: normalizedProfile.bio || null,
-      city: normalizedProfile.city,
-      postal_code: normalizedProfile.postalCode,
-      avatar_url: normalizedProfile.profileImageUrl || null,
-      updated_at: new Date().toISOString(),
-    };
-
-    const [sellerResult, profileResult] = await Promise.all([
-      supabase.from("sellers").update(sellerUpdate).eq("id", user.id),
-      supabase.from("eloo_profiles").update(profileUpdate).eq("id", user.id),
-    ]);
-
-    if (sellerResult.error || profileResult.error) {
+    if (!response.ok) {
       setSaving(false);
-      setSaveError(sellerResult.error?.message || profileResult.error?.message || "Profile changes could not be saved.");
+      setSaveError(payload?.error || "Profile changes could not be saved.");
       return;
     }
 
@@ -216,7 +230,7 @@ export default function ProfilePage() {
                   setIsEditing(true);
                 }
               }}
-              disabled={saving}
+              disabled={saving || profileLoading}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:opacity-70"
             >
               {isEditing ? (
@@ -227,7 +241,7 @@ export default function ProfilePage() {
               ) : (
                 <>
                   <Edit2 className="w-4 h-4" />
-                  Edit Profile
+                  {profileLoading ? "Loading..." : "Edit Profile"}
                 </>
               )}
             </button>
@@ -277,6 +291,118 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Public Profile Fields */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Public Fiverr-style profile</h3>
+              <p className="text-sm text-gray-500">These fields power your public provider page, search card, package pricing, and booking profile.</p>
+            </div>
+            {providerId ? (
+              <a
+                href={`/providers/${providerId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-fit items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                View public profile
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            ) : null}
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label htmlFor="service-category" className="block text-sm font-medium text-gray-700 mb-1">Main service category</label>
+              <select
+                id="service-category"
+                value={profile.serviceCategory}
+                onChange={(e) => setProfile({ ...profile, serviceCategory: e.target.value })}
+                disabled={!isEditing}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              >
+                <option value="">Choose category</option>
+                {CATEGORIES.map((category) => (
+                  <option key={category.slug} value={category.name}>{category.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="experience-level" className="block text-sm font-medium text-gray-700 mb-1">Seller experience level</label>
+              <select
+                id="experience-level"
+                value={profile.experienceLevel}
+                onChange={(e) => setProfile({ ...profile, experienceLevel: e.target.value })}
+                disabled={!isEditing}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              >
+                <option value="">Choose experience</option>
+                {experienceOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="availability-mode" className="block text-sm font-medium text-gray-700 mb-1">Marketplace availability</label>
+              <select
+                id="availability-mode"
+                value={profile.availabilityMode}
+                onChange={(e) => setProfile({ ...profile, availabilityMode: e.target.value })}
+                disabled={!isEditing}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              >
+                {availabilityOptions.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="starting-rate" className="block text-sm font-medium text-gray-700 mb-1">Starting rate</label>
+              <div className="flex rounded-lg border border-gray-200 focus-within:ring-2 focus-within:ring-blue-500">
+                <span className="flex items-center border-r border-gray-200 px-3 text-sm font-semibold text-gray-500">$</span>
+                <input
+                  id="starting-rate"
+                  type="number"
+                  min={0}
+                  value={profile.hourlyRate}
+                  onChange={(e) => setProfile({ ...profile, hourlyRate: Number(e.target.value) })}
+                  disabled={!isEditing}
+                  className="w-full rounded-r-lg px-4 py-2 focus:outline-none disabled:bg-gray-50"
+                />
+              </div>
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="availability-note" className="block text-sm font-medium text-gray-700 mb-1">Availability note shown on profile</label>
+              <input
+                id="availability-note"
+                type="text"
+                value={profile.availabilityNote}
+                onChange={(e) => setProfile({ ...profile, availabilityNote: e.target.value })}
+                disabled={!isEditing}
+                placeholder="Example: Usually available within 24 hours, evenings preferred"
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label htmlFor="public-bio" className="block text-sm font-medium text-gray-700 mb-1">About this gig / public bio</label>
+              <textarea
+                id="public-bio"
+                value={profile.bio}
+                onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
+                disabled={!isEditing}
+                rows={5}
+                placeholder="Describe what buyers get, your process, what you specialize in, and why they should book you."
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              />
+            </div>
+          </div>
+        </div>
+
         {/* KYC Verification */}
         <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-5">
@@ -315,12 +441,13 @@ export default function ProfilePage() {
 
         {/* Portfolio */}
         <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Portfolio</h3>
-          <p className="text-sm text-gray-500 mb-4">Showcase your best work to attract clients</p>
-          <ImageUploader
-            imageType="portfolio"
-            maxImages={12}
-            label=""
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Marketplace media</h3>
+          <p className="text-sm text-gray-500 mb-4">Add up to four photos and one video for your public provider page.</p>
+          <ProviderMediaManager
+            initialImages={portfolioFiles}
+            initialVideo={portfolioVideo}
+            onImagesChange={setPortfolioFiles}
+            onVideoChange={setPortfolioVideo}
           />
         </div>
 
@@ -368,16 +495,6 @@ export default function ProfilePage() {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
-              <textarea
-                value={profile.bio}
-                onChange={(e) => setProfile({ ...profile, bio: e.target.value })}
-                disabled={!isEditing}
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-              />
-            </div>
           </div>
         </div>
 
@@ -415,21 +532,16 @@ export default function ProfilePage() {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               />
             </div>
-          </div>
-        </div>
-
-        {/* Pricing */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Pricing</h3>
-          <div className="max-w-xs">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Hourly Rate (£)</label>
-            <input
-              type="number"
-              value={profile.hourlyRate}
-              onChange={(e) => setProfile({ ...profile, hourlyRate: Number(e.target.value) })}
-              disabled={!isEditing}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+              <input
+                type="text"
+                value={profile.country}
+                onChange={(e) => setProfile({ ...profile, country: e.target.value })}
+                disabled={!isEditing}
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+              />
+            </div>
           </div>
         </div>
       </div>

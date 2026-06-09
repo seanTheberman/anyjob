@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const CATEGORY_LINKS = [
     { href: "/search?cat=menage", label: "Cleaning" },
@@ -43,9 +44,13 @@ export function Footer() {
                     {/* Brand */}
                     <div className="space-y-4">
                         <Link href="/" className="flex items-center gap-2 group">
-                            <span className="text-2xl sm:text-3xl font-cursive font-bold text-red-500 transition-colors duration-300">
-                                AnyJob
-                            </span>
+                            <Image
+                                src="/anyjoblogo-removebg-preview.png"
+                                alt="AnyJob"
+                                width={126}
+                                height={46}
+                                className="h-11 w-auto brightness-110"
+                            />
                         </Link>
                         <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
                             Find and book rated and qualified home service 

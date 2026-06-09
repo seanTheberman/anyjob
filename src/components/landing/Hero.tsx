@@ -3,13 +3,26 @@
 import { useState, useEffect } from "react";
 import { CATEGORIES } from "@/lib/categories";
 
+const JOB_MODES = ["Day to day jobs", "Work shifts"] as const;
+
 export function Hero() {
     const [selectedLanguage, setSelectedLanguage] = useState("en");
     const [isClient, setIsClient] = useState(false);
+    const [selectedJobMode, setSelectedJobMode] = useState<(typeof JOB_MODES)[number]>("Day to day jobs");
+
+    function handleJobModeChange(mode: (typeof JOB_MODES)[number]) {
+        setSelectedJobMode(mode);
+        localStorage.setItem("home_job_mode", mode);
+        window.dispatchEvent(new CustomEvent("homeJobModeChanged", { detail: { mode } }));
+    }
 
     // Set isClient flag after mount
     useEffect(() => {
         setIsClient(true);
+        const savedMode = localStorage.getItem("home_job_mode");
+        if (savedMode === "Day to day jobs" || savedMode === "Work shifts") {
+            setSelectedJobMode(savedMode);
+        }
     }, []);
 
     // Detect language based on geolocation (timezone)
@@ -117,11 +130,41 @@ export function Hero() {
                     <span className="text-red-400">provider</span>
                 </h1>
 
-                {/* Subtitle */}
-                <p className="text-base sm:text-lg md:text-xl text-white/70 max-w-2xl mx-auto mb-16 sm:mb-20">
-                    Trusted home services: cleaning, DIY, gardening, moving and much
-                    more.
-                </p>
+                {/* Job mode selector */}
+                <fieldset className="mx-auto mb-16 max-w-2xl sm:mb-20">
+                    <legend className="sr-only">Choose job type</legend>
+                    <div className="grid gap-3 rounded-3xl border border-white/15 bg-white/10 p-2 backdrop-blur-md sm:grid-cols-2 sm:rounded-full">
+                        {JOB_MODES.map((mode) => {
+                            const isSelected = selectedJobMode === mode;
+                            return (
+                                <label
+                                    key={mode}
+                                    className={`flex cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition-colors sm:text-base ${
+                                        isSelected
+                                            ? "bg-white text-gray-950 shadow-sm"
+                                            : "text-white/80 hover:bg-white/10 hover:text-white"
+                                    }`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="jobMode"
+                                        value={mode}
+                                        checked={isSelected}
+                                        onChange={() => handleJobModeChange(mode)}
+                                        className="sr-only"
+                                    />
+                                    <span
+                                        aria-hidden="true"
+                                        className={`h-3.5 w-3.5 rounded-full border ${
+                                            isSelected ? "border-red-600 bg-red-600 ring-2 ring-red-100" : "border-white/60"
+                                        }`}
+                                    />
+                                    <span>{mode}</span>
+                                </label>
+                            );
+                        })}
+                    </div>
+                </fieldset>
 
                 {/* Popular searches */}
                 <div className="flex flex-wrap items-center justify-center gap-2 mt-20 sm:mt-24">

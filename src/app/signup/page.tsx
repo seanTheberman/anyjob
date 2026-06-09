@@ -3,15 +3,23 @@
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, EyeOff, ArrowRight, Loader2, User, Briefcase } from "lucide-react";
 
+function safeRedirect(value: string | null) {
+    if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+    return value;
+}
+
 function SignupPageContent() {
     const searchParams = useSearchParams();
     const roleParam = searchParams.get("role");
+    const redirectTarget = safeRedirect(searchParams.get("redirect"));
+    const isBusinessRegistrationSignup = searchParams.get("flow") === "business" || redirectTarget === "/register-business";
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -20,8 +28,9 @@ function SignupPageContent() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [role, setRole] = useState<"client" | "provider">(
-        roleParam === "client" || roleParam === "provider" ? roleParam : "client"
+        isBusinessRegistrationSignup ? "client" : roleParam === "client" || roleParam === "provider" ? roleParam : "client"
     );
+    const signupRole = isBusinessRegistrationSignup ? "client" : role;
 
     async function handleSignup(e: React.FormEvent) {
         e.preventDefault();
@@ -38,7 +47,7 @@ function SignupPageContent() {
                 data: {
                     first_name: firstName,
                     last_name: lastName,
-                    role: role,
+                    role: signupRole,
                 },
             },
         });
@@ -55,7 +64,7 @@ function SignupPageContent() {
                 .from('eloo_profiles')
                 .upsert({
                     id: authData.user.id,
-                    role: role,
+                    role: signupRole,
                     first_name: firstName,
                     last_name: lastName,
                     email: email,
@@ -69,7 +78,7 @@ function SignupPageContent() {
                 return;
             }
 
-            if (role === 'provider') {
+            if (signupRole === 'provider') {
                 const providerProfile = await fetch("/api/auth/provider-profile", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -84,8 +93,13 @@ function SignupPageContent() {
                 }
             }
 
-            // Redirect to appropriate dashboard
-            if (role === 'provider') {
+            // Redirect to requested onboarding flow, or the appropriate dashboard.
+            if (redirectTarget) {
+                window.location.href = redirectTarget;
+                return;
+            }
+
+            if (signupRole === 'provider') {
                 window.location.href = "/pro";
             } else {
                 window.location.href = "/dashboard";
@@ -97,10 +111,12 @@ function SignupPageContent() {
 
     async function handleGoogleSignup() {
         const supabase = createClient();
+        const callbackParams = new URLSearchParams({ role: signupRole });
+        if (redirectTarget) callbackParams.set("next", redirectTarget);
         await supabase.auth.signInWithOAuth({
             provider: "google",
             options: {
-                redirectTo: `${window.location.origin}/auth/callback?role=${role}`,
+                redirectTo: `${window.location.origin}/auth/callback?${callbackParams.toString()}`,
                 queryParams: {
                     access_type: 'offline',
                     prompt: 'consent',
@@ -114,44 +130,71 @@ function SignupPageContent() {
             <div className="w-full max-w-md space-y-6">
                 {/* Logo */}
                 <div className="text-center">
-                    <h1 className="text-4xl font-bold text-red-600">AnyJob</h1>
+                    <Image
+                        src="/anyjoblogo-removebg-preview.png"
+                        alt="AnyJob"
+                        width={150}
+                        height={55}
+                        priority
+                        className="mx-auto h-14 w-auto"
+                    />
                     <p className="text-gray-600 mt-2">
-                        Create your {role === 'provider' ? 'provider' : 'client'} account
+                        {isBusinessRegistrationSignup
+                            ? "Create your account to register a business"
+                            : `Create your ${role === 'provider' ? 'provider' : 'client'} account`}
                     </p>
                 </div>
 
                 {/* Role Toggle */}
-                <Card>
-                    <CardContent className="p-4">
-                        <div className="flex gap-2">
-                            <Button
-                                variant={role === 'client' ? 'default' : 'outline'}
-                                className="flex-1"
-                                onClick={() => setRole('client')}
-                            >
-                                <User className="w-4 h-4 mr-2" />
-                                Client
-                            </Button>
-                            <Button
-                                variant={role === 'provider' ? 'default' : 'outline'}
-                                className="flex-1"
-                                onClick={() => setRole('provider')}
-                            >
-                                <Briefcase className="w-4 h-4 mr-2" />
-                                Provider
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+                {isBusinessRegistrationSignup ? (
+                    <Card className="border-amber-200 bg-amber-50">
+                        <CardContent className="p-4">
+                            <div className="flex items-start gap-3 text-amber-950">
+                                <Briefcase className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+                                <div>
+                                    <p className="text-sm font-bold">Business registration account</p>
+                                    <p className="mt-1 text-sm leading-6 text-amber-900">
+                                        Create a standard account first. After signup, you will continue to the business registration questionnaire for verification.
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <Card>
+                        <CardContent className="p-4">
+                            <div className="flex gap-2">
+                                <Button
+                                    variant={role === 'client' ? 'default' : 'outline'}
+                                    className="flex-1"
+                                    onClick={() => setRole('client')}
+                                >
+                                    <User className="w-4 h-4 mr-2" />
+                                    Client
+                                </Button>
+                                <Button
+                                    variant={role === 'provider' ? 'default' : 'outline'}
+                                    className="flex-1"
+                                    onClick={() => setRole('provider')}
+                                >
+                                    <Briefcase className="w-4 h-4 mr-2" />
+                                    Provider
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Signup Form */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-xl">
-                            Join as {role === 'provider' ? 'Service Provider' : 'Client'}
+                            {isBusinessRegistrationSignup ? "Create account for business registration" : `Join as ${role === 'provider' ? 'Service Provider' : 'Client'}`}
                         </CardTitle>
                         <CardDescription>
-                            {role === 'provider' 
+                            {isBusinessRegistrationSignup
+                                ? "You will be sent to the business registration flow after account creation."
+                                : role === 'provider' 
                                 ? 'Start offering your services to clients'
                                 : 'Book services from trusted providers'
                             }
@@ -222,7 +265,7 @@ function SignupPageContent() {
                                     </>
                                 ) : (
                                     <>
-                                        Create Account
+                                        {isBusinessRegistrationSignup ? "Create account and continue" : "Create Account"}
                                         <ArrowRight className="w-4 h-4 ml-2" />
                                     </>
                                 )}
@@ -269,7 +312,7 @@ function SignupPageContent() {
                 {/* Login Link */}
                 <div className="text-center text-sm text-gray-600">
                     Already have an account?{" "}
-                    <Link href="/login" className="text-red-600 hover:text-red-700 font-semibold">
+                    <Link href={isBusinessRegistrationSignup ? "/login?redirect=/register-business" : "/login"} className="text-red-600 hover:text-red-700 font-semibold">
                         Sign in
                     </Link>
                 </div>

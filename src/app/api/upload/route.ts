@@ -8,7 +8,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const UPLOAD_TYPES = ["profile", "portfolio", "work_image", "id_document", "selfie_video"] as const;
+const UPLOAD_TYPES = ["profile", "portfolio", "portfolio_video", "work_image", "id_document", "selfie_video"] as const;
 type UploadType = (typeof UPLOAD_TYPES)[number];
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -16,7 +16,7 @@ const DOCUMENT_TYPES = [...IMAGE_TYPES, "application/pdf"];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
 function getUploadRules(imageType: UploadType) {
-  if (imageType === "selfie_video") {
+  if (imageType === "selfie_video" || imageType === "portfolio_video") {
     return {
       allowedTypes: VIDEO_TYPES,
       maxSize: 100 * 1024 * 1024,
@@ -69,6 +69,16 @@ async function syncKycUpload(
     .eq("id", userId);
 }
 
+function marketplaceUploadLimit(imageType: UploadType) {
+  if (imageType === "portfolio") return 4;
+  if (imageType === "portfolio_video") return 1;
+  return null;
+}
+
+function resourceTypeForDelete(imageType: UploadType | string) {
+  return imageType === "selfie_video" || imageType === "portfolio_video" ? "video" as const : "image" as const;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -100,6 +110,24 @@ export async function POST(request: NextRequest) {
 
     if (file.size > rules.maxSize) {
       return NextResponse.json({ error: `File too large. Max ${Math.round(rules.maxSize / 1024 / 1024)}MB` }, { status: 400 });
+    }
+
+    const uploadLimit = marketplaceUploadLimit(imageType);
+    if (uploadLimit !== null) {
+      const { count, error: countError } = await supabase
+        .from("user_images")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("image_type", imageType);
+
+      if (countError) {
+        return NextResponse.json({ error: "Could not validate upload limit" }, { status: 500 });
+      }
+
+      if ((count || 0) >= uploadLimit) {
+        const noun = imageType === "portfolio_video" ? "portfolio video" : "portfolio images";
+        return NextResponse.json({ error: `Maximum ${uploadLimit} ${noun} allowed` }, { status: 400 });
+      }
     }
 
     // Convert file to buffer for Cloudinary upload
@@ -141,7 +169,7 @@ export async function POST(request: NextRequest) {
 
     if (dbError) {
       // Try to clean up Cloudinary upload if DB save fails
-      await cloudinary.uploader.destroy(uploadResult.public_id).catch(() => {});
+      await cloudinary.uploader.destroy(uploadResult.public_id, { resource_type: rules.resourceType }).catch(() => {});
       return NextResponse.json({ error: "Failed to save image record" }, { status: 500 });
     }
 
@@ -166,6 +194,50 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const imageId = searchParams.get("id");
+    const body = await request.json().catch(() => ({})) as { title?: unknown; description?: unknown };
+
+    if (!imageId) {
+      return NextResponse.json({ error: "Image ID required" }, { status: 400 });
+    }
+
+    const update: { title?: string | null; description?: string | null } = {};
+    if ("title" in body) update.title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : null;
+    if ("description" in body) update.description = typeof body.description === "string" && body.description.trim() ? body.description.trim() : null;
+
+    if (!Object.keys(update).length) {
+      return NextResponse.json({ error: "No editable fields provided" }, { status: 400 });
+    }
+
+    const { data: image, error } = await supabase
+      .from("user_images")
+      .update(update)
+      .eq("id", imageId)
+      .eq("user_id", user.id)
+      .select()
+      .single();
+
+    if (error || !image) {
+      return NextResponse.json({ error: "Image not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ image });
+  } catch (error) {
+    console.error("Upload update error:", error);
+    return NextResponse.json({ error: "Update failed" }, { status: 500 });
   }
 }
 
@@ -198,7 +270,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete from Cloudinary
-    await cloudinary.uploader.destroy(image.public_id).catch(() => {});
+    await cloudinary.uploader.destroy(image.public_id, { resource_type: resourceTypeForDelete(image.image_type) }).catch(() => {});
 
     // Delete from database
     await supabase.from("user_images").delete().eq("id", imageId);

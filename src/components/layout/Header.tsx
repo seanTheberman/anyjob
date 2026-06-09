@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
+import { logoutClientSession } from "@/lib/auth/logout-client";
 import {
     getTaskrabbitCategoryHref,
     getTaskrabbitServiceHref,
@@ -213,6 +215,25 @@ export function Header() {
         return () => document.removeEventListener("mousedown", closeAccountMenu);
     }, []);
 
+    useEffect(() => {
+        if (!mobileMenuOpen) return;
+
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        function closeOnEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") {
+                setMobileMenuOpen(false);
+            }
+        }
+
+        window.addEventListener("keydown", closeOnEscape);
+        return () => {
+            document.body.style.overflow = originalOverflow;
+            window.removeEventListener("keydown", closeOnEscape);
+        };
+    }, [mobileMenuOpen]);
+
     // Force scrolled state (white background/dark text) on non-home pages
     const showSolidStyle = !isHomePage || isScrolled;
     const navLinkClass = showSolidStyle
@@ -246,22 +267,22 @@ export function Header() {
     async function handleLogout() {
         if (loggingOut) return;
         setLoggingOut(true);
-        const supabase = createClient();
-        await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
-        await supabase.auth.signOut().catch(() => null);
+        setAccountMenuOpen(false);
+        setMobileMenuOpen(false);
         setUser(null);
         setAccount(null);
         setCachedHeaderAccount(null);
         setUserRole(null);
+        setHasBusinessProfile(false);
         setAuthResolved(true);
-        setAccountMenuOpen(false);
+        await logoutClientSession();
         router.replace("/");
         router.refresh();
     }
 
     return (
         <header
-            className={`fixed top-0 left-0 right-0 z-[100001] transition-all duration-300 ${showSolidStyle
+            className={`fixed top-0 left-0 right-0 z-[100030] transition-all duration-300 ${showSolidStyle
                 ? "bg-white/90 dark:bg-gray-950/90 backdrop-blur-xl shadow-lg shadow-black/5 border-b"
                 : "bg-transparent"
                 }`}
@@ -270,9 +291,14 @@ export function Header() {
                 <div className="flex items-center justify-between h-16 sm:h-20">
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2 group">
-                        <span className={`text-2xl sm:text-3xl font-cursive font-bold transition-colors duration-300 ${showSolidStyle ? 'text-red-500' : 'text-white'}`}>
-                            AnyJob
-                        </span>
+                        <Image
+                            src="/anyjoblogo-removebg-preview.png"
+                            alt="AnyJob"
+                            width={132}
+                            height={48}
+                            priority
+                            className={`h-10 w-auto transition duration-300 sm:h-12 ${showSolidStyle ? "" : "drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"}`}
+                        />
                     </Link>
 
                     {/* Desktop Nav */}
@@ -412,23 +438,27 @@ export function Header() {
                 </div>
             </div>
             {mobileMenuOpen && (
-                <div className="fixed inset-0 z-[100002] lg:hidden">
+                <div className="fixed inset-0 z-[100050] bg-white text-gray-950 dark:bg-gray-950 dark:text-white lg:hidden">
                     <button
                         type="button"
                         aria-label="Close menu backdrop"
-                        className="absolute inset-0 bg-black/20"
+                        className="absolute inset-0 hidden"
                         onClick={() => setMobileMenuOpen(false)}
                     />
                     <div
                         role="dialog"
                         aria-modal="true"
                         aria-label="Mobile navigation"
-                        className="absolute inset-y-0 right-0 flex w-80 max-w-[85vw] flex-col bg-white shadow-2xl dark:bg-gray-950"
+                        className="relative z-10 flex h-[100dvh] w-full flex-col bg-white dark:bg-gray-950"
                     >
-                        <div className="flex items-center justify-between border-b p-6">
-                            <span className="text-2xl font-cursive font-bold text-red-600">
-                                AnyJob
-                            </span>
+                        <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-5 shadow-sm dark:border-gray-800">
+                            <Image
+                                src="/anyjoblogo-removebg-preview.png"
+                                alt="AnyJob"
+                                width={122}
+                                height={44}
+                                className="h-10 w-auto"
+                            />
                             <button
                                 type="button"
                                 aria-label="Close menu"
@@ -438,7 +468,7 @@ export function Header() {
                                 <X className="h-5 w-5" />
                             </button>
                         </div>
-                        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+                        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4">
                             <button
                                 type="button"
                                 aria-expanded={mobileCategoriesOpen}
@@ -499,7 +529,10 @@ export function Header() {
                                 </Link>
                             ))}
                         </nav>
-                        <div className="p-4 border-t space-y-2">
+                        <div
+                            className="shrink-0 space-y-2 border-t border-gray-100 bg-white px-4 pt-4 shadow-[0_-16px_32px_rgba(15,23,42,0.08)] dark:border-gray-800 dark:bg-gray-950"
+                            style={{ paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
+                        >
                             {!authResolved && !isAuthenticated ? (
                                 <div className="h-11 w-full rounded-xl bg-gray-100" aria-hidden="true" />
                             ) : isAuthenticated ? (

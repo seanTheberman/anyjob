@@ -19,15 +19,15 @@ export type ProviderMarketplaceData = ProviderCardData & {
   rating: number;
   reviewCount: number;
   completedJobs: number;
-  level: "New" | "Level 1" | "Level 2" | "Top Pro";
+  level: string;
   badges: string[];
-  availability: "Today" | "This week" | "Weekends" | "Evenings" | "Remote";
+  availability: string;
   responseTime: string;
   description: string;
   services: string[];
   searchText: string;
   categorySlug: string;
-  heroImage: string;
+  heroImage: string | null;
 };
 
 export type ProviderProfileData = {
@@ -35,19 +35,41 @@ export type ProviderProfileData = {
   name: string;
   category: string;
   categorySlug: string;
+  heroImage: string | null;
+  profileVideo: {
+    url: string;
+    thumbnailUrl: string;
+  } | null;
   avatar: string | null;
   rating: number;
   reviewCount: number;
+  completedJobs: number;
+  level: ProviderMarketplaceData["level"];
+  badges: string[];
+  rate: number;
   email: string;
   phone: string;
   location: string;
   experience: string;
   biography: string;
   services: string[];
+  responseTime: string;
   hourlyRate: string;
   availability: string;
   photos: string[];
   highlights: string[];
+  reviewDistribution: Record<number, number>;
+  writtenReviews: ProviderWrittenReview[];
+  relatedProviders: ProviderMarketplaceData[];
+};
+
+export type ProviderWrittenReview = {
+  id: string;
+  reviewerName: string;
+  reviewerInitials: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
 };
 
 type SellerRow = {
@@ -70,10 +92,53 @@ type SellerRow = {
   created_at: string | null;
 };
 
+type RatingStats = {
+  rating: number;
+  reviewCount: number;
+  distribution: Record<number, number>;
+};
+
+type ProviderMedia = {
+  heroImage: string | null;
+  portfolioPhotos: string[];
+  profileVideo: ProviderProfileData["profileVideo"];
+};
+
+type BadgeAwardRow = {
+  provider_id: string | null;
+  badge_id: string | null;
+};
+
+type BadgeDefinitionRow = {
+  id: string;
+  name: string | null;
+  is_active: boolean | null;
+};
+
 type SellersSupabaseClient = {
   from(table: "sellers"): {
     select(columns: string): {
       eq(column: string, value: string): SellersQuery;
+    };
+  };
+};
+
+type UserImagesSupabaseClient = {
+  from(table: "user_images"): {
+    select(columns: string): any;
+  };
+};
+
+type ReviewsSupabaseClient = {
+  from(table: "eloo_reviews"): {
+    select(columns: string): {
+      eq(column: string, value: string): {
+        eq(column: string, value: boolean): {
+          order(column: string, options: { ascending: boolean }): {
+            limit(count: number): Promise<{ data: ReviewRow[] | null; error: { message: string } | null }>;
+          };
+        };
+      };
     };
   };
 };
@@ -84,20 +149,23 @@ type SellersQuery = {
   maybeSingle(): Promise<{ data: SellerRow | null; error: { message: string } | null }>;
 };
 
-const DEFAULT_RATE = 25;
+type UserImageRow = {
+  user_id?: string | null;
+  image_url: string | null;
+  image_type?: string | null;
+  description?: string | null;
+};
 
-const FALLBACK_IMAGES: Record<string, string> = {
-  "aide-domicile": "https://images.unsplash.com/photo-1576765608622-067973a79f53?q=80&w=900&auto=format&fit=crop",
-  animaux: "https://images.unsplash.com/photo-1548199973-03cce0bbc87b?q=80&w=900&auto=format&fit=crop",
-  bricolage: "https://images.unsplash.com/photo-1504148455328-c376907d081c?q=80&w=900&auto=format&fit=crop",
-  "cours-particuliers": "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=900&auto=format&fit=crop",
-  demenagement: "https://images.unsplash.com/photo-1600518464441-9306b00c4a83?q=80&w=900&auto=format&fit=crop",
-  enfants: "https://images.unsplash.com/photo-1602030028438-4cf153cbae9e?q=80&w=900&auto=format&fit=crop",
-  hiver: "https://images.unsplash.com/photo-1517299321609-52687d1bc55a?q=80&w=900&auto=format&fit=crop",
-  informatique: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=900&auto=format&fit=crop",
-  jardinage: "https://images.unsplash.com/photo-1416879595882-3373a0480b5b?q=80&w=900&auto=format&fit=crop",
-  menage: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=900&auto=format&fit=crop",
-  search: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?q=80&w=900&auto=format&fit=crop",
+type ReviewRow = {
+  id: string;
+  rating: number | null;
+  comment: string | null;
+  created_at: string | null;
+  reviewer_id: string | null;
+  reviewer?: {
+    first_name: string | null;
+    last_name: string | null;
+  } | null;
 };
 
 const CATEGORY_ALIASES: Record<string, string[]> = {
@@ -144,61 +212,40 @@ function providerMatchesCategory(provider: SellerRow, categorySlug?: string) {
 }
 
 function serviceTags(provider: SellerRow) {
-  const tags = [
+  return [
     provider.service_category,
-    provider.experience_level ? `${provider.experience_level} experience` : null,
+    provider.experience_level,
     provider.city,
   ].filter((tag): tag is string => Boolean(tag && tag.trim()));
-
-  return tags.length ? tags : ["Verified provider"];
 }
 
-function deterministicIndex(value: string, size: number) {
-  const sum = value.split("").reduce((total, char) => total + char.charCodeAt(0), 0);
-  return size ? sum % size : 0;
+function initialsForName(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "C";
 }
 
-function providerLevel(provider: SellerRow): ProviderMarketplaceData["level"] {
-  const rating = Number(provider.rating || 0);
-  const jobs = Number(provider.total_jobs || 0);
-  if (rating >= 4.8 && jobs >= 25) return "Top Pro";
-  if (rating >= 4.5 && jobs >= 10) return "Level 2";
-  if (jobs > 0) return "Level 1";
-  return "New";
+function providerAvailabilityLabel(provider: SellerRow) {
+  const availability = provider.availability as { marketplaceAvailability?: string; note?: string } | null;
+  if (availability?.note && availability.note.trim()) return availability.note.trim();
+  if (availability?.marketplaceAvailability && availability.marketplaceAvailability.trim()) return availability.marketplaceAvailability.trim();
+  return "";
 }
 
-function providerAvailability(provider: SellerRow): ProviderMarketplaceData["availability"] {
-  const availabilityOptions: ProviderMarketplaceData["availability"][] = ["Today", "This week", "Weekends", "Evenings", "Remote"];
-  const raw = JSON.stringify(provider.availability || {}).toLowerCase();
-  if (raw.includes("remote")) return "Remote";
-  if (raw.includes("weekend")) return "Weekends";
-  if (raw.includes("evening")) return "Evenings";
-  return availabilityOptions[deterministicIndex(provider.id, availabilityOptions.length)];
+function providerResponseTime(provider: SellerRow) {
+  const availability = provider.availability as { responseTime?: string; response_time?: string } | null;
+  return availability?.responseTime?.trim() || availability?.response_time?.trim() || "";
 }
 
-function providerBadges(provider: SellerRow) {
-  const rating = Number(provider.rating || 0);
-  const jobs = Number(provider.total_jobs || 0);
-  const badges = ["Verified ID"];
-
-  if (rating >= 4.8) badges.push("Top Rated");
-  if (jobs >= 15) badges.push("Proven Expert");
-  if (provider.hourly_rate && provider.hourly_rate <= 30) badges.push("Value Choice");
-  if (provider.experience_level) badges.push("Skilled");
-  if (!jobs) badges.push("Rising Talent");
-
-  return badges.slice(0, 4);
+function providerLevelFromBadges(badges: string[]) {
+  return badges.find((badge) => ["Top Pro", "Level 2", "Level 1"].includes(badge)) || "";
 }
 
 function serviceList(provider: SellerRow) {
-  const category = provider.service_category || "Service provider";
-  const tags = serviceTags(provider);
-  return [
-    category,
-    ...tags,
-    `${category} booking`,
-    `${category} specialist`,
-  ].filter((value, index, array) => value && array.indexOf(value) === index);
+  return serviceTags(provider).filter((value, index, array) => value && array.indexOf(value) === index);
 }
 
 function mapSellerToCard(provider: SellerRow): ProviderCardData {
@@ -207,33 +254,37 @@ function mapSellerToCard(provider: SellerRow): ProviderCardData {
     slug: provider.id,
     name: providerName(provider),
     category: provider.service_category || "Service provider",
-    rate: provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : DEFAULT_RATE,
+    rate: provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : 0,
     image: provider.profile_image_url || null,
     isNew: Number(provider.total_jobs || 0) === 0,
     tags: serviceTags(provider),
   };
 }
 
-function mapSellerToMarketplace(provider: SellerRow): ProviderMarketplaceData {
+function mapSellerToMarketplace(
+  provider: SellerRow,
+  media?: ProviderMedia,
+  ratingStats?: RatingStats,
+  badges: string[] = [],
+): ProviderMarketplaceData {
   const category = provider.service_category || "Service provider";
   const categorySlug = categorySlugFor(category);
   const services = serviceList(provider);
-  const rate = provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : DEFAULT_RATE;
-  const city = provider.city || "Nearby";
+  const rate = provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : 0;
+  const city = provider.city || "";
   const country = provider.country || "";
-  const rating = Number(provider.rating || 0);
-  const reviewCount = Number(provider.total_jobs || 0);
-  const badges = providerBadges(provider);
-  const level = providerLevel(provider);
-  const availability = providerAvailability(provider);
+  const rating = ratingStats?.rating || 0;
+  const reviewCount = ratingStats?.reviewCount || 0;
+  const level = providerLevelFromBadges(badges);
+  const availability = providerAvailabilityLabel(provider);
   const tags = [
     level,
     availability,
     ...badges,
     ...serviceTags(provider),
   ].filter((value, index, array) => value && array.indexOf(value) === index);
-  const description = provider.description || `I will provide reliable ${category.toLowerCase()} services with clear communication and local experience.`;
-  const heroImage = provider.profile_image_url || FALLBACK_IMAGES[categorySlug] || FALLBACK_IMAGES.search;
+  const description = provider.description || "";
+  const heroImage = media?.heroImage || provider.profile_image_url || null;
   const searchText = [
     providerName(provider),
     category,
@@ -256,11 +307,11 @@ function mapSellerToMarketplace(provider: SellerRow): ProviderMarketplaceData {
     location: [city, country].filter(Boolean).join(", "),
     rating,
     reviewCount,
-    completedJobs: reviewCount,
+    completedJobs: Number(provider.total_jobs || 0),
     level,
     badges,
     availability,
-    responseTime: `${deterministicIndex(provider.id, 5) + 1}h avg response`,
+    responseTime: providerResponseTime(provider),
     description,
     services,
     searchText,
@@ -269,30 +320,93 @@ function mapSellerToMarketplace(provider: SellerRow): ProviderMarketplaceData {
   };
 }
 
-function mapSellerToProfile(provider: SellerRow): ProviderProfileData {
+function mapReviewRows(rows: ReviewRow[], provider: SellerRow): ProviderWrittenReview[] {
+  return rows
+    .filter((review) => review.comment && review.comment.trim())
+    .map((review, index) => {
+      const name = [review.reviewer?.first_name, review.reviewer?.last_name?.[0] ? `${review.reviewer.last_name[0]}.` : ""].filter(Boolean).join(" ") || `Client ${index + 1}`;
+      return {
+        id: review.id,
+        reviewerName: name,
+        reviewerInitials: initialsForName(name),
+        rating: Number(review.rating || provider.rating || 5),
+        comment: review.comment?.trim() || "",
+        createdAt: review.created_at ? new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric" }).format(new Date(review.created_at)) : "Verified booking",
+      };
+    });
+}
+
+function parseMediaDescription(description?: string | null) {
+  if (!description) return {};
+  try {
+    const parsed = JSON.parse(description) as { thumbnailUrl?: unknown; thumbnailSecond?: unknown };
+    return {
+      thumbnailUrl: typeof parsed.thumbnailUrl === "string" ? parsed.thumbnailUrl : undefined,
+      thumbnailSecond: typeof parsed.thumbnailSecond === "number" && Number.isFinite(parsed.thumbnailSecond) ? parsed.thumbnailSecond : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+function cloudinaryVideoThumbnail(videoUrl: string, seconds = 0) {
+  if (!videoUrl.includes("/upload/")) return "";
+  const cleanSecond = Math.max(0, Math.round(seconds * 10) / 10);
+  const transformedUrl = videoUrl.replace("/upload/", `/upload/so_${cleanSecond},f_jpg/`);
+  return transformedUrl.replace(/\.(mp4|webm|mov)(\?.*)?$/i, ".jpg$2");
+}
+
+function videoThumbnailFor(row: UserImageRow | null | undefined) {
+  if (!row?.image_url) return "";
+  const metadata = parseMediaDescription(row.description);
+  return metadata.thumbnailUrl || cloudinaryVideoThumbnail(row.image_url, metadata.thumbnailSecond || 0);
+}
+
+function mapSellerToProfile(
+  provider: SellerRow,
+  media: ProviderMedia,
+  ratingStats: RatingStats,
+  writtenReviews: ProviderWrittenReview[] = [],
+  relatedProviders: ProviderMarketplaceData[] = [],
+  badges: string[] = [],
+): ProviderProfileData {
   const category = provider.service_category || "Service provider";
-  const rate = provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : DEFAULT_RATE;
+  const categorySlug = categorySlugFor(category);
+  const rate = provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : 0;
   const location = [provider.city, provider.country].filter(Boolean).join(", ") || "Location not provided";
   const serviceList = serviceTags(provider);
+  const heroImage = media.heroImage || provider.profile_image_url || null;
+  const rating = ratingStats.rating;
+  const completedJobs = Number(provider.total_jobs || 0);
 
   return {
     id: provider.id,
     name: providerName(provider),
     category,
-    categorySlug: categorySlugFor(category),
+    categorySlug,
+    heroImage,
+    profileVideo: media.profileVideo,
     avatar: provider.profile_image_url || null,
-    rating: Number(provider.rating || 0),
-    reviewCount: Number(provider.total_jobs || 0),
+    rating,
+    reviewCount: ratingStats.reviewCount,
+    completedJobs,
+    level: providerLevelFromBadges(badges),
+    badges,
+    rate,
     email: provider.email || "",
     phone: provider.phone || "",
     location,
-    experience: provider.experience_level ? `${provider.experience_level} experience` : "Verified professional",
-    biography: provider.description || "This provider has not added a biography yet.",
+    experience: provider.experience_level || "",
+    biography: provider.description || "",
     services: serviceList,
-    hourlyRate: `From $${rate} / hour`,
-    availability: "Contact provider for availability",
-    photos: provider.profile_image_url ? [provider.profile_image_url] : [],
-    highlights: ["Approved provider", "Real AnyJob profile", "Verified account data"],
+    responseTime: providerResponseTime(provider),
+    hourlyRate: rate ? `From $${rate} / hour` : "Rate not set",
+    availability: providerAvailabilityLabel(provider),
+    photos: [heroImage, ...media.portfolioPhotos].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index),
+    highlights: badges,
+    reviewDistribution: ratingStats.distribution,
+    writtenReviews,
+    relatedProviders,
   };
 }
 
@@ -319,11 +433,164 @@ export async function getProviderCards(categorySlug?: string) {
 
 export async function getMarketplaceProviders() {
   const providers = await getApprovedSellers();
-  return providers.map(mapSellerToMarketplace);
+  const providerIds = providers.map((provider) => provider.id);
+  const [mediaMap, ratingMap, badgeMap] = await Promise.all([
+    getProviderMediaMap(providerIds),
+    getProviderRatingMap(providerIds),
+    getProviderBadgeMap(providerIds),
+  ]);
+
+  return providers.map((provider) => mapSellerToMarketplace(
+    provider,
+    mediaMap.get(provider.id),
+    ratingMap.get(provider.id),
+    badgeMap.get(provider.id) || [],
+  ));
+}
+
+function emptyRatingStats(): RatingStats {
+  return { rating: 0, reviewCount: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
+}
+
+function calculateRatingStats(rows: Array<{ rating: number | null }>): RatingStats {
+  const ratings = rows.map((row) => Number(row.rating || 0)).filter((rating) => rating > 0);
+  if (!ratings.length) return emptyRatingStats();
+
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } as Record<number, number>;
+  for (const rating of ratings) {
+    const star = Math.max(1, Math.min(5, Math.round(rating)));
+    distribution[star] += 1;
+  }
+
+  return {
+    rating: Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10,
+    reviewCount: ratings.length,
+    distribution,
+  };
+}
+
+function mediaFromRows(rows: UserImageRow[], profileImageUrl?: string | null): ProviderMedia {
+  const portfolioPhotos = rows
+    .filter((row) => row.image_type === "portfolio")
+    .map((row) => row.image_url)
+    .filter((url): url is string => Boolean(url));
+  const profileVideoRow = rows.find((row) => row.image_type === "portfolio_video" && row.image_url);
+  const profileVideoThumbnail = videoThumbnailFor(profileVideoRow);
+  const profileVideo = profileVideoRow?.image_url
+    ? {
+      url: profileVideoRow.image_url,
+      thumbnailUrl: profileVideoThumbnail || profileVideoRow.image_url,
+    }
+    : null;
+
+  return {
+    heroImage: profileVideo?.thumbnailUrl || portfolioPhotos[0] || profileImageUrl || null,
+    portfolioPhotos,
+    profileVideo,
+  };
+}
+
+async function getProviderMediaMap(providerIds: string[]) {
+  const media = new Map<string, ProviderMedia>();
+  if (!providerIds.length) return media;
+
+  const supabase = createAdminSupabaseClient() as unknown as UserImagesSupabaseClient;
+  const { data, error } = await supabase
+    .from("user_images")
+    .select("user_id,image_url,image_type,description,created_at")
+    .in("user_id", providerIds)
+    .in("image_type", ["portfolio", "portfolio_video"])
+    .order("created_at", { ascending: false }) as { data: UserImageRow[] | null; error: { message: string } | null };
+
+  if (error) {
+    console.error("Failed to load provider media:", error.message);
+    return media;
+  }
+
+  const rowsByProvider = new Map<string, UserImageRow[]>();
+  for (const row of data || []) {
+    if (!row.user_id) continue;
+    rowsByProvider.set(row.user_id, [...(rowsByProvider.get(row.user_id) || []), row]);
+  }
+
+  for (const [providerId, rows] of rowsByProvider.entries()) {
+    media.set(providerId, mediaFromRows(rows));
+  }
+
+  return media;
+}
+
+async function getProviderRatingMap(providerIds: string[]) {
+  const ratings = new Map<string, RatingStats>();
+  if (!providerIds.length) return ratings;
+
+  const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
+  const { data, error } = await supabase
+    .from("eloo_reviews")
+    .select("reviewee_id,rating,is_public")
+    .in("reviewee_id", providerIds)
+    .eq("is_public", true) as { data: Array<{ reviewee_id: string | null; rating: number | null }> | null; error: { message: string } | null };
+
+  if (error) {
+    console.error("Failed to load provider ratings:", error.message);
+    return ratings;
+  }
+
+  const rowsByProvider = new Map<string, Array<{ rating: number | null }>>();
+  for (const row of data || []) {
+    if (!row.reviewee_id) continue;
+    rowsByProvider.set(row.reviewee_id, [...(rowsByProvider.get(row.reviewee_id) || []), { rating: row.rating }]);
+  }
+
+  for (const [providerId, rows] of rowsByProvider.entries()) {
+    ratings.set(providerId, calculateRatingStats(rows));
+  }
+
+  return ratings;
+}
+
+async function getProviderBadgeMap(providerIds: string[]) {
+  const badges = new Map<string, string[]>();
+  if (!providerIds.length) return badges;
+
+  const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
+  const { data: awards, error: awardError } = await supabase
+    .from("provider_badges")
+    .select("provider_id,badge_id")
+    .in("provider_id", providerIds) as { data: BadgeAwardRow[] | null; error: { message: string } | null };
+
+  if (awardError) {
+    console.error("Failed to load provider badge awards:", awardError.message);
+    return badges;
+  }
+
+  const badgeIds = Array.from(new Set((awards || []).map((award) => award.badge_id).filter((id): id is string => Boolean(id))));
+  if (!badgeIds.length) return badges;
+
+  const { data: definitions, error: definitionError } = await supabase
+    .from("badge_definitions")
+    .select("id,name,is_active")
+    .in("id", badgeIds)
+    .eq("is_active", true) as { data: BadgeDefinitionRow[] | null; error: { message: string } | null };
+
+  if (definitionError) {
+    console.error("Failed to load badge definitions:", definitionError.message);
+    return badges;
+  }
+
+  const definitionMap = new Map((definitions || []).map((definition) => [definition.id, definition.name || ""]));
+  for (const award of awards || []) {
+    if (!award.provider_id || !award.badge_id) continue;
+    const name = definitionMap.get(award.badge_id);
+    if (!name) continue;
+    badges.set(award.provider_id, [...(badges.get(award.provider_id) || []), name]);
+  }
+
+  return badges;
 }
 
 export async function getProviderProfileById(id: string) {
-  const supabase = createAdminSupabaseClient() as unknown as SellersSupabaseClient;
+  const supabase = createAdminSupabaseClient() as unknown as SellersSupabaseClient & UserImagesSupabaseClient & ReviewsSupabaseClient;
   const { data, error } = await supabase
     .from("sellers")
     .select("id,email,first_name,last_name,phone,profile_image_url,city,country,service_category,experience_level,description,hourly_rate,status,rating,total_jobs,availability,created_at")
@@ -338,5 +605,54 @@ export async function getProviderProfileById(id: string) {
 
   if (!data) notFound();
 
-  return mapSellerToProfile(data as SellerRow);
+  const [portfolioResult, reviewResult, approvedProviders, badgeMap] = await Promise.all([
+    supabase
+      .from("user_images")
+      .select("image_url,image_type,description")
+      .eq("user_id", id)
+      .in("image_type", ["portfolio", "portfolio_video"])
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("eloo_reviews")
+      .select("id,rating,comment,created_at,reviewer_id,reviewer:eloo_profiles!eloo_reviews_reviewer_id_fkey(first_name,last_name)")
+      .eq("reviewee_id", id)
+      .eq("is_public", true)
+      .order("created_at", { ascending: false })
+      .limit(8),
+    getApprovedSellers(),
+    getProviderBadgeMap([id]),
+  ]);
+
+  if (portfolioResult.error) {
+    console.error("Failed to load provider portfolio images:", portfolioResult.error.message);
+  }
+
+  if (reviewResult.error) {
+    console.error("Failed to load provider written reviews:", reviewResult.error.message);
+  }
+
+  const providerRow = data as SellerRow;
+  const media = mediaFromRows((portfolioResult.data || []) as UserImageRow[], providerRow.profile_image_url);
+  const ratings = calculateRatingStats(reviewResult.data || []);
+  const badges = badgeMap.get(id) || [];
+  const possibleRelatedProviders = approvedProviders.filter((seller) => seller.id !== id);
+  const sameCategoryProviders = possibleRelatedProviders.filter((seller) => providerMatchesCategory(seller, categorySlugFor(providerRow.service_category)));
+  const relatedSellerRows = (sameCategoryProviders.length ? sameCategoryProviders : possibleRelatedProviders).slice(0, 4);
+  const relatedIds = relatedSellerRows.map((seller) => seller.id);
+  const [relatedMediaMap, relatedRatingMap, relatedBadgeMap] = await Promise.all([
+    getProviderMediaMap(relatedIds),
+    getProviderRatingMap(relatedIds),
+    getProviderBadgeMap(relatedIds),
+  ]);
+  const relatedProviders = relatedSellerRows
+    .map((seller) => mapSellerToMarketplace(
+      seller,
+      relatedMediaMap.get(seller.id),
+      relatedRatingMap.get(seller.id),
+      relatedBadgeMap.get(seller.id) || [],
+    ))
+    .slice(0, 4);
+  const writtenReviews = mapReviewRows(reviewResult.data || [], providerRow);
+
+  return mapSellerToProfile(providerRow, media, ratings, writtenReviews, relatedProviders, badges);
 }

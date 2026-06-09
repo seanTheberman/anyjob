@@ -13,6 +13,8 @@ type SearchResult = {
     categorySlug?: string;
 };
 
+type JobMode = "Day to day jobs" | "Work shifts";
+
 const DEFAULT_SEARCH_RESULTS: SearchResult[] = [{
     type: "category",
     slug: "menage",
@@ -27,6 +29,7 @@ export function SearchBar() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [selectedLanguage, setSelectedLanguage] = useState("en");
+    const [selectedJobMode, setSelectedJobMode] = useState<JobMode>("Day to day jobs");
     const [showLanguageSelector, setShowLanguageSelector] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const searchBoxRef = useRef<HTMLDivElement>(null);
@@ -34,10 +37,24 @@ export function SearchBar() {
 
     // Detect language based on geolocation (timezone)
     useEffect(() => {
+        const savedMode = localStorage.getItem("home_job_mode");
+        if (savedMode === "Day to day jobs" || savedMode === "Work shifts") {
+            setSelectedJobMode(savedMode);
+        }
+
+        const handleJobModeChange = (event: Event) => {
+            const mode = (event as CustomEvent<{ mode?: string }>).detail?.mode;
+            if (mode === "Day to day jobs" || mode === "Work shifts") {
+                setSelectedJobMode(mode);
+            }
+        };
+
+        window.addEventListener("homeJobModeChanged", handleJobModeChange);
+
         const savedLang = localStorage.getItem('user_language');
         if (savedLang) {
             setSelectedLanguage(savedLang);
-            return;
+            return () => window.removeEventListener("homeJobModeChanged", handleJobModeChange);
         }
 
         const detectLanguage = () => {
@@ -64,6 +81,7 @@ export function SearchBar() {
             }
         };
         detectLanguage();
+        return () => window.removeEventListener("homeJobModeChanged", handleJobModeChange);
     }, []);
 
     // Search categories and subcategories from database
@@ -105,6 +123,13 @@ export function SearchBar() {
     }
 
     function getResultHref(result: SearchResult) {
+        if (selectedJobMode === "Work shifts") {
+            const params = new URLSearchParams({ work_type: "shifts" });
+            params.set("shift_query", result.name);
+            if (result.categorySlug || result.slug) params.set("source_category", result.categorySlug || result.slug);
+            return `/questionnaire?${params.toString()}`;
+        }
+
         return result.type === 'subcategory'
             ? `/${result.categorySlug}?subcategory=${result.slug}`
             : `/questionnaire?category=${result.slug}`;
@@ -112,6 +137,13 @@ export function SearchBar() {
 
     function handleCustomService() {
         const query = searchQuery.trim();
+        if (selectedJobMode === "Work shifts") {
+            const params = new URLSearchParams({ work_type: "shifts" });
+            if (query) params.set("shift_query", query);
+            router.push(`/questionnaire?${params.toString()}`);
+            return;
+        }
+
         const params = new URLSearchParams({ category: "custom" });
         if (query) params.set("custom_query", query);
         router.push(`/questionnaire?${params.toString()}`);

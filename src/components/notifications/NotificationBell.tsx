@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bell, Briefcase, Calendar, Check, MessageSquare, ReceiptText, Star } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { InsuranceNotice } from "@/components/safety/InsuranceNotice";
 
 type AppNotification = {
   id: string;
@@ -130,6 +131,9 @@ export function NotificationBell({ href, accent = "red" }: { href: string; accen
           </div>
 
           <div className="max-h-80 overflow-y-auto">
+            <div className="border-b border-gray-100 p-3">
+              <InsuranceNotice compact accent={accent} />
+            </div>
             {loading ? (
               <div className="space-y-3 p-4">
                 {[0, 1, 2].map((item) => (
@@ -239,6 +243,10 @@ export function NotificationCenter({ title = "Notifications", accent = "red" }: 
           <Check className="h-4 w-4" />
           Mark all as read
         </button>
+      </div>
+
+      <div className="mb-4">
+        <InsuranceNotice accent={accent} />
       </div>
 
       {loading ? (

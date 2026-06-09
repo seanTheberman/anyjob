@@ -149,6 +149,74 @@ type ProviderDetails = {
   badges: Array<{ id: string; primary: string; secondary: string; meta: string }>;
 };
 
+type BusinessDetails = {
+  profile: {
+    id: string;
+    ownerUserId: string;
+    name: string;
+    legalName: string;
+    registrationNumber: string;
+    businessType: string;
+    industry: string;
+    contactName: string;
+    contactEmail: string;
+    contactPhone: string;
+    address: string;
+    city: string;
+    postalCode: string;
+    country: string;
+    joined: string;
+    updated: string;
+    lastActivity: string;
+  };
+  owner: {
+    name: string;
+    email: string;
+    phone: string;
+    profileRow: boolean;
+    userProfileRow: boolean;
+    role: string;
+    updated: string;
+  };
+  verification: {
+    status: string;
+    verified: string;
+    reviewedAt: string;
+    rejectionReason: string;
+    registration: string;
+    documentCount: number;
+    missingRequiredDocuments: number;
+    documentSource: string;
+  };
+  commercial: {
+    hires: number;
+    jobs: number;
+    activeJobs: number;
+    activeShifts: number;
+    applications: number;
+    activePayments: number;
+    paidPayments: number;
+    releasedPayments: number;
+    totalPaid: string;
+    totalHeld: string;
+  };
+  workSetup: {
+    workTypes: string[];
+    roles: string[];
+  };
+  documents: Array<{ id: string; primary: string; secondary: string; meta: string; status?: string }>;
+  recentPosts: Array<{ id: string; primary: string; secondary: string; meta: string; status?: string }>;
+  recentApplications: Array<{ id: string; primary: string; secondary: string; meta: string; status?: string }>;
+  recentPayments: Array<{ id: string; primary: string; secondary: string; meta: string; status?: string }>;
+  support: {
+    conversations: number;
+    activeConversations: number;
+    unreadNotifications: number;
+    latestNotification: string;
+    latestConversation: string;
+  };
+};
+
 function DetailMetric({ label, value, icon: Icon }: { label: string; value: string | number; icon: React.ComponentType<{ className?: string }> }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
@@ -350,6 +418,107 @@ function ProviderDetailsPanel({ details }: { details: ProviderDetails }) {
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Listed jobs:</span> {details.commercial.listedJobs}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Reviews:</span> {details.commercial.reviewCount}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Badges:</span> {details.commercial.badges}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BusinessDetailsPanel({ details }: { details: BusinessDetails }) {
+  return (
+    <div className="space-y-4 rounded-lg border border-red-100 bg-red-50/30 p-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <DetailMetric label="Hires" value={details.commercial.hires} icon={UserRound} />
+        <DetailMetric label="Active shifts" value={details.commercial.activeShifts} icon={BriefcaseBusiness} />
+        <DetailMetric label="Active payments" value={details.commercial.activePayments} icon={CreditCard} />
+        <DetailMetric label="Last activity" value={details.profile.lastActivity} icon={Star} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Business account</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Business:</span> {details.profile.name}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Legal name:</span> {details.profile.legalName}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Registration:</span> {details.profile.registrationNumber}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Type:</span> {details.profile.businessType}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Industry:</span> {details.profile.industry}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Location:</span> {details.profile.city} · {details.profile.country}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Address:</span> {details.profile.address}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Postal code:</span> {details.profile.postalCode}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Joined:</span> {details.profile.joined}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Updated:</span> {details.profile.updated}</p>
+          </div>
+          <div className="mt-3 rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Typical work setup</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(details.workSetup.workTypes.length ? details.workSetup.workTypes : ["No work types set"]).map((item) => (
+                <StatusBadge key={`work-${item}`} value={item} />
+              ))}
+              {(details.workSetup.roles.length ? details.workSetup.roles : ["No roles set"]).map((item) => (
+                <StatusBadge key={`role-${item}`} value={item} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Screening and owner</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Admin status:</span> {details.verification.status}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Verified:</span> {details.verification.verified}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Reviewed:</span> {details.verification.reviewedAt}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Registration proof:</span> {details.verification.registration}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Documents:</span> {details.verification.documentCount}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Missing required docs:</span> {details.verification.missingRequiredDocuments}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Owner:</span> {details.owner.name}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Owner role:</span> {details.owner.role}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Owner email:</span> {details.owner.email}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Owner phone:</span> {details.owner.phone}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Profile row:</span> {details.owner.profileRow ? "Added" : "Not added"}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">User row:</span> {details.owner.userProfileRow ? "Added" : "Not added"}</p>
+          </div>
+          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+            Rejection / document note: {details.verification.rejectionReason}
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-4">
+        <DetailMetric label="Jobs" value={details.commercial.jobs} icon={BriefcaseBusiness} />
+        <DetailMetric label="Active jobs" value={details.commercial.activeJobs} icon={ShieldCheck} />
+        <DetailMetric label="Applications" value={details.commercial.applications} icon={Mail} />
+        <DetailMetric label="Paid payments" value={`${details.commercial.paidPayments} · ${details.commercial.totalPaid}`} icon={CreditCard} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DetailList title="Verification documents" empty="No business verification documents found." items={details.documents} />
+        <DetailList title="Recent business jobs" empty="No business jobs or shifts found." items={details.recentPosts} />
+        <DetailList title="Applications and hires" empty="No worker applications found." items={details.recentApplications} />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <DetailList title="Shift payments" empty="No shift payment records found." items={details.recentPayments} />
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Payment and work totals</h3>
+          <div className="mt-3 grid gap-3">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Active payments:</span> {details.commercial.activePayments}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Paid payments:</span> {details.commercial.paidPayments}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Released payments:</span> {details.commercial.releasedPayments}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Total paid/held:</span> {details.commercial.totalPaid}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Held now:</span> {details.commercial.totalHeld}</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-semibold text-slate-950">Support and activity</h3>
+          <div className="mt-3 grid gap-3">
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Support threads:</span> {details.support.conversations}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Active threads:</span> {details.support.activeConversations}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Unread notices:</span> {details.support.unreadNotifications}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Latest notice:</span> {details.support.latestNotification}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Latest conversation:</span> {details.support.latestConversation}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Last activity:</span> {details.profile.lastActivity}</p>
           </div>
         </div>
       </div>
@@ -815,6 +984,10 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [expandedBusinessId, setExpandedBusinessId] = useState<string | null>(null);
+  const [detailsByBusiness, setDetailsByBusiness] = useState<Record<string, BusinessDetails>>({});
+  const [loadingBusinessDetails, setLoadingBusinessDetails] = useState<string | null>(null);
+  const [businessDetailsError, setBusinessDetailsError] = useState<string | null>(null);
 
   useEffect(() => {
     setRows(businesses);
@@ -873,6 +1046,28 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
     )));
     setMessage(`Updated ${businessIds.length} business${businessIds.length === 1 ? "" : "es"}.`);
     router.refresh();
+  }
+
+  async function openBusiness(business: AdminBusiness) {
+    if (expandedBusinessId === business.id) {
+      setExpandedBusinessId(null);
+      return;
+    }
+
+    setExpandedBusinessId(business.id);
+    setBusinessDetailsError(null);
+    if (detailsByBusiness[business.id]) return;
+
+    setLoadingBusinessDetails(business.id);
+    const response = await fetch(`/api/admin/businesses/details?id=${encodeURIComponent(business.id)}`);
+    const payload = await response.json().catch(() => ({}));
+    setLoadingBusinessDetails(null);
+
+    if (!response.ok) {
+      setBusinessDetailsError(payload.error || "Failed to load business details");
+      return;
+    }
+    setDetailsByBusiness((current) => ({ ...current, [business.id]: payload as BusinessDetails }));
   }
 
   return (
@@ -945,41 +1140,69 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((business) => (
-                <tr key={business.id} className="group hover:bg-slate-50">
-                  <td className="px-3 py-4"><input aria-label={`Select ${business.name}`} type="checkbox" checked={selected.has(business.id)} onChange={() => toggleOne(business.id)} /></td>
-                  <td className="px-3 py-4">
-                    <p title={business.name} className="truncate text-sm font-medium text-slate-950">{business.name}</p>
-                    <p title={`${business.industry} · ${business.city} · ${business.id}`} className="truncate text-xs text-slate-500">
-                      {business.industry} · {business.city}
-                    </p>
-                  </td>
-                  <TruncatedCell>{business.registrationNumber}</TruncatedCell>
-                  <TruncatedCell>{business.contact}</TruncatedCell>
-                  <TruncatedCell>{business.workTypes}</TruncatedCell>
-                  <TruncatedCell>{business.created}</TruncatedCell>
-                  <td className="px-3 py-4"><StatusBadge value={business.status} /></td>
-                  <td className="px-3 py-4">
-                    <div className="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
-                      {business.status === "approved" ? (
-                        <button title="Suspend business" aria-label={`Suspend ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
-                          <UserX className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <button title="Approve business" aria-label={`Approve ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">
-                          <ShieldCheck className="h-4 w-4" />
-                        </button>
-                      )}
-                      <button title="Request documents" aria-label={`Request documents from ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                        <Mail className="h-4 w-4" />
+                <Fragment key={business.id}>
+                  <tr className="group hover:bg-slate-50">
+                    <td className="px-3 py-4"><input aria-label={`Select ${business.name}`} type="checkbox" checked={selected.has(business.id)} onChange={() => toggleOne(business.id)} /></td>
+                    <td className="px-3 py-4">
+                      <button
+                        type="button"
+                        onClick={() => openBusiness(business)}
+                        className="inline-flex max-w-full items-center gap-1.5 text-left text-sm font-semibold text-red-700 underline-offset-4 hover:underline"
+                        aria-expanded={expandedBusinessId === business.id}
+                      >
+                        <span title={business.name} className="truncate">{business.name}</span>
+                        {expandedBusinessId === business.id ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
                       </button>
-                      {business.status !== "approved" ? (
-                        <button title="Reject business" aria-label={`Reject ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
-                          <ShieldAlert className="h-4 w-4" />
+                      <p title={`${business.industry} · ${business.city} · ${business.id}`} className="truncate text-xs text-slate-500">
+                        {business.industry} · {business.city}
+                      </p>
+                    </td>
+                    <TruncatedCell>{business.registrationNumber}</TruncatedCell>
+                    <TruncatedCell>{business.contact}</TruncatedCell>
+                    <TruncatedCell>{business.workTypes}</TruncatedCell>
+                    <TruncatedCell>{business.created}</TruncatedCell>
+                    <td className="px-3 py-4"><StatusBadge value={business.status} /></td>
+                    <td className="px-3 py-4">
+                      <div className="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
+                        {business.status === "approved" ? (
+                          <button title="Suspend business" aria-label={`Suspend ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
+                            <UserX className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <button title="Approve business" aria-label={`Approve ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">
+                            <ShieldCheck className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button title="Request documents" aria-label={`Request documents from ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                          <Mail className="h-4 w-4" />
                         </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
+                        {business.status !== "approved" ? (
+                          <button title="Reject business" aria-label={`Reject ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
+                            <ShieldAlert className="h-4 w-4" />
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                  {expandedBusinessId === business.id ? (
+                    <tr>
+                      <td colSpan={8} className="bg-slate-50 p-0">
+                        <div className="w-full px-4 py-4">
+                          {loadingBusinessDetails === business.id ? (
+                            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
+                              <BriefcaseBusiness className="h-4 w-4 animate-pulse" />
+                              Loading business account, verification, hires, shifts, payments, and activity...
+                            </div>
+                          ) : businessDetailsError ? (
+                            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{businessDetailsError}</div>
+                          ) : detailsByBusiness[business.id] ? (
+                            <BusinessDetailsPanel details={detailsByBusiness[business.id]} />
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ) : null}
+                </Fragment>
               ))}
             </tbody>
           </table>

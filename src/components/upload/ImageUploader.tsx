@@ -12,7 +12,7 @@ interface UploadedImage {
   description?: string;
 }
 
-type UploadImageType = "profile" | "portfolio" | "work_image" | "id_document" | "selfie_video";
+type UploadImageType = "profile" | "portfolio" | "portfolio_video" | "work_image" | "id_document" | "selfie_video";
 
 interface ImageUploaderProps {
   imageType: UploadImageType;
@@ -52,7 +52,7 @@ export function ImageUploader({
     setImages(existingImages);
   }, [existingImages]);
 
-  const isVideoUpload = imageType === "selfie_video";
+  const isVideoUpload = imageType === "selfie_video" || imageType === "portfolio_video";
   const isDocumentUpload = imageType === "id_document";
   const uploadNoun = isVideoUpload ? "video" : isDocumentUpload ? "document" : "image";
   const acceptTypes = isVideoUpload
@@ -181,7 +181,7 @@ export function ImageUploader({
           {images.map((img) => {
             const url = img.image_url.toLowerCase();
             const isPdf = url.includes(".pdf") || img.image_type === "id_document";
-            const isVideo = img.image_type === "selfie_video" || url.includes(".mp4") || url.includes(".webm") || url.includes(".mov");
+            const isVideo = img.image_type === "selfie_video" || img.image_type === "portfolio_video" || url.includes(".mp4") || url.includes(".webm") || url.includes(".mov");
 
             return (
               <div key={img.id} className="relative group aspect-square rounded-xl overflow-hidden bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">

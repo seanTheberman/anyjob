@@ -24,8 +24,6 @@ import type { ProviderMarketplaceData } from "@/lib/real-providers";
 import { cn } from "@/lib/utils";
 
 const availabilityOptions = ["Today", "This week", "Weekends", "Evenings", "Remote"];
-const levelOptions = ["Top Pro", "Level 2", "Level 1", "New"];
-const badgeOptions = ["Verified ID", "Top Rated", "Proven Expert", "Value Choice", "Skilled", "Rising Talent"];
 
 type SortOption = "recommended" | "rating" | "reviews" | "price-low" | "price-high";
 
@@ -43,6 +41,9 @@ type FilterControlsProps = {
   minRating: string;
   maxRate: string;
   cities: string[];
+  availabilityOptions: string[];
+  levelOptions: string[];
+  badgeOptions: string[];
   setCategory: (value: string) => void;
   setCity: (value: string) => void;
   setAvailability: (value: string) => void;
@@ -54,6 +55,7 @@ type FilterControlsProps = {
 };
 
 function formatRate(value: number) {
+  if (!value) return "Rate not set";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -88,6 +90,18 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
   const cities = useMemo(() => {
     return Array.from(new Set(providers.map((provider) => provider.city).filter(Boolean))).sort();
   }, [providers]);
+  const availableTimes = useMemo(() => {
+    const loaded = Array.from(new Set(providers.map((provider) => provider.availability).filter(Boolean))).sort();
+    const preferred = availabilityOptions.filter((option) => loaded.includes(option));
+    const remaining = loaded.filter((option) => !preferred.includes(option));
+    return [...preferred, ...remaining];
+  }, [providers]);
+  const levelOptions = useMemo(() => {
+    return Array.from(new Set(providers.map((provider) => provider.level).filter(Boolean))).sort();
+  }, [providers]);
+  const badgeOptions = useMemo(() => {
+    return Array.from(new Set(providers.flatMap((provider) => provider.badges).filter(Boolean))).sort();
+  }, [providers]);
 
   const filteredProviders = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -113,8 +127,8 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
         if (sort === "price-low") return a.rate - b.rate;
         if (sort === "price-high") return b.rate - a.rate;
 
-        const aScore = a.rating * 20 + a.reviewCount + (a.level === "Top Pro" ? 30 : 0) + (a.badges.includes("Verified ID") ? 10 : 0);
-        const bScore = b.rating * 20 + b.reviewCount + (b.level === "Top Pro" ? 30 : 0) + (b.badges.includes("Verified ID") ? 10 : 0);
+        const aScore = a.rating * 20 + a.reviewCount + a.badges.length * 5;
+        const bScore = b.rating * 20 + b.reviewCount + b.badges.length * 5;
         return bScore - aScore;
       });
   }, [availability, badge, category, city, level, maxRate, minRating, providers, query, sort]);
@@ -150,11 +164,11 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
   return (
     <main className="w-full max-w-full overflow-x-hidden bg-white pt-20 text-slate-950">
       <section className="w-full max-w-full overflow-x-hidden border-b border-slate-200 bg-white">
-        <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-red-600">Welcome back, {buyerName}</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">Find a provider and book directly</h1>
+              <p className="hidden text-sm font-semibold text-red-600 sm:block">Welcome back, {buyerName}</p>
+              <h1 className="sr-only mt-1 text-2xl font-bold tracking-tight sm:not-sr-only sm:text-3xl">Find a provider and book directly</h1>
             </div>
 
             <form
@@ -178,7 +192,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
             </form>
           </div>
 
-          <div className="-mx-4 mt-5 flex max-w-[100vw] gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:max-w-full lg:px-0">
+          <div className="-mx-4 mt-5 hidden max-w-[100vw] gap-2 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:flex sm:px-6 lg:mx-0 lg:max-w-full lg:px-0">
             <button
               type="button"
               onClick={() => setCategory("all")}
@@ -198,18 +212,19 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setFiltersOpen(true)}
-            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-950 shadow-sm hover:bg-slate-50 lg:hidden"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters {activeFilterCount ? `(${activeFilterCount})` : ""}
-          </button>
+          <MobileDiscoveryRails
+            query={query}
+            activeCategory={category}
+            activeFilterCount={activeFilterCount}
+            setQuery={setQuery}
+            setCategory={setCategory}
+            openFilters={() => setFiltersOpen(true)}
+            providers={providers}
+          />
         </div>
       </section>
 
-      <section className="w-full max-w-full overflow-x-hidden bg-gradient-to-r from-red-50 via-white to-emerald-50">
+      <section className="hidden w-full max-w-full overflow-x-hidden bg-gradient-to-r from-red-50 via-white to-emerald-50 sm:block">
         <div className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-8 sm:px-6 lg:grid-cols-2 lg:px-8">
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Recommended for you</p>
@@ -237,20 +252,20 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
                 <p className="text-xs text-slate-500">approved providers</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-950">{providers.filter((provider) => provider.badges.includes("Verified ID")).length}</p>
-                <p className="text-xs text-slate-500">verified profiles</p>
+                <p className="text-2xl font-bold text-slate-950">{providers.filter((provider) => provider.badges.length > 0).length}</p>
+                <p className="text-xs text-slate-500">with badges</p>
               </div>
               <div>
-                <p className="text-2xl font-bold text-slate-950">{providers.filter((provider) => provider.level === "Top Pro").length}</p>
-                <p className="text-xs text-slate-500">top pros</p>
+                <p className="text-2xl font-bold text-slate-950">{providers.filter((provider) => provider.reviewCount > 0).length}</p>
+                <p className="text-xs text-slate-500">reviewed</p>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8">
-        <div className="mb-5 flex items-center justify-between gap-3">
+      <section className="mx-auto w-full max-w-7xl overflow-x-hidden px-4 py-4 sm:px-6 sm:py-8 lg:px-8">
+        <div className="mb-5 hidden items-center justify-between gap-3 sm:flex">
           <div>
             <h2 className="text-2xl font-bold text-slate-950">Top matches for your next booking</h2>
             <p className="mt-1 text-sm text-slate-600">Browse provider profiles directly, just like services in a marketplace.</p>
@@ -261,15 +276,23 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
           </button>
         </div>
 
-        {topPicks.length ? (
-          <div className="grid grid-cols-1 gap-5 sm:-mx-6 sm:flex sm:max-w-[100vw] sm:gap-4 sm:overflow-x-auto sm:px-6 sm:pb-4 lg:mx-0 lg:max-w-full lg:px-0">
-            {topPicks.map((provider) => (
-              <ProviderGigCard key={`top-${provider.id}`} provider={provider} saved={savedIds.has(provider.id)} onSave={() => toggleSaved(provider.id)} compact />
+        {filteredProviders.length ? (
+          <div className="grid grid-cols-1 gap-5 sm:hidden">
+            {filteredProviders.map((provider) => (
+              <ProviderGigCard key={`mobile-${provider.id}`} provider={provider} saved={savedIds.has(provider.id)} onSave={() => toggleSaved(provider.id)} compact />
             ))}
           </div>
         ) : (
           <EmptyState onClear={clearFilters} />
         )}
+
+        {topPicks.length ? (
+          <div className="hidden sm:-mx-6 sm:flex sm:max-w-[100vw] sm:gap-4 sm:overflow-x-auto sm:px-6 sm:pb-4 lg:mx-0 lg:max-w-full lg:px-0">
+            {topPicks.map((provider) => (
+              <ProviderGigCard key={`top-${provider.id}`} provider={provider} saved={savedIds.has(provider.id)} onSave={() => toggleSaved(provider.id)} compact />
+            ))}
+          </div>
+        ) : null}
       </section>
 
       {filtersOpen ? (
@@ -306,6 +329,9 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
                   minRating={minRating}
                   maxRate={maxRate}
                   cities={cities}
+                  availabilityOptions={availableTimes}
+                  levelOptions={levelOptions}
+                  badgeOptions={badgeOptions}
                   setCategory={setCategory}
                   setCity={setCity}
                   setAvailability={setAvailability}
@@ -333,7 +359,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
         </div>
       ) : null}
 
-      <section className="mx-auto grid w-full max-w-7xl gap-8 overflow-x-hidden px-4 pb-16 sm:px-6 lg:grid-cols-[18rem_1fr] lg:px-8">
+      <section className="mx-auto hidden w-full max-w-7xl gap-8 overflow-x-hidden px-4 pb-16 sm:grid sm:px-6 lg:grid-cols-[18rem_1fr] lg:px-8">
         <aside className="hidden lg:block">
           <div className="sticky top-24 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
@@ -348,6 +374,9 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
               minRating={minRating}
               maxRate={maxRate}
               cities={cities}
+              availabilityOptions={availableTimes}
+              levelOptions={levelOptions}
+              badgeOptions={badgeOptions}
               setCategory={setCategory}
               setCity={setCity}
               setAvailability={setAvailability}
@@ -428,6 +457,9 @@ function FilterControls({
   minRating,
   maxRate,
   cities,
+  availabilityOptions,
+  levelOptions,
+  badgeOptions,
   setCategory,
   setCity,
   setAvailability,
@@ -449,20 +481,26 @@ function FilterControls({
         {cities.map((item) => <option key={item} value={item}>{item}</option>)}
       </FilterSelect>
 
-      <FilterSelect label="Availability" value={availability} onChange={setAvailability}>
-        <option value="all">Any time</option>
-        {availabilityOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-      </FilterSelect>
+      {availabilityOptions.length ? (
+        <FilterSelect label="Availability" value={availability} onChange={setAvailability}>
+          <option value="all">Any time</option>
+          {availabilityOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+        </FilterSelect>
+      ) : null}
 
-      <FilterSelect label="Seller level" value={level} onChange={setLevel}>
-        <option value="all">Any level</option>
-        {levelOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-      </FilterSelect>
+      {levelOptions.length ? (
+        <FilterSelect label="Seller level" value={level} onChange={setLevel}>
+          <option value="all">Any level</option>
+          {levelOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+        </FilterSelect>
+      ) : null}
 
-      <FilterSelect label="Badges" value={badge} onChange={setBadge}>
-        <option value="all">Any badge</option>
-        {badgeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
-      </FilterSelect>
+      {badgeOptions.length ? (
+        <FilterSelect label="Badges" value={badge} onChange={setBadge}>
+          <option value="all">Any badge</option>
+          {badgeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+        </FilterSelect>
+      ) : null}
 
       <FilterSelect label="Minimum rating" value={minRating} onChange={setMinRating}>
         <option value="0">Any rating</option>
@@ -485,6 +523,105 @@ function FilterControls({
   );
 }
 
+function MobileDiscoveryRails({
+  query,
+  activeCategory,
+  activeFilterCount,
+  setQuery,
+  setCategory,
+  openFilters,
+  providers,
+}: {
+  query: string;
+  activeCategory: string;
+  activeFilterCount: number;
+  setQuery: (value: string) => void;
+  setCategory: (value: string) => void;
+  openFilters: () => void;
+  providers: ProviderMarketplaceData[];
+}) {
+  const relatedTerms = useMemo(() => {
+    const base = query.trim()
+      ? [query.trim(), `${query.trim()} near me`, `${query.trim()} today`, `best ${query.trim()}`]
+      : ["cleaning", "handyman", "babysitter", "moving help", "gardening"];
+
+    return base.slice(0, 6);
+  }, [query]);
+
+  const shopBy = useMemo(() => {
+    return CATEGORIES.map((item) => ({
+      ...item,
+      count: providers.filter((provider) => provider.categorySlug === item.slug).length,
+    })).filter((item) => item.count > 0).slice(0, 8);
+  }, [providers]);
+
+  return (
+    <div className="mt-5 space-y-4 sm:hidden">
+      <div>
+        <h2 className="text-base font-bold text-slate-950">Related results</h2>
+        <div className="-mx-4 mt-2 flex max-w-[100vw] gap-2 overflow-x-auto px-4 pb-1">
+          {relatedTerms.map((term) => (
+            <button
+              key={term}
+              type="button"
+              onClick={() => setQuery(term)}
+              className="shrink-0 rounded-md bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
+            >
+              {term}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <h2 className="sr-only">Filter providers</h2>
+        <div className="-mx-4 flex max-w-[100vw] gap-2 overflow-x-auto px-4 pb-1">
+          <button
+            type="button"
+            onClick={openFilters}
+            className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 shadow-sm"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            All {activeFilterCount ? `(${activeFilterCount})` : ""}
+          </button>
+          {["Categories", "Seller Level", "Availability", "Area", "Badges"].map((label) => (
+            <button
+              key={label}
+              type="button"
+              onClick={openFilters}
+              className="h-10 shrink-0 rounded-full border border-slate-300 bg-white px-4 text-sm font-bold text-slate-950 shadow-sm"
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {shopBy.length ? (
+        <div>
+          <h2 className="text-base font-bold text-slate-950">Shop by</h2>
+          <div className="-mx-4 mt-2 grid max-w-[100vw] auto-cols-[minmax(9rem,1fr)] grid-flow-col grid-rows-1 gap-3 overflow-x-auto px-4 pb-2">
+            {shopBy.map((item) => (
+              <button
+                key={item.slug}
+                type="button"
+                onClick={() => setCategory(item.slug)}
+                className={cn(
+                  "flex h-20 w-[calc((100vw-2.75rem)/2)] min-w-36 shrink-0 flex-col items-center justify-center rounded-lg bg-white px-3 text-center shadow-sm ring-1 transition-colors",
+                  activeCategory === item.slug ? "ring-2 ring-slate-950" : "ring-slate-200"
+                )}
+              >
+                <span className="text-sm font-bold leading-5 text-slate-800">{item.name}</span>
+                <span className="mt-2 text-xs text-slate-500">{item.count.toLocaleString()} providers</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FilterSelect({ label, value, onChange, children }: { label: string; value: string; onChange: (value: string) => void; children: React.ReactNode }) {
   return (
     <label className="mb-3 block">
@@ -503,81 +640,139 @@ function FilterSelect({ label, value, onChange, children }: { label: string; val
   );
 }
 
+function ProviderMediaSlot({ provider, className = "" }: { provider: ProviderMarketplaceData; className?: string }) {
+  if (provider.heroImage) {
+    return (
+      <div
+        className={cn("h-full w-full bg-cover bg-center", className)}
+        style={{ backgroundImage: `url(${provider.heroImage})` }}
+      />
+    );
+  }
+
+  return (
+    <div className={cn("flex h-full w-full items-center justify-center bg-slate-100 text-xs font-bold uppercase tracking-wide text-slate-400", className)}>
+      No image
+    </div>
+  );
+}
+
 function ProviderGigCard({ provider, saved, onSave, compact = false }: { provider: ProviderMarketplaceData; saved: boolean; onSave: () => void; compact?: boolean }) {
   return (
     <article className={cn("group w-full min-w-0 max-w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-lg", compact && "sm:w-[min(18rem,calc(100vw-2rem))] sm:shrink-0")}>
-      <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
-        <Link href={`/providers/${provider.slug}`} aria-label={`View ${provider.name}`}>
-          <div
-            className="h-full w-full bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-            style={{ backgroundImage: `url(${provider.heroImage})` }}
-          />
+      <div className="flex h-32 sm:hidden">
+        <Link href={`/providers/${provider.slug}`} aria-label={`View ${provider.name}`} className="relative block h-full w-[42%] shrink-0 overflow-hidden bg-slate-100">
+          <ProviderMediaSlot provider={provider} />
+          {provider.level === "Top Pro" || provider.level === "Level 2" ? (
+            <span className="absolute left-2 top-2 rounded bg-white/90 px-2 py-0.5 text-xs font-bold text-slate-950 shadow-sm">{provider.level === "Top Pro" ? "Pro" : provider.level}</span>
+          ) : null}
         </Link>
-        <button
-          type="button"
-          onClick={onSave}
-          aria-label={saved ? `Remove ${provider.name} from saved providers` : `Save ${provider.name}`}
-          aria-pressed={saved}
-          className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur hover:bg-white"
-        >
-          <Heart className={cn("h-5 w-5", saved && "fill-red-500 text-red-500")} />
-        </button>
-        <span className={cn("absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ring-1", cardAccent(provider))}>
-          {provider.level}
-        </span>
+        <div className="flex min-w-0 flex-1 flex-col p-3">
+          <div className="flex items-start justify-between gap-2">
+            <Link href={`/providers/${provider.slug}`} className="min-w-0 flex-1">
+              <span className="flex items-center gap-1 text-sm font-bold text-slate-950">
+                <Star className="h-4 w-4 shrink-0 fill-slate-950 text-slate-950" />
+                {provider.rating ? provider.rating.toFixed(1) : "New"}
+                <span className="font-medium text-slate-500">({provider.reviewCount})</span>
+              </span>
+              <span className="mt-1 line-clamp-2 text-sm leading-5 text-slate-950">{provider.description || provider.category}</span>
+            </Link>
+            <button
+              type="button"
+              onClick={onSave}
+              aria-label={saved ? `Remove ${provider.name} from saved providers` : `Save ${provider.name}`}
+              aria-pressed={saved}
+              className="shrink-0 rounded-full p-1 text-slate-300 hover:text-red-500"
+            >
+              <Heart className={cn("h-6 w-6", saved && "fill-red-500 text-red-500")} />
+            </button>
+          </div>
+          <div className="mt-auto flex items-end justify-between gap-3">
+            <span className="min-w-0 truncate text-xs font-medium text-slate-500">{provider.category} · {provider.city}</span>
+            <span className="shrink-0 text-right text-xs text-slate-500">From <strong className="text-base text-slate-950">{formatRate(provider.rate)}</strong></span>
+          </div>
+        </div>
       </div>
 
-      <div className="p-4">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <Link href={`/providers/${provider.slug}`} className="truncate text-sm font-bold text-slate-950 hover:text-red-600">
-              {provider.name}
-            </Link>
-            <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{provider.category}</p>
-          </div>
-          <span className="shrink-0 text-sm font-bold text-slate-950">{formatRate(provider.rate)}<span className="text-xs font-medium text-slate-500">/hr</span></span>
-        </div>
-
-        <Link href={`/providers/${provider.slug}`} className="line-clamp-2 min-h-10 text-sm leading-5 text-slate-700 hover:text-slate-950">
-          {provider.description}
-        </Link>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {provider.badges.slice(0, compact ? 2 : 3).map((item) => (
-            <span key={item} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-              {item === "Verified ID" ? <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-600" /> : <Award className="h-3 w-3 shrink-0 text-red-600" />}
-              <span className="truncate">{item}</span>
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Star className="h-4 w-4 shrink-0 fill-slate-950 text-slate-950" />
-            {provider.rating ? provider.rating.toFixed(1) : "New"} ({provider.reviewCount})
-          </span>
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-            <span className="truncate">{provider.city}</span>
-          </span>
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <Clock className="h-4 w-4 shrink-0 text-blue-500" />
-            <span className="truncate">{provider.availability}</span>
-          </span>
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <BriefcaseBusiness className="h-4 w-4 shrink-0 text-slate-400" />
-            <span className="truncate">{provider.completedJobs} jobs</span>
-          </span>
-        </div>
-
-        <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-          <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-emerald-700">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span className="truncate">{provider.responseTime}</span>
-          </span>
-          <Link href={`/providers/${provider.slug}`} className="shrink-0 rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-red-600">
-            View profile
+      <div className="hidden sm:block">
+        <div className="relative aspect-[16/10] overflow-hidden bg-slate-100">
+          <Link href={`/providers/${provider.slug}`} aria-label={`View ${provider.name}`}>
+            <ProviderMediaSlot provider={provider} className="transition-transform duration-500 group-hover:scale-105" />
           </Link>
+          <button
+            type="button"
+            onClick={onSave}
+            aria-label={saved ? `Remove ${provider.name} from saved providers` : `Save ${provider.name}`}
+            aria-pressed={saved}
+            className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-slate-700 shadow-sm backdrop-blur hover:bg-white"
+          >
+            <Heart className={cn("h-5 w-5", saved && "fill-red-500 text-red-500")} />
+          </button>
+          {provider.level ? (
+            <span className={cn("absolute left-3 top-3 rounded-full px-2.5 py-1 text-xs font-bold ring-1", cardAccent(provider))}>
+              {provider.level}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="p-4">
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <Link href={`/providers/${provider.slug}`} className="truncate text-sm font-bold text-slate-950 hover:text-red-600">
+                {provider.name}
+              </Link>
+              <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{provider.category}</p>
+            </div>
+            <span className="shrink-0 text-sm font-bold text-slate-950">{formatRate(provider.rate)}<span className="text-xs font-medium text-slate-500">/hr</span></span>
+          </div>
+
+          <Link href={`/providers/${provider.slug}`} className="line-clamp-2 min-h-10 text-sm leading-5 text-slate-700 hover:text-slate-950">
+            {provider.description || provider.category}
+          </Link>
+
+          {provider.badges.length ? (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {provider.badges.slice(0, compact ? 2 : 3).map((item) => (
+                <span key={item} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                  {item === "Verified ID" ? <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-600" /> : <Award className="h-3 w-3 shrink-0 text-red-600" />}
+                  <span className="truncate">{item}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="mt-4 grid grid-cols-2 gap-2 text-xs font-semibold text-slate-600">
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <Star className="h-4 w-4 shrink-0 fill-slate-950 text-slate-950" />
+              {provider.rating ? provider.rating.toFixed(1) : "New"} ({provider.reviewCount})
+            </span>
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="truncate">{provider.city}</span>
+            </span>
+            {provider.availability ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5">
+                <Clock className="h-4 w-4 shrink-0 text-blue-500" />
+                <span className="truncate">{provider.availability}</span>
+              </span>
+            ) : null}
+            <span className="inline-flex min-w-0 items-center gap-1.5">
+              <BriefcaseBusiness className="h-4 w-4 shrink-0 text-slate-400" />
+              <span className="truncate">{provider.completedJobs} jobs</span>
+            </span>
+          </div>
+
+          <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+            {provider.responseTime ? (
+              <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span className="truncate">{provider.responseTime}</span>
+              </span>
+            ) : <span />}
+            <Link href={`/providers/${provider.slug}`} className="shrink-0 rounded-lg bg-slate-950 px-3 py-2 text-xs font-bold text-white hover:bg-red-600">
+              View profile
+            </Link>
+          </div>
         </div>
       </div>
     </article>

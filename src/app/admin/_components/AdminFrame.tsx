@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { Bell, LogOut, Search, Settings } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { adminNavItems } from "./admin-data";
+import { logoutClientSession } from "@/lib/auth/logout-client";
+import { InsuranceNotice } from "@/components/safety/InsuranceNotice";
 
 function AdminPendingContent({ path }: { path: string }) {
   const target = adminNavItems.find((item) => item.href === path);
@@ -72,9 +74,8 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
   }, [router]);
 
   async function handleLogout() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/admin-login");
+    await logoutClientSession();
+    router.replace("/admin-login");
     router.refresh();
   }
 
@@ -116,8 +117,14 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
     <div className="min-h-screen bg-slate-100 text-slate-950">
       <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 border-r border-slate-200 bg-slate-950 text-white lg:flex lg:flex-col">
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
-          <Link href="/admin" className="text-2xl font-bold tracking-tight">
-            AnyJob
+          <Link href="/admin" className="flex items-center">
+            <Image
+              src="/anyjoblogo-removebg-preview.png"
+              alt="AnyJob"
+              width={116}
+              height={42}
+              className="h-10 w-auto brightness-110"
+            />
           </Link>
           <span className="rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-medium text-red-200">
             Admin
@@ -163,8 +170,14 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
       <div className="min-w-0 lg:pl-72">
         <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
           <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
-            <Link href="/admin" className="text-xl font-bold text-red-600 lg:hidden">
-              AnyJob
+            <Link href="/admin" className="flex items-center lg:hidden">
+              <Image
+                src="/anyjoblogo-removebg-preview.png"
+                alt="AnyJob"
+                width={104}
+                height={38}
+                className="h-9 w-auto"
+              />
             </Link>
             <form onSubmit={handleAdminSearch} className="relative hidden flex-1 md:block">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -192,7 +205,12 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
           </div>
         </header>
 
-        {pathname !== optimisticPath ? <AdminPendingContent path={optimisticPath} /> : children}
+        <div>
+          <div className="px-4 pt-6 sm:px-6 lg:px-8">
+            <InsuranceNotice accent="slate" />
+          </div>
+          {pathname !== optimisticPath ? <AdminPendingContent path={optimisticPath} /> : children}
+        </div>
       </div>
     </div>
   );

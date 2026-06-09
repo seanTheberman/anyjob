@@ -10,8 +10,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Loader2, User, Briefcase } from "lucide-react";
 
+function safeRedirect(value: string | null) {
+    if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
+    return value;
+}
+
 export default function LoginPage() {
     const router = useRouter();
+    const redirectTarget = typeof window === "undefined"
+        ? "/"
+        : safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
     const [showPassword, setShowPassword] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -25,7 +33,7 @@ export default function LoginPage() {
 
         function goHomeIfSignedIn(userId?: string) {
             if (mounted && userId) {
-                router.replace("/");
+                router.replace(redirectTarget);
             }
         }
 
@@ -47,7 +55,7 @@ export default function LoginPage() {
             mounted = false;
             subscription.unsubscribe();
         };
-    }, [router]);
+    }, [router, redirectTarget]);
 
     async function handleLogin(e: React.FormEvent) {
         e.preventDefault();
@@ -81,18 +89,9 @@ export default function LoginPage() {
             return;
         }
 
-        const userRole = String(payload.user?.role || "client").toLowerCase();
-
-        // Redirect based on user role
-        if (userRole === 'provider' || userRole === 'seller') {
-            router.push("/pro");
-        } else if (userRole === 'admin') {
-            await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
-            router.push("/admin-login");
-        } else {
-            // Default to client dashboard
-            router.push("/dashboard");
-        }
+        // Land on the public home page after login; the logged-in header menu
+        // contains the role-aware dashboard entry.
+        router.push(redirectTarget);
         router.refresh();
     }
 
@@ -101,7 +100,7 @@ export default function LoginPage() {
         await supabase.auth.signInWithOAuth({
             provider: "google",
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTarget)}`,
             },
         });
     }
@@ -118,7 +117,7 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signInWithOtp({
             email,
             options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback`,
+                emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTarget)}`,
             },
         });
 

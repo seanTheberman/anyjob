@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { motion, AnimatePresence } from "framer-motion";
@@ -21,6 +22,8 @@ import {
   Info,
   Sparkles,
   X,
+  Building2,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +48,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { CategoryIcon, SubcategoryIcon } from "@/components/shared/CategoryIcon";
 import type { User } from "@supabase/supabase-js";
+import { SHIFT_NICHES, WORK_TYPES, getShiftNiche } from "@/lib/shift-work";
 
 // Types
 interface Category {
@@ -228,6 +232,45 @@ interface FormData {
   work_images: File[];
 }
 
+type ShiftAudience = "" | "business" | "individual";
+
+type BusinessProfile = {
+  id: string;
+  business_name: string;
+  status: string;
+  industry?: string | null;
+  contact_name?: string | null;
+  contact_phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  postal_code?: string | null;
+};
+
+type ShiftBusinessPostForm = {
+  workType: string;
+  niche: string;
+  industry: string;
+  roleTitle: string;
+  description: string;
+  locationName: string;
+  address: string;
+  city: string;
+  postalCode: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  headcount: string;
+  hourlyRate: string;
+  dayRate: string;
+  acceptsWorkerRateVariation: boolean;
+  requirements: string;
+  uniform: string;
+  breakPolicy: string;
+  contactName: string;
+  contactPhone: string;
+};
+
 const INITIAL_FORM_DATA: FormData = {
   category_slug: "",
   subcategory_slug: "",
@@ -264,6 +307,35 @@ const INITIAL_FORM_DATA: FormData = {
 };
 
 const TOTAL_STEPS = 9;
+const SHIFT_TOTAL_STEPS = 5;
+
+function initialShiftBusinessPostForm(): ShiftBusinessPostForm {
+  const niche = SHIFT_NICHES[0];
+  return {
+    workType: "part_time_day_wage",
+    niche: niche.value,
+    industry: niche.industry,
+    roleTitle: niche.roles[0],
+    description: "",
+    locationName: "",
+    address: "",
+    city: "",
+    postalCode: "",
+    startDate: "",
+    startTime: "09:00",
+    endDate: "",
+    endTime: "17:00",
+    headcount: "1",
+    hourlyRate: String(niche.hourlyAverage),
+    dayRate: String(niche.dayAverage),
+    acceptsWorkerRateVariation: true,
+    requirements: "",
+    uniform: "",
+    breakPolicy: "",
+    contactName: "",
+    contactPhone: "",
+  };
+}
 
 // Main page component wrapped in Suspense
 export default function QuestionnairePage() {
@@ -315,18 +387,30 @@ function ServiceQuestionnaireContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const supabase = createClient();
+  const isShiftQuestionnaire = searchParams.get("work_type") === "shifts";
 
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
+  const [shiftAudience, setShiftAudience] = useState<ShiftAudience>("");
+  const [business, setBusiness] = useState<BusinessProfile | null>(null);
+  const [businessLoading, setBusinessLoading] = useState(false);
+  const [shiftFormData, setShiftFormData] = useState<ShiftBusinessPostForm>(initialShiftBusinessPostForm);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [stepKey, setStepKey] = useState(1);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const isTaskrabbitSelection = searchParams.get("source") === "taskrabbit";
   const selectedCustomJobName = formData.category_slug === "custom" ? formData.custom_tags[0] : "";
+  const selectedShiftNiche = useMemo(() => getShiftNiche(shiftFormData.niche), [shiftFormData.niche]);
 
   // Get pre-selected category from URL
   useEffect(() => {
+    if (isShiftQuestionnaire) {
+      setCurrentStep(1);
+      setStepKey(1);
+      return;
+    }
+
     const cat = searchParams.get("category");
     const subcategory = searchParams.get("subcategory");
     const urgency = searchParams.get("urgency");
@@ -354,7 +438,7 @@ function ServiceQuestionnaireContent() {
       setCurrentStep(nextStep);
       setStepKey(nextStep);
     }
-  }, [searchParams]);
+  }, [searchParams, isShiftQuestionnaire]);
 
   useEffect(() => {
     let mounted = true;
@@ -389,8 +473,67 @@ function ServiceQuestionnaireContent() {
     };
   }, [supabase]);
 
+  useEffect(() => {
+    let mounted = true;
+    if (!isShiftQuestionnaire || !currentUser) {
+      setBusiness(null);
+      setBusinessLoading(false);
+      return;
+    }
+
+    async function loadBusinessStatus() {
+      setBusinessLoading(true);
+      try {
+        const response = await fetch("/api/business/register");
+        const payload = await response.json().catch(() => ({}));
+        if (!mounted) return;
+        const profile = response.ok ? payload.business || null : null;
+        setBusiness(profile);
+        if (profile) {
+          setShiftFormData((current) => ({
+            ...current,
+            industry: profile.industry || current.industry,
+            address: profile.address || current.address,
+            city: profile.city || current.city,
+            postalCode: profile.postal_code || current.postalCode,
+            contactName: profile.contact_name || current.contactName,
+            contactPhone: profile.contact_phone || current.contactPhone,
+          }));
+        }
+      } catch (error) {
+        console.error("Business status lookup failed:", error);
+        if (mounted) setBusiness(null);
+      } finally {
+        if (mounted) setBusinessLoading(false);
+      }
+    }
+
+    loadBusinessStatus();
+    return () => {
+      mounted = false;
+    };
+  }, [currentUser, isShiftQuestionnaire]);
+
   const updateFormData = (field: keyof FormData, value: unknown) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const updateShiftFormData = (field: keyof ShiftBusinessPostForm, value: string | boolean) => {
+    setShiftFormData((prev) => ({ ...prev, [field]: value }));
+    setSubmitError(null);
+  };
+
+  const handleShiftNicheChange = (value: string) => {
+    const niche = getShiftNiche(value);
+    setShiftFormData((prev) => ({
+      ...prev,
+      niche: niche.value,
+      industry: niche.industry,
+      roleTitle: niche.roles[0],
+      hourlyRate: String(niche.hourlyAverage),
+      dayRate: String(niche.dayAverage),
+    }));
+    setSubmitError(null);
   };
 
   const handleNext = () => {
@@ -596,12 +739,94 @@ function ServiceQuestionnaireContent() {
     }
   };
 
+  const handleShiftSubmit = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch("/api/business/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(shiftFormData),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setSubmitError(payload.error || "Unable to create business shift post.");
+        return;
+      }
+      router.push("/dashboard/business");
+      router.refresh();
+    } catch (error) {
+      console.error("Shift post creation failed:", error);
+      setSubmitError("Unable to create business shift post. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Helper function to generate random password for auto-signup
   const generateRandomPassword = () => {
     return Math.random().toString(36).slice(-8) + 'A1!';
   };
 
   const renderStep = () => {
+    if (isShiftQuestionnaire) {
+      switch (currentStep) {
+        case 1:
+          return (
+            <Step1ShiftAudience
+              audience={shiftAudience}
+              setAudience={setShiftAudience}
+              onNext={handleNext}
+            />
+          );
+        case 2:
+          return (
+            <ShiftBusinessAccessStep
+              business={business}
+              businessLoading={businessLoading}
+              currentUser={currentUser}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+            />
+          );
+        case 3:
+          return (
+            <ShiftRoleStep
+              formData={shiftFormData}
+              selectedNiche={selectedShiftNiche}
+              updateFormData={updateShiftFormData}
+              handleNicheChange={handleShiftNicheChange}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+            />
+          );
+        case 4:
+          return (
+            <ShiftScheduleLocationStep
+              formData={shiftFormData}
+              updateFormData={updateShiftFormData}
+              onNext={handleNext}
+              onPrevious={handlePrevious}
+            />
+          );
+        case 5:
+          return (
+            <ShiftPayRequirementsStep
+              formData={shiftFormData}
+              selectedNiche={selectedShiftNiche}
+              updateFormData={updateShiftFormData}
+              onPrevious={handlePrevious}
+              onSubmit={handleShiftSubmit}
+              isSubmitting={isSubmitting}
+              error={submitError}
+            />
+          );
+        default:
+          return null;
+      }
+    }
+
     switch (currentStep) {
       case 1:
         return (
@@ -698,6 +923,11 @@ function ServiceQuestionnaireContent() {
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 pt-20">
       {/* Main Content */}
       <main className="max-w-3xl mx-auto px-4 py-8">
+        {isShiftQuestionnaire && shiftAudience !== "individual" ? (
+          <div className="mb-6 rounded-full bg-white px-4 py-2 text-center text-sm font-semibold text-gray-600 shadow-sm ring-1 ring-gray-200">
+            Work shifts step {currentStep} of {SHIFT_TOTAL_STEPS}
+          </div>
+        ) : null}
         <motion.div
           key={stepKey}
           initial={{ opacity: 0, x: 20 }}
@@ -707,6 +937,448 @@ function ServiceQuestionnaireContent() {
           {renderStep()}
         </motion.div>
       </main>
+    </div>
+  );
+}
+
+function Step1ShiftAudience({
+  audience,
+  setAudience,
+  onNext,
+}: {
+  audience: ShiftAudience;
+  setAudience: (audience: ShiftAudience) => void;
+  onNext: () => void;
+}) {
+  const isIndividual = audience === "individual";
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 text-red-600">
+          <ClipboardList className="h-7 w-7" />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Who is posting this work shift?</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Work shifts are business-only posts because they involve staffing, payroll-style scheduling, and verified company details.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={() => setAudience("business")}
+          className={cn(
+            "rounded-2xl border-2 p-5 text-left transition-all",
+            audience === "business" ? "border-red-600 bg-red-50 ring-4 ring-red-100" : "border-gray-200 bg-white hover:border-gray-300"
+          )}
+        >
+          <Building2 className="mb-3 h-7 w-7 text-red-600" />
+          <span className="block text-base font-bold text-gray-950">I am a business</span>
+          <span className="mt-2 block text-sm leading-6 text-gray-600">
+            Continue to the shift job questionnaire for verified businesses.
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setAudience("individual")}
+          className={cn(
+            "rounded-2xl border-2 p-5 text-left transition-all",
+            audience === "individual" ? "border-amber-500 bg-amber-50 ring-4 ring-amber-100" : "border-gray-200 bg-white hover:border-gray-300"
+          )}
+        >
+          <Home className="mb-3 h-7 w-7 text-amber-600" />
+          <span className="block text-base font-bold text-gray-950">I am an individual</span>
+          <span className="mt-2 block text-sm leading-6 text-gray-600">
+            Use day-to-day jobs for personal home services and one-off help.
+          </span>
+        </button>
+      </div>
+
+      {isIndividual ? (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+          <div className="flex items-start gap-3">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+            <div>
+              <h2 className="font-bold">This is a business-only feature</h2>
+              <p className="mt-2 text-sm leading-6 text-amber-900">
+                Individuals should not post work shifts. Please post your request under day-to-day jobs so it goes through
+                the normal home-service questionnaire.
+              </p>
+              <Link
+                href="/questionnaire"
+                className="mt-4 inline-flex items-center rounded-xl bg-amber-900 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-950"
+              >
+                Post under day-to-day jobs
+              </Link>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex justify-end pt-2">
+        <Button
+          onClick={onNext}
+          disabled={audience !== "business"}
+          className="bg-red-600 px-8 text-white hover:bg-red-700"
+        >
+          Continue <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ShiftBusinessAccessStep({
+  business,
+  businessLoading,
+  currentUser,
+  onNext,
+  onPrevious,
+}: {
+  business: BusinessProfile | null;
+  businessLoading: boolean;
+  currentUser: User | null;
+  onNext: () => void;
+  onPrevious: () => void;
+}) {
+  const approved = business?.status === "approved";
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Business shift access</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          AnyJob checks that this account has an approved business before showing the shift posting questions.
+        </p>
+      </div>
+
+      {businessLoading ? (
+        <div className="flex items-center rounded-2xl border border-gray-200 bg-white p-5 text-gray-600">
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+          Checking business approval...
+        </div>
+      ) : null}
+
+      {!businessLoading && !currentUser ? (
+        <ShiftAccessMessage
+          title="Sign in before posting work shifts"
+          text="Work shift posts must be attached to a verified business account."
+          href="/login?redirect=/register-business"
+          cta="Login"
+          secondaryHref="/business-signup?redirect=/register-business"
+          secondaryCta="Create business account"
+        />
+      ) : null}
+
+      {!businessLoading && currentUser && !business ? (
+        <ShiftAccessMessage
+          title="Register your business first"
+          text="You need a business profile, registration number, and verification document before posting shift jobs."
+          href="/register-business"
+          cta="Register as a business"
+        />
+      ) : null}
+
+      {!businessLoading && business && !approved ? (
+        <ShiftAccessMessage
+          title={`Business approval is ${business.status}`}
+          text="Admin approval is required before this account can post day-wage or shift work."
+          href="/register-business"
+          cta="View registration"
+        />
+      ) : null}
+
+      {!businessLoading && approved ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
+          <div className="flex items-start gap-3">
+            <Check className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
+            <div>
+              <h2 className="font-bold">{business.business_name} is approved</h2>
+              <p className="mt-2 text-sm leading-6 text-emerald-900">
+                Continue to post shift work with role, schedule, location, headcount, rates, and requirements.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onPrevious}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <Button onClick={onNext} disabled={!approved} className="bg-red-600 px-8 text-white hover:bg-red-700">
+          Continue <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ShiftAccessMessage({
+  title,
+  text,
+  href,
+  cta,
+  secondaryHref,
+  secondaryCta,
+}: {
+  title: string;
+  text: string;
+  href: string;
+  cta: string;
+  secondaryHref?: string;
+  secondaryCta?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+      <div className="flex items-start gap-3">
+        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
+        <div>
+          <h2 className="font-bold">{title}</h2>
+          <p className="mt-2 text-sm leading-6 text-amber-900">{text}</p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href={href} className="inline-flex items-center rounded-xl bg-amber-900 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-950">
+              {cta}
+            </Link>
+            {secondaryHref && secondaryCta ? (
+              <Link href={secondaryHref} className="inline-flex items-center rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-100">
+                {secondaryCta}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShiftRoleStep({
+  formData,
+  selectedNiche,
+  updateFormData,
+  handleNicheChange,
+  onNext,
+  onPrevious,
+}: {
+  formData: ShiftBusinessPostForm;
+  selectedNiche: ReturnType<typeof getShiftNiche>;
+  updateFormData: (field: keyof ShiftBusinessPostForm, value: string | boolean) => void;
+  handleNicheChange: (value: string) => void;
+  onNext: () => void;
+  onPrevious: () => void;
+}) {
+  const canContinue = Boolean(formData.niche && formData.roleTitle && formData.description.trim().length >= 10);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Role and worker niche</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          These questions are different from day-to-day jobs. Only matching shift workers can see this business post.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Worker niche *</span>
+          <select value={formData.niche} onChange={(event) => handleNicheChange(event.target.value)} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-3 py-3">
+            {SHIFT_NICHES.map((niche) => (
+              <option key={niche.value} value={niche.value}>{niche.label}</option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-gray-500">Market average: EUR {selectedNiche.hourlyAverage}/hour or EUR {selectedNiche.dayAverage}/day</span>
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Role *</span>
+          <select value={formData.roleTitle} onChange={(event) => updateFormData("roleTitle", event.target.value)} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-3 py-3">
+            {selectedNiche.roles.map((role) => (
+              <option key={role} value={role}>{role}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <label className="block">
+        <span className="text-sm font-semibold text-gray-700">Shift duties and expectations *</span>
+        <Textarea
+          value={formData.description}
+          onChange={(event) => updateFormData("description", event.target.value)}
+          rows={6}
+          className="mt-2 min-h-40 resize-none"
+          placeholder="Describe the shift duties, experience needed, must-have certifications, language needs, and how workers should report on arrival."
+        />
+        <span className="mt-1 block text-xs text-gray-500">Minimum 10 characters • {formData.description.length} characters</span>
+      </label>
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onPrevious}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <Button onClick={onNext} disabled={!canContinue} className="bg-red-600 px-8 text-white hover:bg-red-700">
+          Continue <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ShiftScheduleLocationStep({
+  formData,
+  updateFormData,
+  onNext,
+  onPrevious,
+}: {
+  formData: ShiftBusinessPostForm;
+  updateFormData: (field: keyof ShiftBusinessPostForm, value: string | boolean) => void;
+  onNext: () => void;
+  onPrevious: () => void;
+}) {
+  const canContinue = Boolean(formData.address && formData.city && formData.startDate && formData.startTime && formData.endTime && Number(formData.headcount) > 0);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Schedule, location, and headcount</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Shift posts need exact timing and workplace details so workers can decide if they are available.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Work type *</span>
+          <select value={formData.workType} onChange={(event) => updateFormData("workType", event.target.value)} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-3 py-3">
+            {WORK_TYPES.filter((type) => type.value !== "freelance_service").map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Headcount *</span>
+          <Input type="number" min="1" value={formData.headcount} onChange={(event) => updateFormData("headcount", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Start date *</span>
+          <Input type="date" value={formData.startDate} onChange={(event) => updateFormData("startDate", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Start time *</span>
+          <Input type="time" value={formData.startTime} onChange={(event) => updateFormData("startTime", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">End date</span>
+          <Input type="date" value={formData.endDate} onChange={(event) => updateFormData("endDate", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">End time *</span>
+          <Input type="time" value={formData.endTime} onChange={(event) => updateFormData("endTime", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="text-sm font-semibold text-gray-700">Location name</span>
+          <Input value={formData.locationName} onChange={(event) => updateFormData("locationName", event.target.value)} className="mt-2" placeholder="Main venue, ward, store, warehouse..." />
+        </label>
+        <label className="block sm:col-span-2">
+          <span className="text-sm font-semibold text-gray-700">Address *</span>
+          <Textarea value={formData.address} onChange={(event) => updateFormData("address", event.target.value)} className="mt-2 min-h-20 resize-none" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">City *</span>
+          <Input value={formData.city} onChange={(event) => updateFormData("city", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Postal code</span>
+          <Input value={formData.postalCode} onChange={(event) => updateFormData("postalCode", event.target.value)} className="mt-2" />
+        </label>
+      </div>
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onPrevious}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <Button onClick={onNext} disabled={!canContinue} className="bg-red-600 px-8 text-white hover:bg-red-700">
+          Continue <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ShiftPayRequirementsStep({
+  formData,
+  selectedNiche,
+  updateFormData,
+  onPrevious,
+  onSubmit,
+  isSubmitting,
+  error,
+}: {
+  formData: ShiftBusinessPostForm;
+  selectedNiche: ReturnType<typeof getShiftNiche>;
+  updateFormData: (field: keyof ShiftBusinessPostForm, value: string | boolean) => void;
+  onPrevious: () => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  error: string | null;
+}) {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Pay, requirements, and contact</h1>
+        <p className="mt-2 text-gray-600 dark:text-gray-400">
+          Businesses set preferred rates, then workers can apply, accept, or request a variation.
+        </p>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Preferred hourly rate</span>
+          <Input type="number" min="1" value={formData.hourlyRate} onChange={(event) => updateFormData("hourlyRate", event.target.value)} className="mt-2" />
+          <span className="mt-1 block text-xs text-gray-500">Market average for {selectedNiche.label}: EUR {selectedNiche.hourlyAverage}/hour</span>
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Preferred day rate</span>
+          <Input type="number" min="1" value={formData.dayRate} onChange={(event) => updateFormData("dayRate", event.target.value)} className="mt-2" />
+          <span className="mt-1 block text-xs text-gray-500">Market average for {selectedNiche.label}: EUR {selectedNiche.dayAverage}/day</span>
+        </label>
+        <label className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700 sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={formData.acceptsWorkerRateVariation}
+            onChange={(event) => updateFormData("acceptsWorkerRateVariation", event.target.checked)}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          Accept worker fee variations above or below this preferred rate
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Requirements</span>
+          <Textarea value={formData.requirements} onChange={(event) => updateFormData("requirements", event.target.value)} rows={3} className="mt-2 resize-none" placeholder="Certifications, experience, language, safety requirements..." />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Uniform/equipment</span>
+          <Textarea value={formData.uniform} onChange={(event) => updateFormData("uniform", event.target.value)} rows={3} className="mt-2 resize-none" placeholder="Uniform, PPE, shoes, tools, ID checks..." />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Break policy</span>
+          <Input value={formData.breakPolicy} onChange={(event) => updateFormData("breakPolicy", event.target.value)} className="mt-2" />
+        </label>
+        <label className="block">
+          <span className="text-sm font-semibold text-gray-700">Business contact phone</span>
+          <Input value={formData.contactPhone} onChange={(event) => updateFormData("contactPhone", event.target.value)} className="mt-2" />
+        </label>
+      </div>
+
+      {error ? <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
+
+      <div className="flex justify-between pt-2">
+        <Button variant="outline" onClick={onPrevious} disabled={isSubmitting}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+        </Button>
+        <Button onClick={onSubmit} disabled={isSubmitting} className="bg-red-600 px-8 text-white hover:bg-red-700">
+          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Post business shift
+        </Button>
+      </div>
     </div>
   );
 }

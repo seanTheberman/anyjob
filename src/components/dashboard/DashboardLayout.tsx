@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutGrid,
@@ -27,6 +28,8 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
+import { logoutClientSession } from "@/lib/auth/logout-client";
+import { InsuranceNotice } from "@/components/safety/InsuranceNotice";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -74,11 +77,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = createClient();
+  const showDashboardInsuranceNotice = !pathname?.includes("/notifications");
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => null);
-    router.push("/login");
+    setProfileDropdownOpen(false);
+    setUser(null);
+    await logoutClientSession();
+    router.replace("/login");
+    router.refresh();
   };
 
   const toggleDarkMode = () => {
@@ -135,9 +141,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2 group">
-              <span className="text-2xl sm:text-3xl font-cursive font-bold transition-colors duration-300 text-red-600 hover:text-red-700">
-                AnyJob
-              </span>
+              <Image
+                src="/anyjoblogo-removebg-preview.png"
+                alt="AnyJob"
+                width={120}
+                height={44}
+                className="h-10 w-auto"
+              />
             </Link>
           </div>
 
@@ -213,9 +223,13 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="flex items-center justify-between px-4 h-14">
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-cursive font-bold text-red-600">
-              AnyJob
-            </span>
+            <Image
+              src="/anyjoblogo-removebg-preview.png"
+              alt="AnyJob"
+              width={104}
+              height={38}
+              className="h-9 w-auto"
+            />
           </Link>
 
           {/* Right side - Notifications & Menu */}
@@ -361,6 +375,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Main Content */}
         <main className="flex-1 min-h-[calc(100vh-8rem)] lg:ml-64 lg:min-h-[calc(100vh-4rem)] p-4 lg:p-6 pb-24 lg:pb-6">
+          {showDashboardInsuranceNotice ? (
+            <div className="mb-4 lg:mb-6">
+              <InsuranceNotice />
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

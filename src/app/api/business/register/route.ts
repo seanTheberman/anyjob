@@ -11,6 +11,32 @@ function cleanArray(value: unknown) {
   return value.map((item) => cleanString(item)).filter(Boolean);
 }
 
+function cleanDocuments(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const upload = record.upload && typeof record.upload === "object" ? record.upload as Record<string, unknown> : null;
+      const type = cleanString(record.type || record.key);
+      const label = cleanString(record.label);
+      const link = cleanString(record.link);
+      const fileName = cleanString(upload?.fileName || record.fileName);
+      const dataUrl = cleanString(upload?.dataUrl || record.dataUrl);
+
+      if (!link && !dataUrl) return null;
+
+      return {
+        type,
+        label,
+        link,
+        upload: dataUrl ? { fileName, dataUrl } : null,
+      };
+    })
+    .filter((document): document is { type: string; label: string; link: string; upload: { fileName: string; dataUrl: string } | null } => Boolean(document));
+}
+
 export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
@@ -67,10 +93,17 @@ export async function POST(request: NextRequest) {
     const city = cleanString(body.city);
     const postalCode = cleanString(body.postalCode);
     const country = cleanString(body.country) || "France";
-    const documentUrl = cleanString(body.documentUrl) || cleanString(body.documentDataUrl);
-    const documentSource = cleanString(body.documentDataUrl) ? "upload" : "url";
+    const submittedDocuments = cleanDocuments(body.documents);
+    const legacyDocumentUrl = cleanString(body.documentUrl) || cleanString(body.documentDataUrl);
+    const documentUrl = submittedDocuments.length ? JSON.stringify(submittedDocuments) : legacyDocumentUrl;
+    const documentSource = submittedDocuments.length
+      ? submittedDocuments.some((document) => document.upload) ? "upload" : "url"
+      : cleanString(body.documentDataUrl) ? "upload" : "url";
     const typicalWorkTypes = cleanArray(body.typicalWorkTypes);
     const typicalRolesNeeded = cleanArray(body.typicalRolesNeeded);
+    const hasRegistrationDocument = submittedDocuments.length
+      ? submittedDocuments.some((document) => document.type === "registration")
+      : Boolean(legacyDocumentUrl);
 
     const required = [
       businessName,
@@ -82,12 +115,12 @@ export async function POST(request: NextRequest) {
       contactPhone,
       address,
       city,
-      documentUrl,
+      hasRegistrationDocument ? documentUrl : "",
     ];
 
     if (required.some((value) => !value)) {
       return NextResponse.json(
-        { error: "Business name, registration number, contact details, address, and business document are required" },
+        { error: "Business name, registration number, contact details, address, and company registration document are required" },
         { status: 400 }
       );
     }

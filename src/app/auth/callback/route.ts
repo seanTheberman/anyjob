@@ -5,6 +5,8 @@ export async function GET(request: Request) {
     const { searchParams, origin } = new URL(request.url);
     const code = searchParams.get("code");
     const roleParam = searchParams.get("role");
+    const nextParam = searchParams.get("next");
+    const nextPath = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
 
     if (code) {
         const supabase = await createServerSupabaseClient();
@@ -34,18 +36,7 @@ export async function GET(request: Request) {
                     });
                 }
 
-                // Get user role for redirection
-                const userRole = existingProfile?.role?.toLowerCase() || "client";
-
-                // Redirect based on user role
-                let redirectUrl = "/dashboard"; // default
-                if (userRole === "provider") {
-                    redirectUrl = "/pro";
-                } else if (userRole === "admin") {
-                    redirectUrl = "/admin";
-                }
-
-                return NextResponse.redirect(`${origin}${redirectUrl}`);
+                return NextResponse.redirect(`${origin}${nextPath}`);
             }
         }
     }
