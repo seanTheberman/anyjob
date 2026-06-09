@@ -128,9 +128,31 @@ export default function BecomeProviderPage() {
     const [selectedCity, setSelectedCity] = useState("Paris");
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
+    const [accountType, setAccountType] = useState<"individual" | "business">("individual");
+    const [workModes, setWorkModes] = useState<Array<"freelance" | "shift">>(["freelance", "shift"]);
     const handleCategoryChange = (value: string) => {
         const cat = CATEGORIES.find(c => c.name === value);
         if (cat) setSelectedCategory(cat);
+    };
+    const toggleWorkMode = (mode: "freelance" | "shift") => {
+        setWorkModes((current) => (
+            current.includes(mode)
+                ? current.filter((item) => item !== mode)
+                : [...current, mode]
+        ));
+    };
+    const startRegistration = () => {
+        if (accountType === "business") {
+            router.push("/business-signup?redirect=/register-business");
+            return;
+        }
+
+        const mode = workModes.includes("freelance") && workModes.includes("shift")
+            ? "both"
+            : workModes.includes("shift")
+                ? "shift"
+                : "freelance";
+        router.push(`/seller-register?mode=${mode}`);
     };
 
     return (
@@ -210,25 +232,62 @@ export default function BecomeProviderPage() {
                                 </div>
                             </div>
 
-                            {/* Work Mode Choice */}
-                            <div className="grid gap-3 sm:grid-cols-2">
+                            {/* Registration Choice */}
+                            <div className="space-y-3">
+                                <p className="text-sm font-bold text-gray-900">First, choose what you are registering as</p>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAccountType("individual")}
+                                        className={`rounded-lg border px-4 py-4 text-left transition-colors ${accountType === "individual" ? "border-[#006340] bg-[#006340] text-white ring-2 ring-green-100" : "border-gray-200 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"}`}
+                                    >
+                                        <span className="block text-sm font-bold">I am an individual provider</span>
+                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "individual" ? "text-white/80" : "text-gray-600"}`}>I personally want to work and get screened as a provider.</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAccountType("business")}
+                                        className={`rounded-lg border px-4 py-4 text-left transition-colors ${accountType === "business" ? "border-red-600 bg-red-600 text-white ring-2 ring-red-100" : "border-gray-200 bg-white text-gray-950 hover:border-red-500 hover:bg-red-50"}`}
+                                    >
+                                        <span className="block text-sm font-bold">I am a business</span>
+                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "business" ? "text-white/80" : "text-gray-600"}`}>Register a company to post jobs, hire workers, and manage shifts.</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {accountType === "individual" ? (
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                                 <button
                                     type="button"
-                                    onClick={() => router.push('/seller-register?mode=freelance')}
-                                    className="rounded-lg border border-[#006340]/20 bg-white px-4 py-4 text-left transition-colors hover:border-[#006340] hover:bg-green-50"
+                                    onClick={() => toggleWorkMode("freelance")}
+                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workModes.includes("freelance") ? "border-[#006340] bg-green-50 ring-2 ring-green-100" : "border-[#006340]/20 bg-white hover:border-[#006340] hover:bg-green-50"}`}
                                 >
                                     <span className="block text-sm font-bold text-gray-950">I want to work freelance</span>
                                     <span className="mt-1 block text-xs leading-5 text-gray-600">Quote normal AnyJob service requests and set your own project price.</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => router.push('/seller-register?mode=shift')}
-                                    className="rounded-lg bg-[#006340] px-4 py-4 text-left text-white transition-colors hover:bg-[#005230]"
+                                    onClick={() => toggleWorkMode("shift")}
+                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workModes.includes("shift") ? "border-[#006340] bg-green-50 text-gray-950 ring-2 ring-green-100" : "border-[#006340]/20 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"}`}
                                 >
                                     <span className="block text-sm font-bold">I want to work in shifts</span>
-                                    <span className="mt-1 block text-xs leading-5 text-white/80">Join the business worker pool for day-wage and shift work.</span>
+                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Join the business worker pool for day-wage and shift work.</span>
                                 </button>
-                            </div>
+                              </div>
+                            ) : (
+                              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
+                                Businesses use business registration, not provider registration. Admin will screen the company before job and shift posting opens.
+                              </div>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={startRegistration}
+                                disabled={accountType === "individual" && workModes.length === 0}
+                                className="mt-4 w-full rounded-lg bg-[#006340] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#005230] disabled:cursor-not-allowed disabled:bg-gray-300"
+                            >
+                                {accountType === "business" ? "Continue to business registration" : "Start provider registration"}
+                            </button>
 
                             {/* Sign In Link */}
                             <p className="mt-4 text-center text-sm text-gray-600">

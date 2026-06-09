@@ -29,7 +29,8 @@ import {
   Moon,
   Smartphone,
   Home,
-  Search
+  Search,
+  type LucideIcon
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
@@ -40,11 +41,33 @@ interface ProviderLayoutProps {
   children: React.ReactNode;
 }
 
+type ProviderWorkMode = "freelance" | "shift" | "both" | string | null | undefined;
+
+type ProviderNavItem = {
+  icon: LucideIcon;
+  label: string;
+  href: string;
+  requiresShifts?: boolean;
+};
+
+type ProviderSessionUser = {
+  id: string;
+  email?: string;
+  displayName?: string;
+  role?: string;
+  providerWorkMode?: ProviderWorkMode;
+  canWorkShifts?: boolean | null;
+};
+
+function allowsShiftWork(canWorkShifts: boolean | null | undefined, providerWorkMode: ProviderWorkMode) {
+  return Boolean(canWorkShifts || providerWorkMode === "shift" || providerWorkMode === "both");
+}
+
 // Desktop sidebar items (all items)
-const sidebarItems = [
+const sidebarItems: ProviderNavItem[] = [
   { icon: Briefcase, label: "Live Jobs", href: "/pro" },
   { icon: Search, label: "Browse Jobs", href: "/pro/jobs" },
-  { icon: Calendar, label: "Shift Board", href: "/pro/shifts" },
+  { icon: Calendar, label: "Shift Board", href: "/pro/shifts", requiresShifts: true },
   { icon: User, label: "Profile", href: "/pro/profile" },
   { icon: Wrench, label: "My Services", href: "/pro/services" },
   { icon: DollarSign, label: "Earnings", href: "/pro/earnings" },
@@ -58,10 +81,10 @@ const sidebarItems = [
 ];
 
 // Mobile bottom nav items (main 5 items only)
-const bottomNavItems = [
+const bottomNavItems: ProviderNavItem[] = [
   { icon: Home, label: "Home", href: "/pro" },
   { icon: Briefcase, label: "Jobs", href: "/pro/jobs" },
-  { icon: Calendar, label: "Shifts", href: "/pro/shifts" },
+  { icon: Calendar, label: "Shifts", href: "/pro/shifts", requiresShifts: true },
   { icon: MessageSquare, label: "Chat", href: "/pro/messages" },
   { icon: User, label: "Profile", href: "/pro/profile" },
 ];
@@ -90,9 +113,18 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   const [darkMode, setDarkMode] = useState(false);
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [canSeeShiftBoard, setCanSeeShiftBoard] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
   const showDashboardInsuranceNotice = !pathname?.includes("/notifications");
+  const visibleSidebarItems = useMemo(
+    () => sidebarItems.filter((item) => !item.requiresShifts || canSeeShiftBoard),
+    [canSeeShiftBoard]
+  );
+  const visibleBottomNavItems = useMemo(
+    () => bottomNavItems.filter((item) => !item.requiresShifts || canSeeShiftBoard),
+    [canSeeShiftBoard]
+  );
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -101,19 +133,32 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         const sessionPayload = sessionResponse?.ok ? await sessionResponse.json().catch(() => null) : null;
 
         if (sessionPayload?.user) {
+          const sessionUser = sessionPayload.user as ProviderSessionUser;
           setUser({
-            id: sessionPayload.user.id,
-            email: sessionPayload.user.email,
+            id: sessionUser.id,
+            email: sessionUser.email,
             user_metadata: {
-              first_name: sessionPayload.user.displayName,
-              role: sessionPayload.user.role,
+              first_name: sessionUser.displayName,
+              role: sessionUser.role,
             },
           } as unknown as SupabaseUser);
+          setCanSeeShiftBoard(allowsShiftWork(sessionUser.canWorkShifts, sessionUser.providerWorkMode));
           return;
         }
 
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
+        if (user) {
+          const { data: seller } = await supabase
+            .from("sellers")
+            .select("provider_work_mode, can_work_shifts")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          setCanSeeShiftBoard(allowsShiftWork(seller?.can_work_shifts, seller?.provider_work_mode));
+        } else {
+          setCanSeeShiftBoard(false);
+        }
       } catch (error) {
         console.error('Error fetching user:', error);
       } finally {
@@ -125,6 +170,9 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      if (!session?.user) {
+        setCanSeeShiftBoard(false);
+      }
       setLoading(false);
     });
 
@@ -398,7 +446,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         {/* Desktop Sidebar */}
         <aside className="hidden lg:block sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 overflow-y-auto">
           <nav className="p-4 pt-12 space-y-1">
-            {sidebarItems.map((item) => {
+            {visibleSidebarItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
 
@@ -442,8 +490,11 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 lg:hidden mobile-bottom-nav">
-        <div className="grid grid-cols-5 h-16">
-          {bottomNavItems.map((item) => {
+        <div
+          className="grid h-16"
+          style={{ gridTemplateColumns: `repeat(${visibleBottomNavItems.length}, minmax(0, 1fr))` }}
+        >
+          {visibleBottomNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
             

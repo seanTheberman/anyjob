@@ -119,10 +119,10 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
         <div className="flex h-16 items-center justify-between border-b border-white/10 px-5">
           <Link href="/admin" className="flex items-center">
             <Image
-              src="/anyjoblogo-removebg-preview.png"
+              src="/anyjoblogo-wordmark.png"
               alt="AnyJob"
-              width={116}
-              height={42}
+              width={286}
+              height={96}
               className="h-10 w-auto brightness-110"
             />
           </Link>
@@ -172,10 +172,10 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
           <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
             <Link href="/admin" className="flex items-center lg:hidden">
               <Image
-                src="/anyjoblogo-removebg-preview.png"
+                src="/anyjoblogo-wordmark.png"
                 alt="AnyJob"
-                width={104}
-                height={38}
+                width={286}
+                height={96}
                 className="h-9 w-auto"
               />
             </Link>

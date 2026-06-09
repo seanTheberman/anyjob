@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2 } from "lucide-react";
 import { getShiftNiche, SHIFT_NICHES } from "@/lib/shift-work";
 
-type ProviderWorkMode = "freelance" | "shift" | "both";
+type ProviderAccountType = "" | "individual" | "business";
+type ProviderWorkMode = "none" | "freelance" | "shift" | "both";
 
 type SellerRegistrationForm = {
   firstName: string;
@@ -41,6 +42,7 @@ type SellerRegistrationForm = {
   insuranceDocumentUrl: string;
   termsAccepted: boolean;
   newsletterAccepted: boolean;
+  accountType: ProviderAccountType;
 };
 
 export default function SellerRegisterPage() {
@@ -59,7 +61,7 @@ export default function SellerRegisterPage() {
     serviceCategory: "",
     experience: "",
     description: "",
-    workMode: "freelance" as ProviderWorkMode,
+    workMode: "both" as ProviderWorkMode,
     shiftNiche: SHIFT_NICHES[0].value,
     shiftRoles: [] as string[],
     shiftSkills: "",
@@ -77,7 +79,8 @@ export default function SellerRegisterPage() {
     selfieVideoUrl: "",
     insuranceDocumentUrl: "",
     termsAccepted: false,
-    newsletterAccepted: false
+    newsletterAccepted: false,
+    accountType: ""
   });
 
   const [showPassword, setShowPassword] = useState(false);
@@ -90,6 +93,7 @@ export default function SellerRegisterPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
+  const [workModePreselected, setWorkModePreselected] = useState(false);
 
   const SERVICE_CATEGORIES = [
     "Cleaning",
@@ -114,14 +118,17 @@ export default function SellerRegisterPage() {
     const mode = params.get("mode");
     if (mode === "shift" || mode === "both" || mode === "freelance") {
       const niche = getShiftNiche(params.get("niche"));
+      setWorkModePreselected(true);
       setFormData((prev) => ({
         ...prev,
+        accountType: "individual",
         workMode: mode,
         serviceCategory: mode === "shift" || mode === "both" ? niche.label : prev.serviceCategory,
         shiftNiche: niche.value,
         preferredHourlyRate: String(niche.hourlyAverage),
         preferredDayRate: String(niche.dayAverage),
       }));
+      setCurrentStep(2);
     }
   }, []);
 
@@ -133,14 +140,31 @@ export default function SellerRegisterPage() {
     }
   };
 
-  const handleWorkModeChange = (mode: ProviderWorkMode) => {
+  const handleAccountTypeChange = (accountType: ProviderAccountType) => {
+    setFormData((prev) => ({ ...prev, accountType }));
+    setErrors((prev) => ({ ...prev, accountType: "" }));
+  };
+
+  const handleWorkModeToggle = (mode: "freelance" | "shift") => {
     const niche = getShiftNiche(formData.shiftNiche);
+    const hasFreelance = formData.workMode === "freelance" || formData.workMode === "both";
+    const hasShift = formData.workMode === "shift" || formData.workMode === "both";
+    const nextFreelance = mode === "freelance" ? !hasFreelance : hasFreelance;
+    const nextShift = mode === "shift" ? !hasShift : hasShift;
+    const nextMode: ProviderWorkMode = nextFreelance && nextShift
+      ? "both"
+      : nextFreelance
+        ? "freelance"
+        : nextShift
+          ? "shift"
+          : "none";
     setFormData((prev) => ({
       ...prev,
-      workMode: mode,
-      serviceCategory: mode === "shift" || mode === "both" ? niche.label : prev.serviceCategory,
-      openToFreelanceJobs: mode === "both" || prev.openToFreelanceJobs,
+      workMode: nextMode,
+      serviceCategory: nextShift ? niche.label : prev.serviceCategory,
+      openToFreelanceJobs: nextFreelance,
     }));
+    setErrors((prev) => ({ ...prev, workMode: "" }));
   };
 
   const handleShiftNicheChange = (value: string) => {
@@ -215,6 +239,10 @@ export default function SellerRegisterPage() {
     const newErrors: Record<string, string> = {};
 
     if (step === 1) {
+      if (!formData.accountType) newErrors.accountType = "Choose whether you are an individual provider or a business";
+      if (formData.accountType === "business") newErrors.accountType = "Businesses must use business registration, not provider registration";
+    } else if (step === 2) {
+      if (formData.workMode === "none") newErrors.workMode = "Choose freelance, shifts, or both";
       if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
       if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
       if (!formData.email.trim()) newErrors.email = "Email is required";
@@ -224,7 +252,7 @@ export default function SellerRegisterPage() {
       else if (formData.password.length < 8) newErrors.password = "Minimum 8 characters";
       if (!formData.confirmPassword) newErrors.confirmPassword = "Confirmation is required";
       else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords do not match";
-    } else if (step === 2) {
+    } else if (step === 3) {
       if (!formData.address.trim()) newErrors.address = "L'adresse est requise";
       if (!formData.city.trim()) newErrors.city = "La ville est requise";
       if (!formData.postalCode.trim()) newErrors.postalCode = "Le code postal est requis";
@@ -237,7 +265,7 @@ export default function SellerRegisterPage() {
       if ((formData.workMode === "shift" || formData.workMode === "both") && !formData.preferredHourlyRate && !formData.preferredDayRate) {
         newErrors.shiftRate = "Set an hourly or day fee";
       }
-    } else if (step === 3) {
+    } else if (step === 4) {
       if (!formData.siret.trim()) newErrors.siret = "Le numéro SIRET est requis";
       if (!uploadedFile && !formData.documentUrl.trim()) newErrors.document = "Le document est requis";
       if (!formData.selfieVideoUrl.trim() && !selfieVideoFile) newErrors.selfieVideoUrl = "Selfie video is required";
@@ -245,7 +273,7 @@ export default function SellerRegisterPage() {
         newErrors.insuranceDocumentUrl = "Insurance document URL is required";
       }
       // Remove terms validation from step 3 - it should be validated in step 4
-    } else if (step === 4) {
+    } else if (step === 5) {
       if (!formData.termsAccepted) newErrors.terms = "Les conditions doivent être acceptées";
     }
 
@@ -254,8 +282,12 @@ export default function SellerRegisterPage() {
   };
 
   const handleNextStep = () => {
+    if (currentStep === 1 && formData.accountType === "business") {
+      router.push("/business-signup?redirect=/register-business");
+      return;
+    }
     if (validateStep(currentStep)) {
-      setCurrentStep(prev => Math.min(prev + 1, 4));
+      setCurrentStep(prev => Math.min(prev + 1, 5));
     }
   };
 
@@ -264,7 +296,7 @@ export default function SellerRegisterPage() {
   };
 
   const handleSubmit = async () => {
-    if (validateStep(4)) {
+    if (validateStep(5)) {
       setIsLoading(true);
       setSubmitError("");
       
@@ -363,7 +395,7 @@ export default function SellerRegisterPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            {[1, 2, 3, 4].map((step) => (
+            {[1, 2, 3, 4, 5].map((step) => (
               <div key={step} className="flex items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${
@@ -374,7 +406,7 @@ export default function SellerRegisterPage() {
                 >
                   {step < currentStep ? <Check className="w-5 h-5" /> : step}
                 </div>
-                {step < 4 && (
+                {step < 5 && (
                   <div
                     className={`flex-1 h-1 mx-2 ${
                       step < currentStep ? "bg-blue-600" : "bg-gray-200"
@@ -384,7 +416,8 @@ export default function SellerRegisterPage() {
               </div>
             ))}
           </div>
-          <div className="flex justify-between text-xs text-gray-600">
+          <div className="flex justify-between gap-2 text-xs text-gray-600">
+            <span>Account Type</span>
             <span>Personal Info</span>
             <span>Address & Services</span>
             <span>Documents</span>
@@ -396,34 +429,78 @@ export default function SellerRegisterPage() {
         <div className="bg-white rounded-lg shadow-sm p-6">
           {currentStep === 1 && (
             <div className="space-y-6">
+              <h2 className="text-2xl font-bold text-gray-900">Are you registering as an individual or a business?</h2>
+              <p className="text-sm leading-6 text-gray-600">
+                Provider registration is for individual workers. If you are a company hiring workers or posting business
+                shifts, use the business registration flow instead.
+              </p>
+              <div className="grid gap-4 md:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => handleAccountTypeChange("individual")}
+                  className={`rounded-xl border p-5 text-left transition-colors ${
+                    formData.accountType === "individual"
+                      ? "border-[#006340] bg-[#006340] text-white ring-2 ring-green-100"
+                      : "border-gray-200 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"
+                  }`}
+                >
+                  <span className="block text-base font-bold">I am an individual provider</span>
+                  <span className={`mt-2 block text-sm leading-6 ${formData.accountType === "individual" ? "text-white/80" : "text-gray-600"}`}>
+                    I personally want to offer services, quote jobs, or join the shift worker pool.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAccountTypeChange("business")}
+                  className={`rounded-xl border p-5 text-left transition-colors ${
+                    formData.accountType === "business"
+                      ? "border-red-600 bg-red-600 text-white ring-2 ring-red-100"
+                      : "border-gray-200 bg-white text-gray-950 hover:border-red-500 hover:bg-red-50"
+                  }`}
+                >
+                  <span className="block text-base font-bold">I am a business</span>
+                  <span className={`mt-2 block text-sm leading-6 ${formData.accountType === "business" ? "text-white/80" : "text-gray-600"}`}>
+                    I want to register a company, post work, hire workers, or manage shifts under a business account.
+                  </span>
+                </button>
+              </div>
+              {formData.accountType === "business" ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
+                  Business accounts do not use provider onboarding. Continue to business registration so admin can screen
+                  the company, documents, roles, shifts, and hiring access.
+                </div>
+              ) : null}
+              {errors.accountType && <p className="text-sm text-red-600">{errors.accountType}</p>}
+            </div>
+          )}
+
+          {currentStep === 2 && (
+            <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Personal Info</h2>
 
+              {!workModePreselected ? (
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p className="mb-3 text-sm font-semibold text-gray-900">How do you want to work on AnyJob?</p>
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 md:grid-cols-2">
                   {[
                     {
-                      value: "freelance" as ProviderWorkMode,
+                      value: "freelance" as const,
                       title: "I want to work freelance",
-                      description: "See normal AnyJob service requests and quote clients.",
+                      description: "Quote normal AnyJob service requests and set your own project price.",
                     },
                     {
-                      value: "shift" as ProviderWorkMode,
+                      value: "shift" as const,
                       title: "I want to work in shifts",
-                      description: "Join the business shift-worker pool for day-wage and shift jobs.",
-                    },
-                    {
-                      value: "both" as ProviderWorkMode,
-                      title: "I want both",
-                      description: "See shift jobs and keep access to freelance jobs.",
+                      description: "Join the business worker pool for day-wage and shift work.",
                     },
                   ].map((option) => (
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => handleWorkModeChange(option.value)}
+                      onClick={() => handleWorkModeToggle(option.value)}
                       className={`rounded-lg border p-4 text-left transition-colors ${
-                        formData.workMode === option.value
+                        (option.value === "freelance" && (formData.workMode === "freelance" || formData.workMode === "both")) ||
+                        (option.value === "shift" && (formData.workMode === "shift" || formData.workMode === "both"))
                           ? "border-blue-500 bg-white ring-2 ring-blue-100"
                           : "border-gray-200 bg-white hover:border-gray-300"
                       }`}
@@ -433,12 +510,12 @@ export default function SellerRegisterPage() {
                     </button>
                   ))}
                 </div>
-                {formData.workMode === "freelance" ? (
-                  <p className="mt-3 text-xs text-gray-600">Freelance-only providers will not see business shift jobs unless they opt in later.</p>
-                ) : (
-                  <p className="mt-3 text-xs text-blue-700">Shift mode creates your worker-pool profile immediately after registration and verification submission.</p>
-                )}
+                <p className="mt-3 text-xs text-blue-700">
+                  You can select freelance, shifts, or both. Both are selected by default so you can receive both kinds of work after screening.
+                </p>
+                {errors.workMode && <p className="mt-2 text-xs text-red-600">{errors.workMode}</p>}
               </div>
+              ) : null}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -582,7 +659,7 @@ export default function SellerRegisterPage() {
             </div>
           )}
 
-          {currentStep === 2 && (
+          {currentStep === 3 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Address & Services</h2>
               
@@ -863,7 +940,7 @@ export default function SellerRegisterPage() {
             </div>
           )}
 
-          {currentStep === 3 && (
+          {currentStep === 4 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Professional Documents</h2>
               
@@ -1058,7 +1135,7 @@ export default function SellerRegisterPage() {
             </div>
           )}
 
-          {currentStep === 4 && (
+          {currentStep === 5 && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-6">Verification</h2>
               
@@ -1162,13 +1239,13 @@ export default function SellerRegisterPage() {
               Back
             </button>
 
-            {currentStep < 4 ? (
+            {currentStep < 5 ? (
               <button
                 type="button"
                 onClick={handleNextStep}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center"
               >
-                Next
+                {currentStep === 1 && formData.accountType === "business" ? "Business registration" : "Next"}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </button>
             ) : (
