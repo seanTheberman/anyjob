@@ -292,10 +292,10 @@ export function Header() {
                     {/* Logo */}
                     <Link href="/" className="flex items-center gap-2 group">
                         <Image
-                            src="/anyjoblogo-removebg-preview.png"
+                            src="/anyjoblogo-wordmark.png"
                             alt="AnyJob"
-                            width={132}
-                            height={48}
+                            width={286}
+                            height={96}
                             priority
                             className={`h-10 w-auto transition duration-300 sm:h-12 ${showSolidStyle ? "" : "drop-shadow-[0_2px_8px_rgba(0,0,0,0.35)]"}`}
                         />
@@ -453,10 +453,10 @@ export function Header() {
                     >
                         <div className="flex shrink-0 items-center justify-between border-b border-gray-100 px-5 py-5 shadow-sm dark:border-gray-800">
                             <Image
-                                src="/anyjoblogo-removebg-preview.png"
+                                src="/anyjoblogo-wordmark.png"
                                 alt="AnyJob"
-                                width={122}
-                                height={44}
+                                width={286}
+                                height={96}
                                 className="h-10 w-auto"
                             />
                             <button

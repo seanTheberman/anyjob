@@ -142,10 +142,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <div className="flex items-center gap-4">
             <Link href="/" className="flex items-center gap-2 group">
               <Image
-                src="/anyjoblogo-removebg-preview.png"
+                src="/anyjoblogo-wordmark.png"
                 alt="AnyJob"
-                width={120}
-                height={44}
+                width={286}
+                height={96}
                 className="h-10 w-auto"
               />
             </Link>
@@ -224,10 +224,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <Image
-              src="/anyjoblogo-removebg-preview.png"
+              src="/anyjoblogo-wordmark.png"
               alt="AnyJob"
-              width={104}
-              height={38}
+              width={286}
+              height={96}
               className="h-9 w-auto"
             />
           </Link>
