@@ -158,23 +158,25 @@ export default function BecomeProviderPage() {
     return (
         <div className="min-h-screen bg-white">
             {/* Hero Section */}
-            <section className="bg-[#f5f5f5] pt-32 pb-16">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+            <section className="bg-[#f5f5f5] pt-24 pb-16 sm:pt-28 lg:pt-32">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(480px,0.95fr)] lg:items-start lg:gap-12 xl:gap-16">
                         {/* Left - Image */}
-                        <div className="relative order-2 lg:order-1">
-                            <div className="aspect-[4/3] relative rounded-lg overflow-hidden">
+                        <div className="relative order-2 lg:order-1 lg:pt-10">
+                            <div className="relative min-h-[360px] overflow-hidden rounded-lg shadow-sm sm:min-h-[460px] lg:min-h-[620px]">
                                 <Image
                                     src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?q=80&w=800&auto=format&fit=crop"
                                     alt="Happy service provider"
                                     fill
-                                    className="object-cover"
+                                    sizes="(min-width: 1280px) 600px, (min-width: 1024px) 52vw, 100vw"
+                                    className="object-cover object-[48%_center]"
+                                    priority
                                 />
                             </div>
                         </div>
 
                         {/* Right - Content */}
-                        <div className="order-1 lg:order-2">
+                        <div className="order-1 lg:order-2 lg:max-w-[560px]">
                             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
                                 Earn money your way
                             </h1>
