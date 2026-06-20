@@ -84,4 +84,33 @@ test.describe("public flows", () => {
     await expect(page.getByPlaceholder("your@email.com")).toBeVisible();
     await expect(page.getByPlaceholder("••••••••")).toBeVisible();
   });
+
+  test("hero job mode options are side-by-side on mobile without overlapping", async ({ page }) => {
+    await gotoApp(page, "/");
+
+    const dayToDayLabel = page.locator("label", { hasText: "Day to day jobs" });
+    const workShiftsLabel = page.locator("label", { hasText: "Work shifts" });
+
+    await expect(dayToDayLabel).toBeVisible();
+    await expect(workShiftsLabel).toBeVisible();
+
+    const dayBox = await dayToDayLabel.boundingBox();
+    const shiftBox = await workShiftsLabel.boundingBox();
+
+    expect(dayBox).not.toBeNull();
+    expect(shiftBox).not.toBeNull();
+
+    if (dayBox && shiftBox) {
+      // They should be on roughly the same horizontal line (center Y within 20px)
+      const dayCenterY = dayBox.y + dayBox.height / 2;
+      const shiftCenterY = shiftBox.y + shiftBox.height / 2;
+      expect(Math.abs(dayCenterY - shiftCenterY)).toBeLessThan(20);
+
+      // They should not overlap horizontally
+      const dayRight = dayBox.x + dayBox.width;
+      const shiftRight = shiftBox.x + shiftBox.width;
+      const overlap = Math.max(0, Math.min(dayRight, shiftRight) - Math.max(dayBox.x, shiftBox.x));
+      expect(overlap).toBe(0);
+    }
+  });
 });

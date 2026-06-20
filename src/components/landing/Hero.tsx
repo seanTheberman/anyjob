@@ -133,13 +133,13 @@ export function Hero() {
                 {/* Job mode selector */}
                 <fieldset className="mx-auto mb-16 max-w-2xl sm:mb-20">
                     <legend className="sr-only">Choose job type</legend>
-                    <div className="grid gap-3 rounded-3xl border border-white/15 bg-white/10 p-2 backdrop-blur-md sm:grid-cols-2 sm:rounded-full">
+                    <div className="grid grid-cols-2 gap-2 rounded-full border border-white/15 bg-white/10 p-1.5 backdrop-blur-md sm:gap-3 sm:p-2">
                         {JOB_MODES.map((mode) => {
                             const isSelected = selectedJobMode === mode;
                             return (
                                 <label
                                     key={mode}
-                                    className={`flex cursor-pointer items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-semibold transition-colors sm:text-base ${
+                                    className={`flex cursor-pointer items-center justify-center gap-1.5 rounded-full px-2 py-2 text-xs font-semibold transition-colors sm:gap-2 sm:px-4 sm:py-3 sm:text-sm md:text-base ${
                                         isSelected
                                             ? "bg-white text-gray-950 shadow-sm"
                                             : "text-white/80 hover:bg-white/10 hover:text-white"
