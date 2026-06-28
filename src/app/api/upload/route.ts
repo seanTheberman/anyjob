@@ -8,7 +8,7 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-const UPLOAD_TYPES = ["profile", "portfolio", "portfolio_video", "work_image", "id_document", "selfie_video"] as const;
+const UPLOAD_TYPES = ["profile", "portfolio", "portfolio_video", "work_image", "id_document", "selfie_video", "gig_image", "gig_video"] as const;
 type UploadType = (typeof UPLOAD_TYPES)[number];
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -16,7 +16,7 @@ const DOCUMENT_TYPES = [...IMAGE_TYPES, "application/pdf"];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
 function getUploadRules(imageType: UploadType) {
-  if (imageType === "selfie_video" || imageType === "portfolio_video") {
+  if (imageType === "selfie_video" || imageType === "portfolio_video" || imageType === "gig_video") {
     return {
       allowedTypes: VIDEO_TYPES,
       maxSize: 100 * 1024 * 1024,
@@ -76,7 +76,7 @@ function marketplaceUploadLimit(imageType: UploadType) {
 }
 
 function resourceTypeForDelete(imageType: UploadType | string) {
-  return imageType === "selfie_video" || imageType === "portfolio_video" ? "video" as const : "image" as const;
+  return imageType === "selfie_video" || imageType === "portfolio_video" || imageType === "gig_video" ? "video" as const : "image" as const;
 }
 
 export async function POST(request: NextRequest) {

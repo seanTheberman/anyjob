@@ -67,7 +67,7 @@ function allowsShiftWork(canWorkShifts: boolean | null | undefined, providerWork
 const sidebarItems: ProviderNavItem[] = [
   { icon: Briefcase, label: "Live Jobs", href: "/pro" },
   { icon: Search, label: "Browse Jobs", href: "/pro/jobs" },
-  { icon: Calendar, label: "Shift Board", href: "/pro/shifts", requiresShifts: true },
+  { icon: Calendar, label: "Work shifts", href: "/pro/shifts", requiresShifts: true },
   { icon: User, label: "Profile", href: "/pro/profile" },
   { icon: Wrench, label: "My Services", href: "/pro/services" },
   { icon: DollarSign, label: "Earnings", href: "/pro/earnings" },
@@ -84,7 +84,7 @@ const sidebarItems: ProviderNavItem[] = [
 const bottomNavItems: ProviderNavItem[] = [
   { icon: Home, label: "Home", href: "/pro" },
   { icon: Briefcase, label: "Jobs", href: "/pro/jobs" },
-  { icon: Calendar, label: "Shifts", href: "/pro/shifts", requiresShifts: true },
+  { icon: Calendar, label: "Work shifts", href: "/pro/shifts", requiresShifts: true },
   { icon: MessageSquare, label: "Chat", href: "/pro/messages" },
   { icon: User, label: "Profile", href: "/pro/profile" },
 ];

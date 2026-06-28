@@ -85,6 +85,19 @@ export async function PATCH(request: NextRequest) {
 
   const admin = createAdminSupabaseClient() as never as LooseAdminClient;
   const now = new Date().toISOString();
+  const { data: existingSeller, error: existingSellerError } = await admin
+    .from("sellers")
+    .select("availability")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (existingSellerError) {
+    return NextResponse.json({ error: existingSellerError.message }, { status: 500 });
+  }
+
+  const existingAvailability = existingSeller?.availability && typeof existingSeller.availability === "object"
+    ? existingSeller.availability
+    : {};
   const sellerUpdate = {
     first_name: firstName,
     last_name: lastName,
@@ -94,6 +107,7 @@ export async function PATCH(request: NextRequest) {
     service_category: text(body.serviceCategory) || "Service provider",
     experience_level: text(body.experienceLevel) || null,
     availability: {
+      ...existingAvailability,
       marketplaceAvailability: availabilityMode,
       note: text(body.availabilityNote) || null,
     },

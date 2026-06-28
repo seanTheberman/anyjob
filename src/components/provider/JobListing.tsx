@@ -68,7 +68,7 @@ export function JobListing({ jobs }: JobListingProps) {
   const urgencyLabels = {
     low: "Flexible",
     medium: "Soon",
-    high: "Urgent",
+    high: "Emergency",
   };
 
   return (
@@ -169,7 +169,7 @@ export function JobListing({ jobs }: JobListingProps) {
                 <option value="">All</option>
                 <option value="low">Flexible</option>
                 <option value="medium">Soon</option>
-                <option value="high">Urgent</option>
+                <option value="high">Emergency</option>
               </select>
             </div>
 

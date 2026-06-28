@@ -37,6 +37,9 @@ type HeaderAccount = {
     role: string;
     displayName: string;
     hasBusinessProfile: boolean;
+    providerWorkMode?: string | null;
+    canWorkFreelance?: boolean;
+    canWorkShifts?: boolean;
 };
 
 const HEADER_ACCOUNT_CACHE_KEY = "anyjob.headerAccount";
@@ -242,13 +245,20 @@ export function Header() {
     const isAuthenticated = Boolean(user || account);
     const dashboardHref = userRole === "admin" ? "/admin" : userRole === "provider" || userRole === "seller" ? "/pro" : hasBusinessProfile ? "/dashboard/business" : "/dashboard";
     const isProviderAccount = userRole === "provider" || userRole === "seller";
+    const canWorkShifts = Boolean(account?.canWorkShifts || account?.providerWorkMode === "shift" || account?.providerWorkMode === "both");
     const displayName =
         account?.displayName ||
         user?.user_metadata?.first_name ||
         user?.user_metadata?.full_name ||
         user?.email?.split("@")[0] ||
         "Account";
-    const visibleNavLinks = NAV_LINKS.filter((link) => {
+    const providerNavLinks = [
+        { href: "/pro/jobs", label: "Browse Jobs" },
+        ...(canWorkShifts ? [{ href: "/pro/shifts", label: "Work shifts" }] : []),
+        { href: "/pro/services", label: "My gigs" },
+        { href: "/pro/profile", label: "Profile" },
+    ];
+    const visibleNavLinks = isAuthenticated && isProviderAccount ? providerNavLinks : NAV_LINKS.filter((link) => {
         if (!authResolved && !isAuthenticated) {
             return link.href === "/search";
         }
@@ -263,6 +273,7 @@ export function Header() {
 
         return true;
     });
+    const logoHref = isAuthenticated && isProviderAccount ? "/pro" : "/";
 
     async function handleLogout() {
         if (loggingOut) return;
@@ -290,7 +301,7 @@ export function Header() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between h-16 sm:h-20">
                     {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2 group">
+                    <Link href={logoHref} className="flex items-center gap-2 group">
                         <Image
                             src="/anyjoblogo-wordmark.png"
                             alt="AnyJob"
@@ -303,7 +314,7 @@ export function Header() {
 
                     {/* Desktop Nav */}
                     <nav className="hidden lg:flex items-center gap-1">
-                        <div ref={categoriesMenuRef} className="relative">
+                        {!isProviderAccount ? <div ref={categoriesMenuRef} className="relative">
                             <button
                                 type="button"
                                 aria-haspopup="menu"
@@ -351,7 +362,7 @@ export function Header() {
                                     </div>
                                 </div>
                             )}
-                        </div>
+                        </div> : null}
                         {visibleNavLinks.map((link) => (
                             <Link
                                 key={link.href}
@@ -469,19 +480,21 @@ export function Header() {
                             </button>
                         </div>
                         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4">
-                            <button
-                                type="button"
-                                aria-expanded={mobileCategoriesOpen}
-                                onClick={() => setMobileCategoriesOpen((open) => !open)}
-                                className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium text-gray-700 transition-all hover:bg-red-50 hover:text-red-600 dark:text-gray-200 dark:hover:bg-red-950/50"
-                            >
-                                <span>Categories</span>
-                                <ChevronDown
-                                    className={`h-4 w-4 transition-transform ${mobileCategoriesOpen ? "rotate-180" : ""}`}
-                                    aria-hidden="true"
-                                />
-                            </button>
-                            {mobileCategoriesOpen && (
+                            {!isProviderAccount ? (
+                              <button
+                                  type="button"
+                                  aria-expanded={mobileCategoriesOpen}
+                                  onClick={() => setMobileCategoriesOpen((open) => !open)}
+                                  className="flex w-full items-center justify-between rounded-xl px-4 py-3 text-left text-sm font-medium text-gray-700 transition-all hover:bg-red-50 hover:text-red-600 dark:text-gray-200 dark:hover:bg-red-950/50"
+                              >
+                                  <span>Categories</span>
+                                  <ChevronDown
+                                      className={`h-4 w-4 transition-transform ${mobileCategoriesOpen ? "rotate-180" : ""}`}
+                                      aria-hidden="true"
+                                  />
+                              </button>
+                            ) : null}
+                            {!isProviderAccount && mobileCategoriesOpen && (
                                 <div className="mb-2 max-h-96 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
                                     {TASKRABBIT_CATEGORIES.map((category) => (
                                         <details key={category.slug} className="group rounded-lg">

@@ -6,12 +6,13 @@ import { createClient } from "@/lib/supabase/client";
 import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2 } from "lucide-react";
 import { getShiftNiche, SHIFT_NICHES } from "@/lib/shift-work";
 
-type ProviderAccountType = "" | "individual" | "business";
+type ProviderAccountType = "" | "individual" | "business" | "agency";
 type ProviderWorkMode = "none" | "freelance" | "shift" | "both";
 
 type SellerRegistrationForm = {
   firstName: string;
   lastName: string;
+  businessName: string;
   email: string;
   phone: string;
   password: string;
@@ -50,6 +51,7 @@ export default function SellerRegisterPage() {
   const [formData, setFormData] = useState<SellerRegistrationForm>({
     firstName: "",
     lastName: "",
+    businessName: "",
     email: "",
     phone: "",
     password: "",
@@ -116,12 +118,16 @@ export default function SellerRegisterPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get("mode");
+    const accountTypeParam = params.get("accountType");
+    const nextAccountType: ProviderAccountType = accountTypeParam === "business" || accountTypeParam === "agency"
+      ? accountTypeParam
+      : "individual";
     if (mode === "shift" || mode === "both" || mode === "freelance") {
       const niche = getShiftNiche(params.get("niche"));
       setWorkModePreselected(true);
       setFormData((prev) => ({
         ...prev,
-        accountType: "individual",
+        accountType: nextAccountType,
         workMode: mode,
         serviceCategory: mode === "shift" || mode === "both" ? niche.label : prev.serviceCategory,
         shiftNiche: niche.value,
@@ -129,6 +135,8 @@ export default function SellerRegisterPage() {
         preferredDayRate: String(niche.dayAverage),
       }));
       setCurrentStep(2);
+    } else if (accountTypeParam === "business" || accountTypeParam === "agency") {
+      setFormData((prev) => ({ ...prev, accountType: accountTypeParam }));
     }
   }, []);
 
@@ -239,10 +247,12 @@ export default function SellerRegisterPage() {
     const newErrors: Record<string, string> = {};
 
     if (step === 1) {
-      if (!formData.accountType) newErrors.accountType = "Choose whether you are an individual provider or a business";
-      if (formData.accountType === "business") newErrors.accountType = "Businesses must use business registration, not provider registration";
+      if (!formData.accountType) newErrors.accountType = "Choose whether you are an individual, business, or agency provider";
     } else if (step === 2) {
       if (formData.workMode === "none") newErrors.workMode = "Choose freelance, shifts, or both";
+      if ((formData.accountType === "business" || formData.accountType === "agency") && !formData.businessName.trim()) {
+        newErrors.businessName = "Business or agency name is required";
+      }
       if (!formData.firstName.trim()) newErrors.firstName = "First name is required";
       if (!formData.lastName.trim()) newErrors.lastName = "Last name is required";
       if (!formData.email.trim()) newErrors.email = "Email is required";
@@ -282,10 +292,6 @@ export default function SellerRegisterPage() {
   };
 
   const handleNextStep = () => {
-    if (currentStep === 1 && formData.accountType === "business") {
-      router.push("/business-signup?redirect=/register-business");
-      return;
-    }
     if (validateStep(currentStep)) {
       setCurrentStep(prev => Math.min(prev + 1, 5));
     }
@@ -309,6 +315,8 @@ export default function SellerRegisterPage() {
           body: JSON.stringify({
             firstName: formData.firstName,
             lastName: formData.lastName,
+            businessName: formData.businessName,
+            accountType: formData.accountType || "individual",
             email: formData.email,
             phone: formData.phone,
             password: formData.password,
@@ -429,12 +437,12 @@ export default function SellerRegisterPage() {
         <div className="bg-white rounded-lg shadow-sm p-6">
           {currentStep === 1 && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold text-gray-900">Are you registering as an individual or a business?</h2>
+              <h2 className="text-2xl font-bold text-gray-900">Who will provide services?</h2>
               <p className="text-sm leading-6 text-gray-600">
-                Provider registration is for individual workers. If you are a company hiring workers or posting business
-                shifts, use the business registration flow instead.
+                Choose the provider type that clients should see on your public profile. Businesses that want to hire
+                workers or post shifts should still use Register as a Business.
               </p>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => handleAccountTypeChange("individual")}
@@ -458,16 +466,30 @@ export default function SellerRegisterPage() {
                       : "border-gray-200 bg-white text-gray-950 hover:border-red-500 hover:bg-red-50"
                   }`}
                 >
-                  <span className="block text-base font-bold">I am a business</span>
+                  <span className="block text-base font-bold">Business provider</span>
                   <span className={`mt-2 block text-sm leading-6 ${formData.accountType === "business" ? "text-white/80" : "text-gray-600"}`}>
-                    I want to register a company, post work, hire workers, or manage shifts under a business account.
+                    A registered company will provide services to customers under one public business profile.
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleAccountTypeChange("agency")}
+                  className={`rounded-xl border p-5 text-left transition-colors ${
+                    formData.accountType === "agency"
+                      ? "border-purple-600 bg-purple-600 text-white ring-2 ring-purple-100"
+                      : "border-gray-200 bg-white text-gray-950 hover:border-purple-500 hover:bg-purple-50"
+                  }`}
+                >
+                  <span className="block text-base font-bold">Agency provider</span>
+                  <span className={`mt-2 block text-sm leading-6 ${formData.accountType === "agency" ? "text-white/80" : "text-gray-600"}`}>
+                    An agency or team will provide services with assigned staff and agency-level documents.
                   </span>
                 </button>
               </div>
-              {formData.accountType === "business" ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
-                  Business accounts do not use provider onboarding. Continue to business registration so admin can screen
-                  the company, documents, roles, shifts, and hiring access.
+              {formData.accountType === "business" || formData.accountType === "agency" ? (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+                  This creates a service-provider profile that appears in Find a Provider with a {formData.accountType === "agency" ? "Agency" : "Business"} badge.
+                  To post jobs or hire shift workers, use Register as a Business instead.
                 </div>
               ) : null}
               {errors.accountType && <p className="text-sm text-red-600">{errors.accountType}</p>}
@@ -517,10 +539,33 @@ export default function SellerRegisterPage() {
               </div>
               ) : null}
               
+              {(formData.accountType === "business" || formData.accountType === "agency") && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {formData.accountType === "agency" ? "Agency Name" : "Business Name"} *
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={formData.businessName}
+                      onChange={(e) => handleInputChange("businessName", e.target.value)}
+                      className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.businessName ? "border-red-500" : "border-gray-300"
+                      }`}
+                      placeholder={formData.accountType === "agency" ? "AnyJob Services Agency" : "AnyJob Repairs Ltd"}
+                    />
+                    {errors.businessName && (
+                      <p className="text-red-500 text-xs mt-1">{errors.businessName}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name *
+                    {formData.accountType === "individual" ? "First Name *" : "Contact First Name *"}
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -541,7 +586,7 @@ export default function SellerRegisterPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name *
+                    {formData.accountType === "individual" ? "Last Name *" : "Contact Last Name *"}
                   </label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />

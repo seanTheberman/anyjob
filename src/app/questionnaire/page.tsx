@@ -201,6 +201,7 @@ interface FormData {
   category_slug: string;
   subcategory_slug: string;
   service_type: string;
+  job_title: string;
   job_description: string;
   job_urgency: string;
   preferred_date: Date | undefined;
@@ -275,6 +276,7 @@ const INITIAL_FORM_DATA: FormData = {
   category_slug: "",
   subcategory_slug: "",
   service_type: "",
+  job_title: "",
   job_description: "",
   job_urgency: "",
   preferred_date: undefined,
@@ -308,6 +310,14 @@ const INITIAL_FORM_DATA: FormData = {
 
 const TOTAL_STEPS = 9;
 const SHIFT_TOTAL_STEPS = 5;
+
+function hasMeaningfulText(value: string) {
+  return /[\p{L}\p{N}]/u.test(value);
+}
+
+function buildStoredJobDescription(title: string, description: string) {
+  return [title.trim(), description.trim()].filter(Boolean).join("\n\n");
+}
 
 function initialShiftBusinessPostForm(): ShiftBusinessPostForm {
   const niche = SHIFT_NICHES[0];
@@ -559,7 +569,10 @@ function ServiceQuestionnaireContent() {
       case 3:
         return !!formData.service_type && !!formData.job_urgency;
       case 4:
-        return formData.job_description.length >= 10;
+        return formData.job_title.trim().length >= 3 &&
+          hasMeaningfulText(formData.job_title) &&
+          formData.job_description.trim().length >= 10 &&
+          hasMeaningfulText(formData.job_description);
       case 5:
         return !!formData.preferred_date;
       case 6:
@@ -657,6 +670,7 @@ function ServiceQuestionnaireContent() {
 
       // Parse budget range
       const budgetOption = BUDGET_OPTIONS.find((b) => b.value === formData.budget_range);
+      const storedJobDescription = buildStoredJobDescription(formData.job_title, formData.job_description);
 
       // Create service request (now that user is authenticated)
       const { data: inquiry, error: inquiryError } = await supabase
@@ -671,9 +685,9 @@ function ServiceQuestionnaireContent() {
           subcategory_slug: formData.subcategory_slug,
           custom_tags: formData.custom_tags,
           service_type: formData.service_type,
-          job_description: formData.job_description,
+          job_description: storedJobDescription,
           job_urgency: formData.job_urgency,
-          preferred_date: formData.preferred_date?.toISOString().split("T")[0],
+          preferred_date: formData.preferred_date ? format(formData.preferred_date, "yyyy-MM-dd") : undefined,
           preferred_time_start: formData.preferred_time_start,
           preferred_time_end: formData.preferred_time_end,
           flexible_timing: formData.flexible_timing,
@@ -1774,6 +1788,21 @@ function Step4JobDetails({
       </div>
 
       <div className="space-y-4">
+        <div>
+          <Label>Job title</Label>
+          <Input
+            placeholder="Example: Fix leaking kitchen tap"
+            value={formData.job_title}
+            onChange={(e) => updateFormData("job_title", e.target.value)}
+            className="mt-2"
+          />
+          <p className="mt-1 text-sm text-gray-500">
+            Minimum 3 characters with letters or numbers • {formData.job_title.length} characters
+          </p>
+        </div>
+
+        <div>
+          <Label>Description</Label>
         <Textarea
           placeholder="Describe what you need to do...
 
@@ -1784,11 +1813,12 @@ For example:
 - I have a dog but it will be outside"
           value={formData.job_description}
           onChange={(e) => updateFormData("job_description", e.target.value)}
-          className="min-h-[200px] resize-none"
+          className="mt-2 min-h-[200px] resize-none"
         />
         <p className="text-sm text-gray-500">
-          Minimum 10 characters • {formData.job_description.length} characters
+          Minimum 10 characters with letters or numbers • {formData.job_description.length} characters
         </p>
+        </div>
       </div>
 
       <div className="flex justify-between pt-4">
@@ -1797,7 +1827,12 @@ For example:
         </Button>
         <Button
           onClick={onNext}
-          disabled={formData.job_description.length < 10}
+          disabled={
+            formData.job_title.trim().length < 3 ||
+            !hasMeaningfulText(formData.job_title) ||
+            formData.job_description.trim().length < 10 ||
+            !hasMeaningfulText(formData.job_description)
+          }
           className="bg-red-600 hover:bg-red-700 text-white px-8"
         >
           Continue <ArrowRight className="w-4 h-4 ml-2" />

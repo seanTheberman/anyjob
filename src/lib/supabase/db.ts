@@ -354,6 +354,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           hourly_rate: number
+          gig_details: Json
           id: string
           is_active: boolean | null
           max_radius_km: number | null
@@ -368,6 +369,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           hourly_rate: number
+          gig_details?: Json
           id?: string
           is_active?: boolean | null
           max_radius_km?: number | null
@@ -382,6 +384,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           hourly_rate?: number
+          gig_details?: Json
           id?: string
           is_active?: boolean | null
           max_radius_km?: number | null

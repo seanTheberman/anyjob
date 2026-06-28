@@ -128,7 +128,7 @@ export default function BecomeProviderPage() {
     const [selectedCity, setSelectedCity] = useState("Paris");
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
-    const [accountType, setAccountType] = useState<"individual" | "business">("individual");
+    const [accountType, setAccountType] = useState<"individual" | "contractor">("individual");
     const [workModes, setWorkModes] = useState<Array<"freelance" | "shift">>(["freelance", "shift"]);
     const handleCategoryChange = (value: string) => {
         const cat = CATEGORIES.find(c => c.name === value);
@@ -142,17 +142,15 @@ export default function BecomeProviderPage() {
         ));
     };
     const startRegistration = () => {
-        if (accountType === "business") {
-            router.push("/business-signup?redirect=/register-business");
-            return;
-        }
-
-        const mode = workModes.includes("freelance") && workModes.includes("shift")
+        const mode = accountType === "contractor"
+            ? "freelance"
+            : workModes.includes("freelance") && workModes.includes("shift")
             ? "both"
             : workModes.includes("shift")
                 ? "shift"
                 : "freelance";
-        router.push(`/seller-register?mode=${mode}`);
+        const providerType = accountType === "contractor" ? "business" : "individual";
+        router.push(`/seller-register?mode=${mode}&accountType=${providerType}`);
     };
 
     return (
@@ -248,11 +246,11 @@ export default function BecomeProviderPage() {
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={() => setAccountType("business")}
-                                        className={`rounded-lg border px-4 py-4 text-left transition-colors ${accountType === "business" ? "border-red-600 bg-red-600 text-white ring-2 ring-red-100" : "border-gray-200 bg-white text-gray-950 hover:border-red-500 hover:bg-red-50"}`}
+                                        onClick={() => setAccountType("contractor")}
+                                        className={`rounded-lg border px-4 py-4 text-left transition-colors ${accountType === "contractor" ? "border-blue-600 bg-blue-600 text-white ring-2 ring-blue-100" : "border-gray-200 bg-white text-gray-950 hover:border-blue-500 hover:bg-blue-50"}`}
                                     >
-                                        <span className="block text-sm font-bold">I am a business</span>
-                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "business" ? "text-white/80" : "text-gray-600"}`}>Register a company to post jobs, hire workers, and manage shifts.</span>
+                                        <span className="block text-sm font-bold">We are a contractor</span>
+                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "contractor" ? "text-white/80" : "text-gray-600"}`}>Register a business or team that provides services to customers.</span>
                                     </button>
                                 </div>
                             </div>
@@ -276,11 +274,7 @@ export default function BecomeProviderPage() {
                                     <span className="mt-1 block text-xs leading-5 text-gray-600">Join the business worker pool for day-wage and shift work.</span>
                                 </button>
                               </div>
-                            ) : (
-                              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-800">
-                                Businesses use business registration, not provider registration. Admin will screen the company before job and shift posting opens.
-                              </div>
-                            )}
+                            ) : null}
 
                             <button
                                 type="button"
@@ -288,7 +282,7 @@ export default function BecomeProviderPage() {
                                 disabled={accountType === "individual" && workModes.length === 0}
                                 className="mt-4 w-full rounded-lg bg-[#006340] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#005230] disabled:cursor-not-allowed disabled:bg-gray-300"
                             >
-                                {accountType === "business" ? "Continue to business registration" : "Start provider registration"}
+                                {accountType === "contractor" ? "Start contractor registration" : "Start provider registration"}
                             </button>
 
                             {/* Sign In Link */}

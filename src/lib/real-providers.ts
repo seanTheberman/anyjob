@@ -189,7 +189,33 @@ function normalize(value: string | null | undefined) {
     .trim();
 }
 
+function providerMetadata(provider: SellerRow) {
+  return (provider.availability && typeof provider.availability === "object" ? provider.availability : {}) as {
+    providerAccountType?: string;
+    businessName?: string | null;
+    companyName?: string | null;
+    marketplaceAvailability?: string;
+    note?: string;
+    responseTime?: string;
+    response_time?: string;
+  };
+}
+
+function providerAccountKind(provider: SellerRow) {
+  const kind = normalize(providerMetadata(provider).providerAccountType);
+  if (kind === "business" || kind === "agency") return kind;
+  return "individual";
+}
+
+function providerBusinessName(provider: SellerRow) {
+  const metadata = providerMetadata(provider);
+  return metadata.businessName?.trim() || metadata.companyName?.trim() || "";
+}
+
 function providerName(provider: SellerRow) {
+  const kind = providerAccountKind(provider);
+  const businessName = providerBusinessName(provider);
+  if ((kind === "business" || kind === "agency") && businessName) return businessName;
   return [provider.first_name, provider.last_name].filter(Boolean).join(" ").trim() || "Provider";
 }
 
@@ -229,15 +255,22 @@ function initialsForName(name: string) {
 }
 
 function providerAvailabilityLabel(provider: SellerRow) {
-  const availability = provider.availability as { marketplaceAvailability?: string; note?: string } | null;
+  const availability = providerMetadata(provider);
   if (availability?.note && availability.note.trim()) return availability.note.trim();
   if (availability?.marketplaceAvailability && availability.marketplaceAvailability.trim()) return availability.marketplaceAvailability.trim();
   return "";
 }
 
 function providerResponseTime(provider: SellerRow) {
-  const availability = provider.availability as { responseTime?: string; response_time?: string } | null;
+  const availability = providerMetadata(provider);
   return availability?.responseTime?.trim() || availability?.response_time?.trim() || "";
+}
+
+function providerAccountBadges(provider: SellerRow) {
+  const kind = providerAccountKind(provider);
+  if (kind === "agency") return ["Agency"];
+  if (kind === "business") return ["Business"];
+  return [];
 }
 
 function providerLevelFromBadges(badges: string[]) {
@@ -270,17 +303,18 @@ function mapSellerToMarketplace(
   const category = provider.service_category || "Service provider";
   const categorySlug = categorySlugFor(category);
   const services = serviceList(provider);
-  const rate = provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : 0;
   const city = provider.city || "";
   const country = provider.country || "";
   const rating = ratingStats?.rating || 0;
   const reviewCount = ratingStats?.reviewCount || 0;
   const level = providerLevelFromBadges(badges);
+  const accountBadges = providerAccountBadges(provider);
+  const displayBadges = [...accountBadges, ...badges].filter((value, index, array) => value && array.indexOf(value) === index);
   const availability = providerAvailabilityLabel(provider);
   const tags = [
     level,
     availability,
-    ...badges,
+    ...displayBadges,
     ...serviceTags(provider),
   ].filter((value, index, array) => value && array.indexOf(value) === index);
   const description = provider.description || "";
@@ -294,7 +328,7 @@ function mapSellerToMarketplace(
     provider.experience_level,
     level,
     availability,
-    ...badges,
+    ...displayBadges,
     ...services,
   ].filter(Boolean).join(" ").toLowerCase();
 
@@ -309,7 +343,7 @@ function mapSellerToMarketplace(
     reviewCount,
     completedJobs: Number(provider.total_jobs || 0),
     level,
-    badges,
+    badges: displayBadges,
     availability,
     responseTime: providerResponseTime(provider),
     description,
@@ -378,6 +412,7 @@ function mapSellerToProfile(
   const heroImage = media.heroImage || provider.profile_image_url || null;
   const rating = ratingStats.rating;
   const completedJobs = Number(provider.total_jobs || 0);
+  const displayBadges = [...providerAccountBadges(provider), ...badges].filter((value, index, array) => value && array.indexOf(value) === index);
 
   return {
     id: provider.id,
@@ -391,7 +426,7 @@ function mapSellerToProfile(
     reviewCount: ratingStats.reviewCount,
     completedJobs,
     level: providerLevelFromBadges(badges),
-    badges,
+    badges: displayBadges,
     rate,
     email: provider.email || "",
     phone: provider.phone || "",
@@ -403,7 +438,7 @@ function mapSellerToProfile(
     hourlyRate: rate ? `From $${rate} / hour` : "Rate not set",
     availability: providerAvailabilityLabel(provider),
     photos: [heroImage, ...media.portfolioPhotos].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index),
-    highlights: badges,
+    highlights: displayBadges,
     reviewDistribution: ratingStats.distribution,
     writtenReviews,
     relatedProviders,

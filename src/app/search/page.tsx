@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, ShieldCheck, ThumbsUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
@@ -53,7 +54,7 @@ const SPRING_SERVICES = [
 ];
 
 
-async function getBuyerMarketplaceUser() {
+async function getMarketplaceViewer() {
     const supabase = await createServerSupabaseClient();
     const {
         data: { user },
@@ -75,7 +76,8 @@ async function getBuyerMarketplaceUser() {
     ]);
 
     const role = String(profile?.role || user.user_metadata?.role || "client").toLowerCase();
-    if (seller || ["admin", "provider", "seller"].includes(role)) return null;
+    if (seller || ["provider", "seller"].includes(role)) return { kind: "provider" as const };
+    if (role === "admin") return { kind: "admin" as const };
 
     const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
         || user.user_metadata?.first_name
@@ -83,15 +85,23 @@ async function getBuyerMarketplaceUser() {
         || user.email?.split("@")[0]
         || "there";
 
-    return { displayName };
+    return { kind: "buyer" as const, displayName };
 }
 
 export default async function CataloguePage() {
-    const buyer = await getBuyerMarketplaceUser();
+    const viewer = await getMarketplaceViewer();
 
-    if (buyer) {
+    if (viewer?.kind === "provider") {
+        redirect("/pro/services");
+    }
+
+    if (viewer?.kind === "admin") {
+        redirect("/admin/providers");
+    }
+
+    if (viewer?.kind === "buyer") {
         const marketplaceProviders = await getMarketplaceProviders();
-        return <BuyerProviderMarketplace providers={marketplaceProviders} buyerName={buyer.displayName} />;
+        return <BuyerProviderMarketplace providers={marketplaceProviders} buyerName={viewer.displayName} />;
     }
 
     const providers = await getProviderCards();

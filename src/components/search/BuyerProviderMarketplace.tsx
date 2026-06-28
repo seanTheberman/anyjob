@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Award,
   BadgeCheck,
+  Building2,
   BriefcaseBusiness,
   CheckCircle2,
   ChevronDown,
@@ -72,6 +73,28 @@ function cardAccent(provider: ProviderMarketplaceData) {
   if (provider.level === "Level 2") return "bg-emerald-50 text-emerald-700 ring-emerald-100";
   if (provider.level === "Level 1") return "bg-blue-50 text-blue-700 ring-blue-100";
   return "bg-slate-100 text-slate-700 ring-slate-200";
+}
+
+function ProviderBadgePill({ label }: { label: string }) {
+  const isAgency = label === "Agency";
+  const isBusiness = label === "Business";
+  const Icon = isAgency || isBusiness ? Building2 : label === "Verified ID" ? ShieldCheck : Award;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex max-w-full items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold",
+        isAgency
+          ? "bg-purple-50 text-purple-700 ring-1 ring-purple-100"
+          : isBusiness
+            ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+            : "bg-slate-100 text-slate-700"
+      )}
+    >
+      <Icon className={cn("h-3 w-3 shrink-0", isAgency ? "text-purple-600" : isBusiness ? "text-blue-600" : label === "Verified ID" ? "text-emerald-600" : "text-red-600")} />
+      <span className="truncate">{label}</span>
+    </span>
+  );
 }
 
 export function BuyerProviderMarketplace({ providers, buyerName = "there" }: BuyerProviderMarketplaceProps) {
@@ -688,7 +711,16 @@ function ProviderGigCard({ provider, saved, onSave, compact = false }: { provide
             </button>
           </div>
           <div className="mt-auto flex items-end justify-between gap-3">
-            <span className="min-w-0 truncate text-xs font-medium text-slate-500">{provider.category} · {provider.city}</span>
+            <div className="min-w-0">
+              <span className="block truncate text-xs font-medium text-slate-500">{provider.category} · {provider.city}</span>
+              {provider.badges.some((item) => item === "Business" || item === "Agency") ? (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {provider.badges.filter((item) => item === "Business" || item === "Agency").map((item) => (
+                    <ProviderBadgePill key={item} label={item} />
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <span className="shrink-0 text-right text-xs text-slate-500">From <strong className="text-base text-slate-950">{formatRate(provider.rate)}</strong></span>
           </div>
         </div>
@@ -733,10 +765,7 @@ function ProviderGigCard({ provider, saved, onSave, compact = false }: { provide
           {provider.badges.length ? (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {provider.badges.slice(0, compact ? 2 : 3).map((item) => (
-                <span key={item} className="inline-flex max-w-full items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                  {item === "Verified ID" ? <ShieldCheck className="h-3 w-3 shrink-0 text-emerald-600" /> : <Award className="h-3 w-3 shrink-0 text-red-600" />}
-                  <span className="truncate">{item}</span>
-                </span>
+                <ProviderBadgePill key={item} label={item} />
               ))}
             </div>
           ) : null}

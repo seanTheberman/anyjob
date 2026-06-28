@@ -16,6 +16,61 @@ function average(rows: LooseRow[], field = "rating") {
   return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
+const categoryLabels: Record<string, string> = {
+  menage: "Cleaning",
+  bricolage: "Handyman",
+  jardinage: "Gardening",
+  demenagement: "Moving",
+  enfants: "Childcare",
+  animaux: "Pet Care",
+  informatique: "IT Support",
+  "aide-domicile": "Home Help",
+  "cours-particuliers": "Private Tutoring",
+  hiver: "Winter Services",
+  custom: "Custom job request",
+};
+
+function readableSlug(slug?: string | null) {
+  if (!slug) return "";
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function hasMeaningfulText(value?: string | null) {
+  return /[\p{L}\p{N}]/u.test(value || "");
+}
+
+function jobTitleFromInquiry(job: LooseRow) {
+  const description = String(job.job_description || "").trim();
+  if (hasMeaningfulText(description)) {
+    const [firstBlock] = description.split(/\n\s*\n/);
+    return firstBlock.split(/[.!?]/).find((part) => hasMeaningfulText(part))?.trim().slice(0, 90) || firstBlock.trim().slice(0, 90);
+  }
+
+  return (
+    readableSlug(job.subcategory_slug) ||
+    categoryLabels[String(job.category_slug || "")] ||
+    readableSlug(job.category_slug) ||
+    "Service request"
+  );
+}
+
+function jobDescriptionFromInquiry(job: LooseRow) {
+  const description = String(job.job_description || "").trim();
+  if (!hasMeaningfulText(description)) return "No description provided";
+
+  const blocks = description.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+  if (blocks.length > 1 && blocks[0].length <= 120) {
+    const details = blocks.slice(1).join("\n\n").trim();
+    if (hasMeaningfulText(details)) return details;
+  }
+
+  return description;
+}
+
 // GET: Fetch details for a specific job
 export async function GET(
   request: NextRequest,
@@ -207,8 +262,8 @@ export async function GET(
     // Transform the data to match the expected format
     const transformedJob = {
       id: job.id,
-      title: job.job_description ? job.job_description.split('.').slice(0, 2).join('.').trim() : 'Service Request',
-      description: job.job_description || 'No description provided',
+      title: jobTitleFromInquiry(job),
+      description: jobDescriptionFromInquiry(job),
       client: {
         name: `${job.first_name} ${job.last_name}`,
         email: user && showContact ? job.email : undefined, // Only after bid accepted

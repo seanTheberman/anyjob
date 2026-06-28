@@ -24,6 +24,8 @@ export async function POST(request: NextRequest) {
     const {
       firstName,
       lastName,
+      businessName,
+      accountType = "individual",
       email,
       phone,
       password,
@@ -55,6 +57,8 @@ export async function POST(request: NextRequest) {
       newsletterAccepted
     } = body;
 
+    const providerAccountType = accountType === "business" || accountType === "agency" ? accountType : "individual";
+    const providerBusinessName = cleanString(businessName);
     const providerWorkMode = workMode === "shift" || workMode === "both" ? workMode : "freelance";
     const wantsShiftWork = providerWorkMode === "shift" || providerWorkMode === "both";
     const shiftNicheList = cleanStringArray(shiftNiches);
@@ -69,6 +73,13 @@ export async function POST(request: NextRequest) {
         !city || !postalCode || !birthDate || !serviceCategory) {
       return NextResponse.json(
         { error: "All required fields must be filled" },
+        { status: 400 }
+      );
+    }
+
+    if ((providerAccountType === "business" || providerAccountType === "agency") && !providerBusinessName) {
+      return NextResponse.json(
+        { error: "Business or agency name is required" },
         { status: 400 }
       );
     }
@@ -161,6 +172,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const availabilityMetadata = {
+      providerAccountType,
+      businessName: providerBusinessName || null,
+      marketplaceAvailability: "",
+      responseTime: "",
+    };
+
     // Insert seller profile data
     const { error: sellerError } = await supabase
       .from('sellers')
@@ -184,6 +202,7 @@ export async function POST(request: NextRequest) {
           selfie_video_url: selfieVideoUrl || null,
           insurance_document_url: insuranceDocumentUrl || null,
           kyc_submitted_at: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? new Date().toISOString() : null,
+          availability: availabilityMetadata,
           provider_work_mode: providerWorkMode,
           can_work_freelance: providerWorkMode === "freelance" || providerWorkMode === "both",
           can_work_shifts: wantsShiftWork,
