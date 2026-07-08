@@ -131,6 +131,7 @@ function gigDetailsValue(value: unknown) {
     .slice(0, 10);
 
   return {
+    category: limitedText(source.category, 80),
     packages,
     faqs,
     mediaFiles,

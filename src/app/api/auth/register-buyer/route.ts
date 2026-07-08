@@ -1,5 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { upsertCustomAuthUser } from "@/lib/custom-auth/users";
+import { invokeEmailFunction } from "@/lib/notifications/email-functions";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -119,9 +121,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    await upsertCustomAuthUser({
+      supabaseUserId: authData.user.id,
+      email: email.toLowerCase(),
+      password,
+      role: "buyer",
+      metadata: {
+        firstName,
+        lastName,
+        phone: phone || null,
+      },
+    });
+
+    const verificationEmail = await invokeEmailFunction({
+      functionName: "email-verification",
+      payload: {
+        tenantSlug: "default",
+        action: "request",
+        email: email.toLowerCase(),
+      },
+      useServiceRole: true,
+    });
+
+    if (!verificationEmail.ok) {
+      console.error("Buyer verification email failed:", verificationEmail);
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Account created successfully! Please check your email to verify your account.",
+      message: "Account created successfully. Check your email to verify your account.",
       user: {
         id: authData.user.id,
         email: authData.user.email,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, Clock, MessageCircle, RefreshCw } from "lucide-react";
+import { Check, Clock, RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -10,7 +10,6 @@ type PackageKey = "basic" | "standard" | "premium";
 
 type ProviderPackageCardProps = {
   bookingHref: string;
-  providerName: string;
   category: string;
   baseRate: number;
   responseTime: string;
@@ -29,7 +28,6 @@ function formatPrice(value: number) {
 
 export function ProviderPackageCard({
   bookingHref,
-  providerName,
   category,
   baseRate,
   responseTime,
@@ -122,13 +120,9 @@ export function ProviderPackageCard({
           Continue
         </Link>
 
-        <Link
-          href={`/dashboard/mail?provider=${encodeURIComponent(providerName)}`}
-          className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded border border-slate-300 px-4 text-sm font-bold text-slate-950 transition-colors hover:bg-slate-50"
-        >
-          <MessageCircle className="h-4 w-4" />
-          Contact provider
-        </Link>
+        <p className="mt-3 rounded bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
+          Share the job details first so the provider can confirm the scope before any booking moves forward.
+        </p>
       </div>
     </div>
   );

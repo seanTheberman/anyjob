@@ -145,8 +145,23 @@ export default function JobDetailsPage() {
   const handleSubmitBid = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!bidAmount || parseFloat(bidAmount) <= 0) {
-      setError("Please enter a valid bid amount");
+    const amount = parseFloat(bidAmount);
+    const minBudget = Number(job?.budget.min || 0);
+    const maxBudget = Number(job?.budget.max || 0);
+    if (!bidAmount.trim()) {
+      setError("Enter your bid amount before submitting.");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError("Please enter a valid bid amount greater than 0.");
+      return;
+    }
+    if (minBudget && amount < minBudget) {
+      setError(`Your bid is below the client budget minimum of ${job?.budget.currency || "€"}${minBudget}.`);
+      return;
+    }
+    if (maxBudget && amount > maxBudget) {
+      setError(`Your bid is above the client budget maximum of ${job?.budget.currency || "€"}${maxBudget}.`);
       return;
     }
 
@@ -161,7 +176,7 @@ export default function JobDetailsPage() {
         },
         body: JSON.stringify({
           inquiry_id: jobId,
-          amount: parseFloat(bidAmount),
+          amount,
           message: bidMessage,
         }),
       });
@@ -219,6 +234,15 @@ export default function JobDetailsPage() {
   const bidAmountValue = parseFloat(bidAmount);
   const hasBidAmount = Number.isFinite(bidAmountValue) && bidAmountValue > 0;
   const feeBreakdown = calculateBookingTokenBreakdown(hasBidAmount ? bidAmountValue : 0);
+  const bidValidationError = !bidAmount.trim()
+    ? null
+    : !hasBidAmount
+      ? "Enter a valid bid amount greater than 0."
+      : job.budget.min && bidAmountValue < job.budget.min
+        ? `Your bid is below the client budget minimum of ${job.budget.currency}${job.budget.min}.`
+        : job.budget.max && bidAmountValue > job.budget.max
+          ? `Your bid is above the client budget maximum of ${job.budget.currency}${job.budget.max}.`
+          : null;
   const offers = job.offers || [];
   const buyerStats = job.buyerStats || { jobsPosted: 0, hires: 0, hireRate: 0, averageRatingGiven: 0, ratingsGiven: 0 };
 
@@ -428,7 +452,10 @@ export default function JobDetailsPage() {
                         max={job.budget.max * 1.5}
                         step="0.01"
                         value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
+                        onChange={(e) => {
+                          setBidAmount(e.target.value);
+                          setError(null);
+                        }}
                         placeholder={`Enter amount between ${job.budget.min} - ${job.budget.max}`}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         required
@@ -438,7 +465,13 @@ export default function JobDetailsPage() {
                       </p>
                     </div>
 
-                    {hasBidAmount && (
+                    {hasBidAmount && bidValidationError ? (
+                      <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+                        {bidValidationError}
+                      </div>
+                    ) : null}
+
+                    {hasBidAmount && !bidValidationError && (
                       <div className="rounded-xl border border-red-100 bg-red-50 p-4">
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Your job payout</span>

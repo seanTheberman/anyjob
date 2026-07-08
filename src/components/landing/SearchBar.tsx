@@ -180,7 +180,9 @@ export function SearchBar() {
                     e.preventDefault();
                     if (selectedIndex >= 0 && selectedIndex < filteredCategories.length) {
                         handleCategorySelect(filteredCategories[selectedIndex]);
-                    } else if (filteredCategories.length === 0) {
+                    } else if (filteredCategories.length > 0) {
+                        handleCategorySelect(filteredCategories[0]);
+                    } else {
                         handleCustomService();
                     }
                     break;

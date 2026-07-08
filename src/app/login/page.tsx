@@ -25,7 +25,6 @@ export default function LoginPage() {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [magicLinkSent, setMagicLinkSent] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -105,32 +104,6 @@ export default function LoginPage() {
         });
     }
 
-    async function handleMagicLink() {
-        if (!email) {
-            setError("Please enter your email first");
-            return;
-        }
-        setLoading(true);
-        setError(null);
-
-        const supabase = createClient();
-        const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-                emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectTarget)}`,
-            },
-        });
-
-        if (error) {
-            setError(error.message);
-            setLoading(false);
-            return;
-        }
-
-        setMagicLinkSent(true);
-        setLoading(false);
-    }
-
     return (
         <div className="min-h-screen flex items-center justify-center px-4 py-20 bg-gradient-to-br from-red-50/50 via-white to-indigo-50/50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
             <Card className="relative w-full max-w-md border-gray-100 dark:border-gray-800 shadow-xl shadow-black/5 rounded-3xl overflow-hidden">
@@ -156,13 +129,6 @@ export default function LoginPage() {
                     {error && (
                         <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm rounded-xl px-4 py-3">
                             {error}
-                        </div>
-                    )}
-
-                    {/* Magic Link Success */}
-                    {magicLinkSent && (
-                        <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 text-sm rounded-xl px-4 py-3">
-                            ✅ A login link has been sent to <strong>{email}</strong>. Check your inbox.
                         </div>
                     )}
 
@@ -215,14 +181,12 @@ export default function LoginPage() {
                                 <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                     Password
                                 </label>
-                                <button
-                                    type="button"
-                                    onClick={handleMagicLink}
-                                    disabled={loading}
-                                    className="text-xs text-red-600 hover:text-red-700 font-medium disabled:opacity-60"
+                                <Link
+                                    href="/forgot-password"
+                                    className="text-xs text-red-600 hover:text-red-700 font-medium"
                                 >
                                     Forgot?
-                                </button>
+                                </Link>
                             </div>
                             <div className="relative">
                                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -257,17 +221,6 @@ export default function LoginPage() {
                             )}
                         </button>
                     </form>
-
-                    {/* Magic Link */}
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={handleMagicLink}
-                        disabled={loading}
-                        className="w-full rounded-xl py-5 text-sm text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
-                    >
-                        ✨ Login with magic link
-                    </Button>
 
                     {/* Role Selection for New Users */}
                     <Card>

@@ -134,7 +134,12 @@ export default function BrowseJobsPage() {
       const res = await fetch(`/api/jobs?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        const nextJobs = data.jobs || [];
+        const normalizedCity = searchCity.trim().toLowerCase();
+        const nextJobs = (data.jobs || []).filter((job: Job) => {
+          const categoryMatches = !selectedCategory || job.category_slug === selectedCategory;
+          const cityMatches = !normalizedCity || [job.city, job.address].some((value) => String(value || "").toLowerCase().includes(normalizedCity));
+          return categoryMatches && cityMatches;
+        });
         setJobs(nextJobs);
         setSelectedJobId((current) => current && nextJobs.some((job: Job) => job.id === current) ? current : nextJobs[0]?.id || null);
       }

@@ -123,11 +123,38 @@ export default function NewBusinessPostPage() {
     setSubmitting(true);
     setError(null);
 
+    const submittedForm = new FormData(event.currentTarget);
+    const formText = (field: keyof BusinessPostForm) => {
+      const value = submittedForm.get(field);
+      return typeof value === "string" ? value.trim() : "";
+    };
+    const submitPayload: BusinessPostForm = {
+      ...formData,
+      niche: formText("niche") || formData.niche,
+      roleTitle: formText("roleTitle") || formData.roleTitle,
+      description: formText("description") || formData.description,
+      locationName: formText("locationName") || formData.locationName,
+      address: formText("address") || formData.address,
+      city: formText("city") || formData.city,
+      postalCode: formText("postalCode") || formData.postalCode,
+      startDate: formText("startDate") || formData.startDate,
+      startTime: formText("startTime") || formData.startTime,
+      endDate: formText("endDate") || formData.endDate || formText("startDate") || formData.startDate,
+      endTime: formText("endTime") || formData.endTime,
+      headcount: formText("headcount") || formData.headcount,
+      hourlyRate: formText("hourlyRate") || formData.hourlyRate,
+      dayRate: formText("dayRate") || formData.dayRate,
+      acceptsWorkerRateVariation: submittedForm.get("acceptsWorkerRateVariation") === "on",
+      requirements: formText("requirements") || formData.requirements,
+      uniform: formText("uniform") || formData.uniform,
+      breakPolicy: formText("breakPolicy") || formData.breakPolicy,
+    };
+
     try {
       const response = await fetch("/api/business/posts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitPayload),
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -208,40 +235,40 @@ export default function NewBusinessPostPage() {
           <div className="mt-6 grid gap-5 md:grid-cols-2">
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Worker niche *</span>
-              <select value={formData.niche} onChange={(e) => handleNicheChange(e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+              <select name="niche" value={formData.niche} onChange={(e) => handleNicheChange(e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
                 {SHIFT_NICHES.map((niche) => <option key={niche.value} value={niche.value}>{niche.label}</option>)}
               </select>
               <span className="mt-1 block text-xs text-gray-500">Only matching shift workers will see this business shift job.</span>
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Role *</span>
-              <select value={formData.roleTitle} onChange={(e) => updateField("roleTitle", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+              <select name="roleTitle" value={formData.roleTitle} onChange={(e) => updateField("roleTitle", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
                 {selectedNiche.roles.map((role) => <option key={role} value={role}>{role}</option>)}
               </select>
             </label>
             <label className="block md:col-span-2">
               <span className="text-sm font-semibold text-gray-700">Description *</span>
-              <textarea value={formData.description} onChange={(e) => updateField("description", e.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required placeholder="Describe duties, expectations, experience, and any must-have requirements." />
+              <textarea name="description" value={formData.description} onChange={(e) => updateField("description", e.target.value)} rows={5} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required placeholder="Describe duties, expectations, experience, and any must-have requirements." />
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Location name</span>
-              <input value={formData.locationName} onChange={(e) => updateField("locationName", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Main venue, ward, store, warehouse..." />
+              <input name="locationName" value={formData.locationName} onChange={(e) => updateField("locationName", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Main venue, ward, store, warehouse..." />
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Headcount *</span>
-              <input type="number" min="1" value={formData.headcount} onChange={(e) => updateField("headcount", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+              <input name="headcount" type="number" min="1" value={formData.headcount} onChange={(e) => updateField("headcount", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
             </label>
             <label className="block md:col-span-2">
               <span className="text-sm font-semibold text-gray-700">Address *</span>
-              <input value={formData.address} onChange={(e) => updateField("address", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+              <input name="address" value={formData.address} onChange={(e) => updateField("address", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">City *</span>
-              <input value={formData.city} onChange={(e) => updateField("city", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
+              <input name="city" value={formData.city} onChange={(e) => updateField("city", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Postal code</span>
-              <input value={formData.postalCode} onChange={(e) => updateField("postalCode", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <input name="postalCode" value={formData.postalCode} onChange={(e) => updateField("postalCode", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
           </div>
 
@@ -249,19 +276,19 @@ export default function NewBusinessPostPage() {
             <div className="mt-6 grid gap-5 rounded-lg border border-gray-200 bg-gray-50 p-4 md:grid-cols-2">
               <label className="block">
                 <span className="text-sm font-semibold text-gray-700">Start date *</span>
-                <input type="date" value={formData.startDate} onChange={(e) => updateField("startDate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required />
+                <input name="startDate" type="date" value={formData.startDate} onChange={(e) => updateField("startDate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required />
               </label>
               <label className="block">
                 <span className="text-sm font-semibold text-gray-700">Start time *</span>
-                <input type="time" value={formData.startTime} onChange={(e) => updateField("startTime", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required />
+                <input name="startTime" type="time" value={formData.startTime} onChange={(e) => updateField("startTime", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required />
               </label>
               <label className="block">
                 <span className="text-sm font-semibold text-gray-700">End date</span>
-                <input type="date" value={formData.endDate} onChange={(e) => updateField("endDate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" />
+                <input name="endDate" type="date" value={formData.endDate} onChange={(e) => updateField("endDate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" />
               </label>
               <label className="block">
                 <span className="text-sm font-semibold text-gray-700">End time *</span>
-                <input type="time" value={formData.endTime} onChange={(e) => updateField("endTime", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required />
+                <input name="endTime" type="time" value={formData.endTime} onChange={(e) => updateField("endTime", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2" required />
               </label>
             </div>
           ) : null}
@@ -269,29 +296,29 @@ export default function NewBusinessPostPage() {
           <div className="mt-6 grid gap-5 md:grid-cols-2">
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Preferred hourly rate</span>
-              <input type="number" min="1" value={formData.hourlyRate} onChange={(e) => updateField("hourlyRate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <input name="hourlyRate" type="number" min="1" value={formData.hourlyRate} onChange={(e) => updateField("hourlyRate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
               <span className="mt-1 block text-xs text-gray-500">Market average for {selectedNiche.label}: €{selectedNiche.hourlyAverage}/hour</span>
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Preferred day rate</span>
-              <input type="number" min="1" value={formData.dayRate} onChange={(e) => updateField("dayRate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <input name="dayRate" type="number" min="1" value={formData.dayRate} onChange={(e) => updateField("dayRate", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
               <span className="mt-1 block text-xs text-gray-500">Market average for {selectedNiche.label}: €{selectedNiche.dayAverage}/day</span>
             </label>
             <label className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-3 text-sm text-gray-700 md:col-span-2">
-              <input type="checkbox" checked={formData.acceptsWorkerRateVariation} onChange={(e) => updateField("acceptsWorkerRateVariation", e.target.checked)} />
+              <input name="acceptsWorkerRateVariation" type="checkbox" checked={formData.acceptsWorkerRateVariation} onChange={(e) => updateField("acceptsWorkerRateVariation", e.target.checked)} />
               Accept worker fee variations above or below this preferred rate
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Requirements</span>
-              <textarea value={formData.requirements} onChange={(e) => updateField("requirements", e.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <textarea name="requirements" value={formData.requirements} onChange={(e) => updateField("requirements", e.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
             <label className="block">
               <span className="text-sm font-semibold text-gray-700">Uniform/equipment</span>
-              <textarea value={formData.uniform} onChange={(e) => updateField("uniform", e.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <textarea name="uniform" value={formData.uniform} onChange={(e) => updateField("uniform", e.target.value)} rows={3} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
             <label className="block md:col-span-2">
               <span className="text-sm font-semibold text-gray-700">Break policy</span>
-              <input value={formData.breakPolicy} onChange={(e) => updateField("breakPolicy", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+              <input name="breakPolicy" value={formData.breakPolicy} onChange={(e) => updateField("breakPolicy", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
           </div>
 

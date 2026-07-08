@@ -7,7 +7,6 @@ import {
   Clock,
   Heart,
   MapPin,
-  MessageCircle,
   ShieldCheck,
   Star,
 } from "lucide-react";
@@ -103,7 +102,6 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
   const packageCard = (
     <ProviderPackageCard
       bookingHref={bookingHref}
-      providerName={provider.name}
       category={provider.category}
       baseRate={provider.rate}
       responseTime={provider.responseTime}
@@ -256,13 +254,9 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
                     <span>{provider.completedJobs} completed jobs</span>
                     {provider.experience ? <span>{provider.experience}</span> : null}
                   </div>
-                  <Link
-                    href={`/dashboard/mail?provider=${encodeURIComponent(provider.name)}`}
-                    className="mt-4 inline-flex items-center gap-2 rounded border border-slate-300 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-slate-50"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    Contact me
-                  </Link>
+                  <p className="mt-4 rounded border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold leading-6 text-slate-600">
+                    Start with a job request so the provider can review the exact scope before booking.
+                  </p>
                 </div>
               </div>
 
@@ -296,7 +290,7 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
             <div className="mt-4 divide-y divide-slate-200 rounded-lg border border-slate-200">
               {[
                 ["How do I book this provider?", "Choose a package, continue to the request flow, and share the job details before confirming."],
-                ["Can I contact the provider first?", "Yes. Use the contact button to ask questions before sending a booking request."],
+                ["Can I choose this provider for my request?", "Yes. Continue to the request flow, describe the job, and AnyJob keeps the scope visible for the provider before confirmation."],
                 ["Are reviews verified?", "Reviews come from completed AnyJob bookings tied to real client requests."],
               ].map(([question, answer]) => (
                 <details key={question} className="group p-4">

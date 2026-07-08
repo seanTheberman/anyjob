@@ -442,7 +442,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         )}
       </header>
 
-      <div className="flex min-h-0 flex-1 lg:flex-row flex-col">
+      <div className="flex flex-1 flex-col lg:flex-row lg:items-start">
         {/* Desktop Sidebar */}
         <aside className="hidden lg:block sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 overflow-y-auto">
           <nav className="p-4 pt-12 space-y-1">
@@ -478,7 +478,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-4rem)] overflow-y-auto p-4 lg:p-6 pb-24 lg:pb-6">
+        <main className="w-full flex-1 min-h-[calc(100vh-8rem)] overflow-visible p-4 lg:p-6 pb-24 lg:pb-6">
           {showDashboardInsuranceNotice ? (
             <div className="mb-4 lg:mb-6">
               <InsuranceNotice accent="green" />

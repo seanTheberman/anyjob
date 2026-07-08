@@ -61,6 +61,7 @@ export default async function DemenagementPage() {
                         src="https://images.unsplash.com/photo-1600518464441-9154a4dea21b?q=80&w=1600&auto=format&fit=crop"
                         alt="Moving services"
                         fill
+                        sizes="(min-width: 1024px) 72rem, calc(100vw - 2rem)"
                         className="object-cover"
                         priority
                     />
@@ -103,6 +104,7 @@ export default async function DemenagementPage() {
                         src="https://images.unsplash.com/photo-1585458941243-bacd4fc6f8d0?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&w=1400"
                         alt="Moving special offer"
                         fill
+                        sizes="(min-width: 1024px) 56rem, calc(100vw - 2rem)"
                         className="object-cover"
                     />
                     <div className="absolute inset-0 bg-purple-900/60 mix-blend-multiply"></div>
@@ -131,6 +133,7 @@ export default async function DemenagementPage() {
                                         src={service.image}
                                         alt={service.title}
                                         fill
+                                        sizes="(min-width: 1024px) 18rem, (min-width: 640px) 50vw, calc(100vw - 2rem)"
                                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                                     />
                                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300"></div>

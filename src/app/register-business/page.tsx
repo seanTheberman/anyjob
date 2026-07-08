@@ -992,19 +992,20 @@ function StepDocuments({
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
               <label className="block">
-                <span className="text-sm font-semibold text-gray-700">Document link</span>
+                <span className="text-sm font-semibold text-gray-700">{document.label} link</span>
                 <input
                   type="url"
                   value={formData.documentLinks[document.key]}
                   onChange={(event) => updateDocumentLink(document.key, event.target.value)}
                   className="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
-                  placeholder="https://example.com/business-document.pdf"
+                  placeholder={`https://example.com/${document.key}-document.pdf`}
+                  aria-label={`${document.label} document link`}
                 />
               </label>
               <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-5 py-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100">
                 <FileUp className="mb-2 h-5 w-5" />
-                Upload document
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" onChange={(event) => handleFileUpload(document.key, event)} />
+                Upload {document.key} document
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" aria-label={`Upload ${document.label}`} onChange={(event) => handleFileUpload(document.key, event)} />
                 {formData.documentFileNames[document.key] ? (
                   <span className="mt-2 max-w-48 break-all text-xs font-medium text-emerald-700">{formData.documentFileNames[document.key]}</span>
                 ) : null}

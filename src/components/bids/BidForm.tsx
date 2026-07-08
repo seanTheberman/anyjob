@@ -22,11 +22,28 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
   const amountValue = parseFloat(amount);
   const hasAmount = Number.isFinite(amountValue) && amountValue > 0;
   const feeBreakdown = calculateBookingTokenBreakdown(hasAmount ? amountValue : 0);
+  const minBudget = Number(budgetMin || 0);
+  const maxBudget = Number(budgetMax || 0);
+  const amountValidationError = !amount.trim()
+    ? "Enter your quote before submitting."
+    : !hasAmount
+      ? "Enter a valid quote greater than 0."
+      : minBudget && amountValue < minBudget
+        ? `Your quote is below the client budget minimum of €${minBudget}.`
+        : maxBudget && amountValue > maxBudget
+          ? `Your quote is above the client budget maximum of €${maxBudget}.`
+          : null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+
+    if (amountValidationError) {
+      setError(amountValidationError);
+      return;
+    }
+
+    setSubmitting(true);
 
     try {
       const response = await fetch("/api/bids", {
@@ -89,7 +106,10 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
           <input
             type="number"
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onChange={(e) => {
+              setAmount(e.target.value);
+              setError(null);
+            }}
             placeholder="e.g. 150"
             min="1"
             step="0.01"
@@ -98,7 +118,13 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
           />
         </div>
 
-        {hasAmount && (
+        {hasAmount && amountValidationError && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
+            {amountValidationError}
+          </div>
+        )}
+
+        {hasAmount && !amountValidationError && (
           <div className="rounded-xl border border-red-100 bg-red-50 p-4">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-600">Your job payout</span>
@@ -164,7 +190,7 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
 
         <button
           type="submit"
-          disabled={submitting || !hasAmount}
+          disabled={submitting}
           className="w-full flex items-center justify-center gap-2 bg-red-600 text-white px-6 py-3 rounded-xl font-medium hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? (

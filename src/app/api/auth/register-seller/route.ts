@@ -1,5 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { upsertCustomAuthUser } from "@/lib/custom-auth/users";
+import { invokeEmailFunction } from "@/lib/notifications/email-functions";
 import { NextRequest, NextResponse } from "next/server";
 
 function cleanString(value: unknown) {
@@ -295,9 +297,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await upsertCustomAuthUser({
+      supabaseUserId: authData.user.id,
+      email: email.toLowerCase(),
+      password,
+      role: "provider",
+      metadata: {
+        firstName,
+        lastName,
+        providerAccountType,
+        providerWorkMode,
+      },
+    });
+
+    const verificationEmail = await invokeEmailFunction({
+      functionName: "email-verification",
+      payload: {
+        tenantSlug: "default",
+        action: "request",
+        email: email.toLowerCase(),
+      },
+      useServiceRole: true,
+    });
+
+    if (!verificationEmail.ok) {
+      console.error("Provider verification email failed:", verificationEmail);
+    }
+
     return NextResponse.json({
       success: true,
-      message: "Seller registration successful! Your account is pending KYC verification.",
+      message: "Seller registration successful. Check your email to verify your account. Your provider account is pending KYC verification.",
       user: {
         id: authData.user.id,
         email: authData.user.email,

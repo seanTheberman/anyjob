@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { adminForbidden, getAdminApiUser, logAdminAction } from "@/lib/auth/admin-api";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 
 const actions = ["refresh", "approve", "request_info", "mark_live", "start", "complete", "reject", "cancel", "expire"] as const;
 type JobAction = (typeof actions)[number];
@@ -112,6 +113,15 @@ export async function POST(request: Request) {
       });
 
       if (notificationError) return NextResponse.json({ error: notificationError.message }, { status: 500 });
+    }
+
+    if (["approve", "mark_live"].includes(action) && nextStatus && ["approved", "submitted"].includes(nextStatus)) {
+      await notifyJobEvent({
+        action: "job_marked_live",
+        source,
+        jobId,
+        status: nextStatus,
+      });
     }
 
     await logAdminAction({

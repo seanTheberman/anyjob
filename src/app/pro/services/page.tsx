@@ -44,6 +44,7 @@ type GigMediaFile = {
 };
 
 type GigDetails = {
+  category?: string;
   packages: GigPackage[];
   faqs: GigFaq[];
   mediaUrls: string[];
@@ -161,6 +162,7 @@ function draftFromService(service: GigService): GigDraft {
     ...blankDraft,
     id: service.id,
     title: service.title || "",
+    category: details?.category || "",
     description: service.description || "",
     hourlyRate: Number(service.hourly_rate || 25),
     minHours: Number(service.min_hours || 1),
@@ -262,6 +264,7 @@ export default function ServicesPage() {
       tags: currentKeywords,
       isActive: draft.isActive,
       gigDetails: {
+        category: draft.category,
         packages: draft.packages,
         faqs: draft.faqs.filter((faq) => faq.question.trim() || faq.answer.trim()),
         mediaFiles: draft.mediaFiles.filter(Boolean).slice(0, 4),
@@ -788,7 +791,7 @@ export default function ServicesPage() {
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <p className="text-sm font-black text-blue-950">FAQ {index + 1}</p>
                       {draft.faqs.length > 1 ? (
-                        <button type="button" onClick={() => removeFaq(index)} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-red-50 hover:text-red-600">
+                        <button type="button" onClick={() => removeFaq(index)} aria-label={`Remove FAQ ${index + 1}`} title={`Remove FAQ ${index + 1}`} className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-red-50 hover:text-red-600">
                           <X className="h-4 w-4" />
                         </button>
                       ) : null}
@@ -863,7 +866,7 @@ export default function ServicesPage() {
                       />
                     </label>
                     {draft.requirementQuestions.length > 1 ? (
-                      <button type="button" onClick={() => removeRequirement(index)} className="mt-6 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
+                      <button type="button" onClick={() => removeRequirement(index)} aria-label={`Remove requirement ${index + 1}`} title={`Remove requirement ${index + 1}`} className="mt-6 inline-flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:border-red-200 hover:bg-red-50 hover:text-red-600">
                         <X className="h-4 w-4" />
                       </button>
                     ) : null}

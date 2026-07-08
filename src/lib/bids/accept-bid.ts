@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
@@ -102,6 +103,16 @@ export async function acceptBidAndUnlockChat(
       });
     }
   }
+
+  await notifyJobEvent({
+    action: "job_payment_accepted",
+    jobId: bid.inquiry_id,
+    inquiryId: bid.inquiry_id,
+    bidId: bid.id,
+    buyerUserId: bid.inquiry.user_id,
+    providerUserId: bid.provider_id,
+    status: "bid_accepted",
+  });
 
   return { bid: updated, conversation };
 }

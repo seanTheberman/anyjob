@@ -13,6 +13,29 @@ function categoryLabel(value?: string | null) {
   return String(value || "General").replaceAll("-", " ");
 }
 
+function hasMeaningfulText(value?: string | null) {
+  return /[\p{L}\p{N}]/u.test(value || "");
+}
+
+function splitStoredJobDescription(value?: string | null) {
+  const text = String(value || "").trim();
+  if (!hasMeaningfulText(text)) return { title: "", description: "" };
+
+  const blocks = text.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+  if (blocks.length > 1 && blocks[0].length <= 120) {
+    return {
+      title: blocks[0],
+      description: blocks.slice(1).join("\n\n"),
+    };
+  }
+
+  const firstSentence = text.split(/[.!?]/).find((part) => hasMeaningfulText(part))?.trim();
+  return {
+    title: (firstSentence || text).slice(0, 120),
+    description: text,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -69,6 +92,7 @@ export async function GET(request: NextRequest) {
     }
 
     const buyerTasks = ((inquiriesResult.data || []) as Row[]).map((job) => {
+      const storedDescription = splitStoredJobDescription(job.job_description);
       const bids = bidsByInquiry.get(String(job.id)) || [];
       const workImages = (imagesByInquiry.get(String(job.id)) || []).map((image) => ({
         id: String(image.id),
@@ -81,9 +105,9 @@ export async function GET(request: NextRequest) {
       return {
         id: String(job.id),
         source: "buyer",
-        title: categoryLabel(job.subcategory_slug || job.category_slug),
+        title: storedDescription.title || categoryLabel(job.subcategory_slug || job.category_slug),
         category: String(job.category_slug || "general"),
-        description: String(job.job_description || ""),
+        description: storedDescription.description || String(job.job_description || ""),
         location: job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(", ") || "Remote or approximate area",
         remote: false,
         priceMin: Number(job.budget_range_min || 0),

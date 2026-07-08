@@ -3,7 +3,7 @@
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Calendar, Clock, MapPin, ArrowLeft, User as UserIcon, MessageSquare, CheckCircle, XCircle, Clock3, Star, Gavel, ImageIcon } from "lucide-react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useParams, useRouter } from "next/navigation";
@@ -100,6 +100,29 @@ const getServiceName = (categorySlug: string, subcategorySlug: string) => {
   return `${categoryName} - ${subcategoryName}`;
 };
 
+function hasMeaningfulText(value?: string | null) {
+  return /[\p{L}\p{N}]/u.test(value || "");
+}
+
+function splitStoredJobDescription(value?: string | null) {
+  const text = value?.trim() || "";
+  if (!hasMeaningfulText(text)) return { title: "", description: "" };
+
+  const blocks = text.split(/\n\s*\n/).map((block) => block.trim()).filter(Boolean);
+  if (blocks.length > 1 && blocks[0].length <= 120) {
+    return {
+      title: blocks[0],
+      description: blocks.slice(1).join("\n\n"),
+    };
+  }
+
+  const firstSentence = text.split(/[.!?]/).find((part) => hasMeaningfulText(part))?.trim();
+  return {
+    title: firstSentence || text,
+    description: text,
+  };
+}
+
 export default function RequestDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -114,56 +137,43 @@ export default function RequestDetailPage() {
   const [bids, setBids] = useState<Bid[]>([]);
   const [workImages, setWorkImages] = useState<WorkImage[]>([]);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
     const fetchRequestData = async () => {
       try {
+        const requestId = Array.isArray(params.id) ? params.id[0] : params.id;
+        if (!requestId) {
+          setError("Request id is missing");
+          return;
+        }
+
         const { data: { user } } = await supabase.auth.getUser();
         setUser(user);
-        
-        if (user && params.id) {
-          // Fetch the specific inquiry
-          const { data: inquiryData, error } = await supabase
-            .from("service_inquiries")
-            .select("*")
-            .eq("id", params.id)
-            .eq("user_id", user.id)
-            .single();
 
-          if (error) {
-            console.error("Error fetching inquiry:", error);
-            setError("Request not found or you don't have permission to view it");
-          } else if (inquiryData) {
-            setInquiry(inquiryData);
-            
-            // Fetch reviews for this inquiry
-            const reviewsResponse = await fetch(`/api/reviews?service_inquiry_id=${params.id}`);
-            if (reviewsResponse.ok) {
-              const reviewsData = await reviewsResponse.json();
-              setReviews(reviewsData.reviews || []);
-            }
+        const detailResponse = await fetch(`/api/dashboard/requests/${requestId}`, { cache: "no-store" });
+        const detailPayload = await detailResponse.json().catch(() => ({}));
+        if (!detailResponse.ok) {
+          setError(detailPayload.error || "Request not found or you don't have permission to view it");
+          return;
+        }
 
-            // Fetch bids for this inquiry
-            const bidsResponse = await fetch(`/api/bids?inquiry_id=${params.id}`);
-            if (bidsResponse.ok) {
-              const bidsData = await bidsResponse.json();
-              setBids(bidsData.bids || []);
-            }
+        setInquiry(detailPayload.inquiry);
+        setWorkImages(detailPayload.workImages || []);
 
-            const { data: imageData, error: imageError } = await supabase
-              .from("user_images")
-              .select("id,image_url,public_id,image_type,title,description")
-              .eq("inquiry_id", params.id)
-              .eq("image_type", "work_image")
-              .order("created_at", { ascending: true });
+        const [reviewsResponse, bidsResponse] = await Promise.all([
+          fetch(`/api/reviews?service_inquiry_id=${requestId}`),
+          fetch(`/api/bids?inquiry_id=${requestId}`),
+        ]);
 
-            if (imageError) {
-              console.error("Error fetching work images:", imageError);
-            } else {
-              setWorkImages(imageData || []);
-            }
-          }
+        if (reviewsResponse.ok) {
+          const reviewsData = await reviewsResponse.json();
+          setReviews(reviewsData.reviews || []);
+        }
+
+        if (bidsResponse.ok) {
+          const bidsData = await bidsResponse.json();
+          setBids(bidsData.bids || []);
         }
       } catch (error) {
         console.error("Error:", error);
@@ -305,6 +315,9 @@ export default function RequestDetailPage() {
   const StatusIcon = jobStatusIcons[inquiry.status as keyof typeof jobStatusIcons] || Clock3;
   const acceptedBid = bids.find((bid) => bid.status === "accepted") || null;
   const acceptedBreakdown = acceptedBid ? calculateBookingTokenBreakdown(Number(acceptedBid.amount)) : null;
+  const requestCopy = splitStoredJobDescription(inquiry.job_description);
+  const requestTitle = requestCopy.title || getServiceName(inquiry.category_slug, inquiry.subcategory_slug);
+  const requestDescription = requestCopy.description || "No description provided.";
 
   return (
     <DashboardLayout>
@@ -321,7 +334,7 @@ export default function RequestDetailPage() {
           
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <h1 className="text-2xl font-bold text-gray-900">
-              {getServiceName(inquiry.category_slug, inquiry.subcategory_slug)}
+              {requestTitle}
             </h1>
             
             <div className="flex items-center gap-3">
@@ -340,7 +353,7 @@ export default function RequestDetailPage() {
             {/* Job Description */}
             <div className="bg-white rounded-xl p-6 border border-gray-200">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Job Description</h2>
-              <p className="text-gray-700 leading-relaxed">{inquiry.job_description}</p>
+              <p className="whitespace-pre-wrap text-gray-700 leading-relaxed">{requestDescription}</p>
             </div>
 
             {/* Service Details */}
