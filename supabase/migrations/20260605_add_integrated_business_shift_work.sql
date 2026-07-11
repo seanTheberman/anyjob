@@ -24,7 +24,7 @@ create table if not exists public.business_profiles (
   address text not null,
   city text not null,
   postal_code text,
-  country text not null default 'France',
+  country text not null default 'Ireland',
   document_url text not null,
   document_source text not null default 'url',
   typical_work_types text[] not null default '{}',
@@ -46,7 +46,7 @@ create index if not exists idx_business_profiles_industry on public.business_pro
 
 create table if not exists public.shift_market_rates (
   id uuid primary key default gen_random_uuid(),
-  country text not null default 'France',
+  country text not null default 'Ireland',
   city text,
   industry text not null,
   niche text not null,
@@ -222,12 +222,12 @@ create policy "Business owners can update own work posts"
 
 insert into public.shift_market_rates (country, industry, niche, role_title, hourly_low, hourly_average, hourly_high, day_low, day_average, day_high, source)
 values
-  ('France', 'Healthcare', 'healthcare', 'Healthcare support worker', 16, 22, 30, 120, 165, 230, 'AnyJob launch estimate'),
-  ('France', 'Hospitality', 'hospitality', 'Wait staff', 13, 17, 24, 95, 130, 180, 'AnyJob launch estimate'),
-  ('France', 'Cleaning', 'cleaning', 'Commercial cleaner', 14, 18, 24, 100, 135, 180, 'AnyJob launch estimate'),
-  ('France', 'Retail', 'retail', 'Retail assistant', 12, 16, 22, 90, 120, 165, 'AnyJob launch estimate'),
-  ('France', 'Logistics', 'logistics', 'Warehouse operative', 14, 18, 25, 100, 140, 190, 'AnyJob launch estimate'),
-  ('France', 'Events', 'events', 'Event staff', 13, 18, 26, 95, 140, 200, 'AnyJob launch estimate')
+  ('Ireland', 'Healthcare', 'healthcare', 'Healthcare support worker', 16, 22, 30, 120, 165, 230, 'AnyJob launch estimate'),
+  ('Ireland', 'Hospitality', 'hospitality', 'Wait staff', 13, 17, 24, 95, 130, 180, 'AnyJob launch estimate'),
+  ('Ireland', 'Cleaning', 'cleaning', 'Commercial cleaner', 14, 18, 24, 100, 135, 180, 'AnyJob launch estimate'),
+  ('Ireland', 'Retail', 'retail', 'Retail assistant', 12, 16, 22, 90, 120, 165, 'AnyJob launch estimate'),
+  ('Ireland', 'Logistics', 'logistics', 'Warehouse operative', 14, 18, 25, 100, 140, 190, 'AnyJob launch estimate'),
+  ('Ireland', 'Events', 'events', 'Event staff', 13, 18, 26, 95, 140, 200, 'AnyJob launch estimate')
 on conflict do nothing;
 
 create or replace function public.set_updated_at()

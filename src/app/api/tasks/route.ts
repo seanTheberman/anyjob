@@ -1,4 +1,5 @@
 import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
+import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
     const [inquiriesResult, businessPostsResult, bidsResult, imagesResult] = await Promise.all([
       admin
         .from("service_inquiries")
-        .select("id,category_slug,subcategory_slug,service_type,job_description,city,postal_code,coarse_location_label,budget_range_min,budget_range_max,preferred_date,status,submitted_at,created_at")
+        .select("id,user_id,category_slug,subcategory_slug,service_type,job_description,city,postal_code,coarse_location_label,budget_range_min,budget_range_max,preferred_date,status,submitted_at,created_at")
         .eq("status", "submitted")
         .order("submitted_at", { ascending: false })
         .limit(100),
@@ -91,6 +92,9 @@ export async function GET(request: NextRequest) {
       imagesByInquiry.set(inquiryId, [...(imagesByInquiry.get(inquiryId) || []), image]);
     }
 
+    const buyerIds = Array.from(new Set(((inquiriesResult.data || []) as Row[]).map((job) => String(job.user_id || "")).filter(Boolean)));
+    const buyerTrustByUser = await getBuyerTrustForUsers(admin, buyerIds);
+
     const buyerTasks = ((inquiriesResult.data || []) as Row[]).map((job) => {
       const storedDescription = splitStoredJobDescription(job.job_description);
       const bids = bidsByInquiry.get(String(job.id)) || [];
@@ -118,6 +122,7 @@ export async function GET(request: NextRequest) {
         createdAt: job.submitted_at || job.created_at,
         href: `/pro/jobs/${job.id}`,
         workImages,
+        buyerTrust: buyerTrustByUser.get(String(job.user_id || "")) || null,
       };
     });
 

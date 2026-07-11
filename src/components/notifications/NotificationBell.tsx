@@ -55,7 +55,7 @@ function iconClass(type: string, accent: "red" | "green") {
   return accent === "green" ? "bg-green-50 text-green-600" : "bg-red-50 text-red-600";
 }
 
-export function NotificationBell({ href, accent = "red" }: { href: string; accent?: "red" | "green" }) {
+export function NotificationBell({ href, accent = "red", showInsuranceNotice = false }: { href: string; accent?: "red" | "green"; showInsuranceNotice?: boolean }) {
   const [open, setOpen] = useState(false);
   const [payload, setPayload] = useState<NotificationPayload>({ notifications: [], unreadCount: 0 });
   const [loading, setLoading] = useState(true);
@@ -131,9 +131,11 @@ export function NotificationBell({ href, accent = "red" }: { href: string; accen
           </div>
 
           <div className="max-h-80 overflow-y-auto">
-            <div className="border-b border-gray-100 p-3">
-              <InsuranceNotice compact accent={accent} />
-            </div>
+            {showInsuranceNotice ? (
+              <div className="border-b border-gray-100 p-3">
+                <InsuranceNotice compact accent={accent} />
+              </div>
+            ) : null}
             {loading ? (
               <div className="space-y-3 p-4">
                 {[0, 1, 2].map((item) => (
@@ -179,7 +181,7 @@ export function NotificationBell({ href, accent = "red" }: { href: string; accen
   );
 }
 
-export function NotificationCenter({ title = "Notifications", accent = "red" }: { title?: string; accent?: "red" | "green" }) {
+export function NotificationCenter({ title = "Notifications", accent = "red", showInsuranceNotice = false }: { title?: string; accent?: "red" | "green"; showInsuranceNotice?: boolean }) {
   const [payload, setPayload] = useState<NotificationPayload>({ notifications: [], unreadCount: 0 });
   const [loading, setLoading] = useState(true);
 
@@ -245,9 +247,11 @@ export function NotificationCenter({ title = "Notifications", accent = "red" }: 
         </button>
       </div>
 
-      <div className="mb-4">
-        <InsuranceNotice accent={accent} />
-      </div>
+      {showInsuranceNotice ? (
+        <div className="mb-4">
+          <InsuranceNotice accent={accent} />
+        </div>
+      ) : null}
 
       {loading ? (
         <div className="space-y-3">

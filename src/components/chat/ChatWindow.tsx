@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from "react";
 import { Send, ArrowLeft, Loader2, User, Paperclip, Share2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -40,12 +40,19 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [showReferral, setShowReferral] = useState(false);
   const [referralEmail, setReferralEmail] = useState("");
+  const [referralMessage, setReferralMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const container = messagesScrollRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+      return;
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
   }, []);
 
   // Fetch messages
@@ -60,6 +67,7 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
           const data = await res.json();
           setMessages(data.messages || []);
           setConversation(data.conversation);
+          requestAnimationFrame(() => scrollToBottom("auto"));
         }
       } catch (error) {
         console.error("Error fetching messages:", error);
@@ -69,7 +77,7 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
     };
 
     fetchMessages();
-  }, [conversationId]);
+  }, [conversationId, scrollToBottom]);
 
   // Subscribe to realtime messages
   useEffect(() => {
@@ -101,9 +109,10 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
   }, [conversationId, supabase]);
 
   // Scroll to bottom on new messages
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  useLayoutEffect(() => {
+    if (loading) return;
+    requestAnimationFrame(() => scrollToBottom("auto"));
+  }, [conversationId, loading, messages.length, scrollToBottom]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +131,12 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
 
       if (!res.ok) {
         setNewMessage(content);
+      } else {
+        const data = await res.json().catch(() => null);
+        if (data?.message) {
+          setMessages((prev) => (prev.some((msg) => msg.id === data.message.id) ? prev : [...prev, data.message]));
+        }
+        requestAnimationFrame(() => scrollToBottom("auto"));
       }
     } catch {
       setNewMessage(content);
@@ -149,16 +164,17 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
 
   if (!conversationId) {
     return (
-      <div className="flex items-center justify-center h-full text-gray-500">
+      <div className="flex h-full w-full items-center justify-center bg-white text-gray-500 dark:bg-gray-900">
         <p>Select a conversation to start chatting</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+      <div className="shrink-0 border-b border-gray-200 bg-white px-5 py-4 dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex items-center gap-3">
         {onBack && (
           <button onClick={onBack} className="text-gray-500 hover:text-gray-700 lg:hidden">
             <ArrowLeft className="w-5 h-5" />
@@ -166,7 +182,7 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
         )}
         <a
           href={otherUser ? `/profile/${otherUser.id}` : undefined}
-          className="flex items-center gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 px-2 py-1 rounded-lg transition-colors"
+          className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-1 transition-colors hover:bg-gray-50 dark:hover:bg-gray-800"
         >
           {otherUser?.profile_image_url ? (
             <img src={otherUser.profile_image_url} alt="" className="w-10 h-10 rounded-full object-cover" />
@@ -175,65 +191,68 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
               <User className="w-5 h-5 text-gray-400" />
             </div>
           )}
-          <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
-              {otherUser?.first_name} {otherUser?.last_name}
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-semibold text-gray-900 dark:text-white">
+              {[otherUser?.first_name, otherUser?.last_name].filter(Boolean).join(" ") || "Conversation"}
             </h3>
             <p className="text-xs text-green-500">Online</p>
           </div>
         </a>
+        </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+      <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
+          <div className="flex h-full items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
           </div>
         ) : messages.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">
+          <div className="flex h-full items-center justify-center text-center text-sm text-gray-500">
             <p>No messages yet. Start the conversation!</p>
           </div>
         ) : (
-          messages.map((msg) => {
-            const isMine = msg.sender_id === currentUserId;
-            return (
-              <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${
-                    isMine
-                      ? "bg-red-600 text-white rounded-br-md"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white rounded-bl-md"
-                  }`}
-                >
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  <p className={`text-[10px] mt-1 ${isMine ? "text-red-200" : "text-gray-400"}`}>
-                    {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                  </p>
+          <div className="space-y-3 pb-2">
+            {messages.map((msg) => {
+              const isMine = msg.sender_id === currentUserId;
+              return (
+                <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`max-w-[min(72%,44rem)] break-words rounded-2xl px-4 py-2.5 shadow-sm ${
+                      isMine
+                        ? "rounded-br-md bg-red-600 text-white"
+                        : "rounded-bl-md bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-white"
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+                    <p className={`mt-1 text-[10px] ${isMine ? "text-red-100" : "text-gray-400"}`}>
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSend} className="border-t border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-900 space-y-3">
+      <form onSubmit={handleSend} className="shrink-0 space-y-3 border-t border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900">
         <div className="flex items-center gap-3">
           <input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="min-w-0 flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-red-500 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
           />
           <button
             type="submit"
             disabled={sending}
-            className="p-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors disabled:opacity-60"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700 disabled:opacity-60"
             title="Send"
           >
-            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
           </button>
         </div>
 
@@ -301,8 +320,8 @@ export function ChatWindow({ conversationId, currentUserId, onBack }: ChatWindow
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Message (optional)</label>
                 <textarea
-                  value={referralEmail}
-                  onChange={(e) => setReferralEmail(e.target.value)}
+                  value={referralMessage}
+                  onChange={(e) => setReferralMessage(e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
                   placeholder="I think you'd be perfect for this job..."

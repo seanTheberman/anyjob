@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Upload, X, Loader2, ImagePlus, FileText, Video } from "lucide-react";
+import { Upload, X, Loader2, ImagePlus, FileText, Video, Camera } from "lucide-react";
 
 interface UploadedImage {
   id: string;
@@ -13,6 +13,53 @@ interface UploadedImage {
 }
 
 type UploadImageType = "profile" | "portfolio" | "portfolio_video" | "work_image" | "id_document" | "selfie_video";
+type CameraCaptureMode = "user" | "environment";
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    mobile?: boolean;
+  };
+};
+
+function isMobileCameraDevice() {
+  if (typeof window === "undefined") return false;
+
+  const navigatorWithData = navigator as NavigatorWithUserAgentData;
+  if (navigatorWithData.userAgentData?.mobile) return true;
+
+  const userAgent = navigator.userAgent || "";
+  if (/Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(userAgent)) return true;
+
+  const coarsePointer = window.matchMedia?.("(hover: none) and (pointer: coarse)").matches ?? false;
+  const touchPoints = navigator.maxTouchPoints || 0;
+  const smallestScreenSide = Math.min(window.screen?.width || window.innerWidth, window.screen?.height || window.innerHeight);
+
+  return coarsePointer && touchPoints > 0 && smallestScreenSide <= 1024;
+}
+
+async function requestCameraPermission(captureMode: CameraCaptureMode) {
+  if (!navigator.mediaDevices?.getUserMedia) return;
+
+  const stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: captureMode },
+    audio: false,
+  });
+
+  stream.getTracks().forEach((track) => track.stop());
+}
+
+function cameraPermissionErrorMessage(error: unknown) {
+  if (error instanceof DOMException) {
+    if (error.name === "NotAllowedError" || error.name === "SecurityError") {
+      return "Camera permission was denied. Allow camera access in your browser settings or use Browse files.";
+    }
+
+    if (error.name === "NotFoundError" || error.name === "OverconstrainedError") {
+      return "No usable camera was found on this device. Use Browse files instead.";
+    }
+  }
+
+  return "Camera could not be opened. Allow camera access or use Browse files.";
+}
 
 interface ImageUploaderProps {
   imageType: UploadImageType;
@@ -24,6 +71,12 @@ interface ImageUploaderProps {
   className?: string;
   label?: string;
   compact?: boolean;
+  uploadTitle?: string;
+  uploadDescription?: string;
+  fileButtonLabel?: string;
+  cameraButtonLabel?: string;
+  enableCamera?: boolean;
+  cameraCapture?: CameraCaptureMode;
 }
 
 export function ImageUploader({
@@ -36,11 +89,20 @@ export function ImageUploader({
   className = "",
   label,
   compact = false,
+  uploadTitle,
+  uploadDescription,
+  fileButtonLabel,
+  cameraButtonLabel,
+  enableCamera = true,
+  cameraCapture,
 }: ImageUploaderProps) {
   const [images, setImages] = useState<UploadedImage[]>(existingImages);
   const [uploading, setUploading] = useState(false);
+  const [isMobileCamera, setIsMobileCamera] = useState(false);
+  const [requestingCameraPermission, setRequestingCameraPermission] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const existingImagesKeyRef = useRef(
     existingImages.map((image) => `${image.id}:${image.image_url}:${image.image_type}`).join("|")
   );
@@ -51,6 +113,18 @@ export function ImageUploader({
     existingImagesKeyRef.current = nextKey;
     setImages(existingImages);
   }, [existingImages]);
+
+  useEffect(() => {
+    const updateMobileCameraAvailability = () => setIsMobileCamera(isMobileCameraDevice());
+    updateMobileCameraAvailability();
+    window.addEventListener("resize", updateMobileCameraAvailability);
+    window.addEventListener("orientationchange", updateMobileCameraAvailability);
+
+    return () => {
+      window.removeEventListener("resize", updateMobileCameraAvailability);
+      window.removeEventListener("orientationchange", updateMobileCameraAvailability);
+    };
+  }, []);
 
   const isVideoUpload = imageType === "selfie_video" || imageType === "portfolio_video";
   const isDocumentUpload = imageType === "id_document";
@@ -65,6 +139,29 @@ export function ImageUploader({
     : isDocumentUpload
       ? "JPG, PNG, WebP, PDF • Max 25MB"
       : "JPG, PNG, WebP • Max 10MB";
+  const cameraAcceptTypes = isVideoUpload ? acceptTypes : "image/*";
+  const resolvedCameraCapture = cameraCapture || (isVideoUpload ? "user" : "environment");
+  const showCameraButton = enableCamera && isMobileCamera;
+  const resolvedFileButtonLabel = fileButtonLabel || `Browse ${maxImages > 1 ? `${uploadNoun}s` : uploadNoun}`;
+  const resolvedCameraButtonLabel = cameraButtonLabel || (isVideoUpload ? "Record with camera" : "Use camera");
+
+  const openCameraCapture = useCallback(async () => {
+    if (!showCameraButton) {
+      setError("Camera capture is only available on mobile. Use Browse files on this device.");
+      return;
+    }
+
+    try {
+      setError(null);
+      setRequestingCameraPermission(true);
+      await requestCameraPermission(resolvedCameraCapture);
+      cameraInputRef.current?.click();
+    } catch (err) {
+      setError(cameraPermissionErrorMessage(err));
+    } finally {
+      setRequestingCameraPermission(false);
+    }
+  }, [resolvedCameraCapture, showCameraButton]);
 
   const handleUpload = useCallback(async (files: FileList) => {
     if (images.length + files.length > maxImages) {
@@ -80,6 +177,8 @@ export function ImageUploader({
         const formData = new FormData();
         formData.append("file", file);
         formData.append("image_type", imageType);
+        if (uploadTitle) formData.append("title", uploadTitle);
+        if (uploadDescription) formData.append("description", uploadDescription);
         if (inquiryId) formData.append("inquiry_id", inquiryId);
 
         const response = await fetch("/api/upload", {
@@ -102,7 +201,8 @@ export function ImageUploader({
 
     setUploading(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [images.length, maxImages, uploadNoun, imageType, inquiryId, onUploadComplete]);
+    if (cameraInputRef.current) cameraInputRef.current.value = "";
+  }, [images.length, maxImages, uploadNoun, imageType, uploadTitle, uploadDescription, inquiryId, onUploadComplete]);
 
   const handleDelete = useCallback(async (imageId: string) => {
     try {
@@ -149,13 +249,26 @@ export function ImageUploader({
             )}
           </div>
           <div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-            >
-              {uploading ? "Uploading..." : "Change photo"}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+              >
+                {uploading ? "Uploading..." : "Change photo"}
+              </button>
+              {showCameraButton ? (
+                <button
+                  type="button"
+                  onClick={() => void openCameraCapture()}
+                  disabled={uploading || requestingCameraPermission}
+                  className="text-sm font-medium text-gray-700 hover:text-gray-900 disabled:opacity-50"
+                >
+                  {requestingCameraPermission ? "Allow camera..." : "Use camera"}
+                </button>
+              ) : null}
+            </div>
             <p className="text-xs text-gray-500 mt-1">JPG, PNG, WebP. Max 10MB.</p>
           </div>
         </div>
@@ -166,6 +279,16 @@ export function ImageUploader({
           className="hidden"
           onChange={(e) => e.target.files && handleUpload(e.target.files)}
         />
+        {showCameraButton ? (
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture={resolvedCameraCapture}
+            className="hidden"
+            onChange={(e) => e.target.files && handleUpload(e.target.files)}
+          />
+        ) : null}
         {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
       </div>
     );
@@ -180,7 +303,7 @@ export function ImageUploader({
         <div className={`grid ${compact ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-3 md:grid-cols-4"} gap-3 mb-3`}>
           {images.map((img) => {
             const url = img.image_url.toLowerCase();
-            const isPdf = url.includes(".pdf") || img.image_type === "id_document";
+            const isPdf = /\.pdf($|[?#])/i.test(url) || url.includes("/raw/upload/");
             const isVideo = img.image_type === "selfie_video" || img.image_type === "portfolio_video" || url.includes(".mp4") || url.includes(".webm") || url.includes(".mov");
 
             return (
@@ -218,7 +341,6 @@ export function ImageUploader({
           onDrop={handleDrop}
           onDragOver={(e) => e.preventDefault()}
           className={`border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl ${compact ? "p-4" : "p-6"} text-center hover:border-red-400 transition-colors cursor-pointer`}
-          onClick={() => fileInputRef.current?.click()}
         >
           {uploading ? (
             <div className="flex flex-col items-center gap-2">
@@ -229,11 +351,39 @@ export function ImageUploader({
             <div className="flex flex-col items-center gap-2">
               {isVideoUpload ? <Video className="w-6 h-6 text-gray-400" /> : <Upload className="w-6 h-6 text-gray-400" />}
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Drop {uploadNoun}s here or <span className="text-red-600 font-medium">browse</span>
+                Drop {uploadNoun}s here or choose an option below
               </p>
               <p className="text-xs text-gray-400">
                 {images.length}/{maxImages} {maxImages === 1 ? uploadNoun : `${uploadNoun}s`} • {uploadHelp}
               </p>
+              <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 disabled:opacity-60"
+                  disabled={uploading}
+                >
+                  <Upload className="h-4 w-4" />
+                  {resolvedFileButtonLabel}
+                </button>
+                {showCameraButton ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void openCameraCapture();
+                    }}
+                    className="inline-flex items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 disabled:opacity-60"
+                    disabled={uploading || requestingCameraPermission}
+                  >
+                    <Camera className="h-4 w-4" />
+                    {requestingCameraPermission ? "Allow camera..." : resolvedCameraButtonLabel}
+                  </button>
+                ) : null}
+              </div>
             </div>
           )}
         </div>
@@ -247,6 +397,17 @@ export function ImageUploader({
         className="hidden"
         onChange={(e) => e.target.files && handleUpload(e.target.files)}
       />
+      {showCameraButton ? (
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept={cameraAcceptTypes}
+          capture={resolvedCameraCapture}
+          multiple={false}
+          className="hidden"
+          onChange={(e) => e.target.files && handleUpload(e.target.files)}
+        />
+      ) : null}
       {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
     </div>
   );

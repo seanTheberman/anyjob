@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
@@ -71,6 +72,46 @@ export async function proxy(request: NextRequest) {
     if (user && isProtected && requiredRole) {
         let userRole: string | null = null
 
+        const adminSupabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+            ? createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+                auth: { autoRefreshToken: false, persistSession: false },
+            }) as never as {
+                from(table: string): {
+                    select(columns: string): {
+                        eq(column: string, value: string): {
+                            maybeSingle(): Promise<{ data: { status?: string } | null; error: unknown }>
+                        }
+                    }
+                }
+            }
+            : null
+
+        const [{ data: authProfile }, { data: buyerProfile }, { data: adminFlag }] = await Promise.all([
+            supabase
+                .from('user_profiles')
+                .select('role,is_active')
+                .eq('id', user.id)
+                .maybeSingle(),
+            supabase
+                .from('buyers')
+                .select('is_active')
+                .eq('id', user.id)
+                .maybeSingle(),
+            adminSupabase
+                ? adminSupabase
+                    .from('admin_user_flags')
+                    .select('status')
+                    .eq('user_id', user.id)
+                    .maybeSingle()
+                : Promise.resolve({ data: null, error: null }),
+        ])
+
+        if (authProfile?.is_active === false || buyerProfile?.is_active === false || adminFlag?.status === 'blocked') {
+            const suspendedUrl = new URL(loginUrl, request.url)
+            suspendedUrl.searchParams.set('error', 'account_suspended')
+            return NextResponse.redirect(suspendedUrl)
+        }
+
         // Check eloo_profiles first
         const { data: profile } = await supabase
             .from('eloo_profiles')
@@ -80,6 +121,9 @@ export async function proxy(request: NextRequest) {
 
         if (profile?.role) {
             userRole = profile.role.toLowerCase()
+        } else if (authProfile?.role) {
+            const profileRole = String(authProfile.role).toLowerCase()
+            userRole = profileRole === 'buyer' ? 'client' : profileRole === 'seller' ? 'provider' : profileRole
         } else {
             // Check if user is a seller (treat as provider for /pro routes)
             const { data: seller } = await supabase

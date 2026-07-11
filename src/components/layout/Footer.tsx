@@ -24,8 +24,9 @@ const COMPANY_LINKS = [
 const SUPPORT_LINKS = [
     { href: "/dashboard/help", label: "Help Center" },
     { href: "/how-it-works#trust", label: "Trust & Safety" },
-    { href: "/pricing#terms", label: "Terms of Service" },
-    { href: "/pricing#privacy", label: "Privacy Policy" },
+    { href: "/terms-of-use", label: "Terms of Use" },
+    { href: "/privacy-policy", label: "Privacy Policy" },
+    { href: "/refund-policy", label: "Refund Policy" },
 ];
 
 const SOCIAL_LINKS = [

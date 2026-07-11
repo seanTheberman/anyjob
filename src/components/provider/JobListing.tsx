@@ -149,10 +149,10 @@ export function JobListing({ jobs }: JobListingProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">County</label>
               <input
                 type="text"
-                placeholder="Enter state"
+                placeholder="Enter county"
                 value={filters.state}
                 onChange={(e) => setFilters({ ...filters, state: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -203,7 +203,12 @@ export function JobListing({ jobs }: JobListingProps) {
           </div>
         )}
 
-        {filteredJobs.map((job) => (
+        {filteredJobs.map((job) => {
+          const clientRating = Number(job.client.rating || 0);
+          const clientReviewCount = Number(job.client.reviewCount || 0);
+          const hasClientRating = clientRating > 0 && clientReviewCount > 0;
+
+          return (
           <JobApplicationGuard key={job.id}>
             <Link
               href={`/pro/jobs/${job.id}`}
@@ -239,12 +244,14 @@ export function JobListing({ jobs }: JobListingProps) {
                   )}
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-gray-700">{job.client.name}</span>
+                    {hasClientRating ? (
                     <div className="flex items-center gap-1">
                       <span className="text-yellow-400">★</span>
                       <span className="text-sm text-gray-500">
-                        {job.client.rating} ({job.client.reviewCount})
+                        {clientRating.toFixed(1)} ({clientReviewCount})
                       </span>
                     </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -277,7 +284,8 @@ export function JobListing({ jobs }: JobListingProps) {
             </div>
           </Link>
           </JobApplicationGuard>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

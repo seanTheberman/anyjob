@@ -1,11 +1,12 @@
 "use client";
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
-import { Edit2, ExternalLink, Save, ShieldCheck } from "lucide-react";
+import { Edit2, ExternalLink, Lock, Mail, Save, ShieldCheck } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ImageUploader } from "@/components/upload/ImageUploader";
 import { CATEGORIES } from "@/lib/categories";
 import { ProviderMediaManager } from "./ProviderMediaManager";
+import { ReceivedReviewsPanel } from "@/components/reviews/ReceivedReviewsPanel";
 
 interface UploadedFile {
   id: string;
@@ -37,6 +38,13 @@ type ProfileState = {
   kycStatus: string;
 };
 
+type SecurityState = {
+  email: string;
+  emailConfirmed: boolean;
+  lastSignInAt: string | null;
+  createdAt: string | null;
+};
+
 const emptyProfile: ProfileState = {
   firstName: "",
   lastName: "",
@@ -50,7 +58,7 @@ const emptyProfile: ProfileState = {
   address: "",
   city: "",
   postalCode: "",
-  country: "France",
+  country: "Ireland",
   hourlyRate: 0,
   profileImageUrl: "",
   rating: 0,
@@ -60,6 +68,18 @@ const emptyProfile: ProfileState = {
 
 const availabilityOptions = ["Today", "This week", "Weekends", "Evenings", "Remote"];
 const experienceOptions = ["New provider", "Beginner", "Intermediate", "Experienced", "Expert", "Agency"];
+const ID_FRONT_TITLE = "Government ID front";
+const ID_BACK_TITLE = "Government ID back";
+
+function documentSideFiles(files: UploadedFile[], side: "front" | "back"): UploadedFile[] {
+  const documents = files.filter((file) => file.image_type === "id_document");
+  const titled = documents.filter((file) => (file.title || "").toLowerCase().includes(side));
+  if (titled.length) return titled.slice(0, 1);
+
+  if (side === "front") return documents.slice(0, 1);
+  const frontId = documentSideFiles(files, "front")[0]?.id;
+  return documents.filter((file) => file.id !== frontId).slice(0, 1);
+}
 
 function availabilityFields(value: unknown) {
   const data = value && typeof value === "object" ? value as { marketplaceAvailability?: unknown; note?: unknown } : {};
@@ -85,6 +105,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [security, setSecurity] = useState<SecurityState | null>(null);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [securitySaving, setSecuritySaving] = useState(false);
+  const [securityMessage, setSecurityMessage] = useState<string | null>(null);
+  const [securityError, setSecurityError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -100,6 +127,7 @@ export default function ProfilePage() {
         const user = payload.user as { id: string; email?: string };
         const seller = payload.seller;
         const files = (payload.files || []) as UploadedFile[];
+        const stats = payload.stats || {};
 
         setProviderId(user.id);
 
@@ -118,11 +146,11 @@ export default function ProfilePage() {
             address: seller.address || "",
             city: seller.city || "",
             postalCode: seller.postal_code || "",
-            country: seller.country || "France",
+            country: "Ireland",
             hourlyRate: seller.hourly_rate || 0,
             profileImageUrl: seller.profile_image_url || "",
-            rating: seller.rating || 0,
-            totalJobs: seller.total_jobs || 0,
+            rating: stats.rating || 0,
+            totalJobs: stats.completedJobs || 0,
             kycStatus: seller.verification_status || "not_started",
           };
           setProfile(nextProfile);
@@ -132,6 +160,17 @@ export default function ProfilePage() {
         setKycFiles(files.filter((file) => ["id_document", "selfie_video"].includes(file.image_type)));
         setPortfolioFiles(files.filter((file) => file.image_type === "portfolio"));
         setPortfolioVideo(files.find((file) => file.image_type === "portfolio_video") || null);
+
+        const securityResponse = await fetch("/api/provider/security", { cache: "no-store" });
+        const securityPayload = securityResponse.ok ? await securityResponse.json().catch(() => null) : null;
+        if (securityPayload?.account) {
+          setSecurity({
+            email: securityPayload.account.email || user.email || "",
+            emailConfirmed: Boolean(securityPayload.account.emailConfirmed),
+            lastSignInAt: securityPayload.account.lastSignInAt || null,
+            createdAt: securityPayload.account.createdAt || null,
+          });
+        }
       } finally {
         setProfileLoading(false);
       }
@@ -158,7 +197,7 @@ export default function ProfilePage() {
       address: profile.address.trim(),
       city: profile.city.trim(),
       postalCode: profile.postalCode.trim(),
-      country: profile.country.trim() || "France",
+      country: "Ireland",
       hourlyRate: Number.isFinite(profile.hourlyRate) ? profile.hourlyRate : 0,
     };
 
@@ -199,6 +238,43 @@ export default function ProfilePage() {
     setIsEditing(false);
     setSaveError(null);
     setSaveMessage(null);
+  }
+
+  async function changePassword() {
+    setSecuritySaving(true);
+    setSecurityError(null);
+    setSecurityMessage(null);
+
+    if (newPassword !== confirmPassword) {
+      setSecuritySaving(false);
+      setSecurityError("New password and confirmation do not match.");
+      return;
+    }
+
+    const response = await fetch("/api/provider/security", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    const payload = await response.json().catch(() => null);
+
+    setSecuritySaving(false);
+    if (!response.ok) {
+      setSecurityError(payload?.error || "Password could not be updated.");
+      return;
+    }
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setSecurityMessage("Password updated successfully.");
+  }
+
+  function formatSecurityDate(value: string | null) {
+    if (!value) return "Not available";
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return "Not available";
+    return new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short" }).format(date);
   }
 
   return (
@@ -289,6 +365,13 @@ export default function ProfilePage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Reviews */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-2">Reviews</h3>
+          <p className="text-sm text-gray-500 mb-4">Your public rating count and score from completed work.</p>
+          <ReceivedReviewsPanel mode="summary" allReviewsHref="/pro/reviews" />
         </div>
 
         {/* Public Profile Fields */}
@@ -404,11 +487,11 @@ export default function ProfilePage() {
         </div>
 
         {/* KYC Verification */}
-        <div className="bg-white rounded-xl p-6 border border-gray-200 mb-6">
+        <div id="kyc" className="bg-white rounded-xl p-6 border border-gray-200 mb-6 scroll-mt-24">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-5">
             <div>
               <h3 className="text-lg font-bold text-gray-900">KYC Verification</h3>
-              <p className="text-sm text-gray-500">Upload your government ID and a short selfie video holding the ID.</p>
+              <p className="text-sm text-gray-500">Upload the front and back of your government ID, then a short selfie video holding the ID.</p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -419,11 +502,33 @@ export default function ProfilePage() {
             <ImageUploader
               imageType="id_document"
               maxImages={1}
-              label="Government ID"
-              existingImages={kycFiles.filter((file) => file.image_type === "id_document").slice(0, 1)}
+              label="Government ID front"
+              uploadTitle={ID_FRONT_TITLE}
+              uploadDescription="KYC document front side"
+              cameraButtonLabel="Capture front"
+              existingImages={documentSideFiles(kycFiles, "front")}
               onUploadComplete={(file) => {
-                setKycFiles((prev) => [file, ...prev.filter((item) => item.image_type !== "id_document")]);
+                setKycFiles((prev) => [file, ...prev.filter((item) => item.id !== file.id && (item.image_type !== "id_document" || !(item.title || "").toLowerCase().includes("front")))]);
                 setProfile((prev) => ({ ...prev, kycStatus: "pending" }));
+              }}
+              onDeleteComplete={(imageId) => {
+                setKycFiles((prev) => prev.filter((file) => file.id !== imageId));
+              }}
+            />
+            <ImageUploader
+              imageType="id_document"
+              maxImages={1}
+              label="Government ID back"
+              uploadTitle={ID_BACK_TITLE}
+              uploadDescription="KYC document back side"
+              cameraButtonLabel="Capture back"
+              existingImages={documentSideFiles(kycFiles, "back")}
+              onUploadComplete={(file) => {
+                setKycFiles((prev) => [file, ...prev.filter((item) => item.id !== file.id && (item.image_type !== "id_document" || !(item.title || "").toLowerCase().includes("back")))]);
+                setProfile((prev) => ({ ...prev, kycStatus: "pending" }));
+              }}
+              onDeleteComplete={(imageId) => {
+                setKycFiles((prev) => prev.filter((file) => file.id !== imageId));
               }}
             />
             <ImageUploader
@@ -434,6 +539,9 @@ export default function ProfilePage() {
               onUploadComplete={(file) => {
                 setKycFiles((prev) => [file, ...prev.filter((item) => item.image_type !== "selfie_video")]);
                 setProfile((prev) => ({ ...prev, kycStatus: "pending" }));
+              }}
+              onDeleteComplete={(imageId) => {
+                setKycFiles((prev) => prev.filter((file) => file.id !== imageId));
               }}
             />
           </div>
@@ -476,7 +584,7 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Public contact email</label>
               <input
                 type="email"
                 value={profile.email}
@@ -495,6 +603,97 @@ export default function ProfilePage() {
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Account Security */}
+        <div id="security" className="bg-white rounded-xl p-6 border border-gray-200 mb-6 scroll-mt-24">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-gray-900">Account security</h3>
+              <p className="text-sm text-gray-500">View your login email and update your password.</p>
+            </div>
+            <span className="inline-flex w-fit items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+              <Lock className="h-3.5 w-3.5" />
+              Provider login
+            </span>
+          </div>
+
+          {securityError ? (
+            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              {securityError}
+            </div>
+          ) : null}
+          {securityMessage ? (
+            <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
+              {securityMessage}
+            </div>
+          ) : null}
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <Mail className="h-4 w-4 text-blue-600" />
+                Login email
+              </div>
+              <p className="mt-2 break-words text-sm font-bold text-gray-950">{security?.email || profile.email || "Not available"}</p>
+              <p className="mt-1 text-xs text-gray-500">{security?.emailConfirmed ? "Email verified" : "Email verification pending"}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm font-semibold text-gray-700">Last sign-in</p>
+              <p className="mt-2 text-sm font-bold text-gray-950">{formatSecurityDate(security?.lastSignInAt || null)}</p>
+            </div>
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <p className="text-sm font-semibold text-gray-700">Account created</p>
+              <p className="mt-2 text-sm font-bold text-gray-950">{formatSecurityDate(security?.createdAt || null)}</p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            <div>
+              <label htmlFor="current-password" className="block text-sm font-medium text-gray-700 mb-1">Current password</label>
+              <input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(event) => setCurrentPassword(event.target.value)}
+                autoComplete="current-password"
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">New password</label>
+              <input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                autoComplete="new-password"
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">Confirm new password</label>
+              <input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                autoComplete="new-password"
+                className="w-full rounded-lg border border-gray-200 px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={changePassword}
+              disabled={securitySaving || !currentPassword || !newPassword || !confirmPassword}
+              className="inline-flex items-center gap-2 rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Lock className="h-4 w-4" />
+              {securitySaving ? "Updating..." : "Update password"}
+            </button>
           </div>
         </div>
 
@@ -523,7 +722,7 @@ export default function ProfilePage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Postal Code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Eircode</label>
               <input
                 type="text"
                 value={profile.postalCode}
@@ -536,10 +735,9 @@ export default function ProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
               <input
                 type="text"
-                value={profile.country}
-                onChange={(e) => setProfile({ ...profile, country: e.target.value })}
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                value="Ireland"
+                readOnly
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
           </div>

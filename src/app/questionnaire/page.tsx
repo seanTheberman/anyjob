@@ -24,6 +24,7 @@ import {
   X,
   Building2,
   ShieldAlert,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,6 +50,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CategoryIcon, SubcategoryIcon } from "@/components/shared/CategoryIcon";
 import type { User } from "@supabase/supabase-js";
 import { SHIFT_NICHES, WORK_TYPES, getShiftNiche } from "@/lib/shift-work";
+import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
 
 // Types
 interface Category {
@@ -741,6 +743,14 @@ function ServiceQuestionnaireContent() {
         }
       }
 
+      await fetch("/api/kyc/buyer-pending", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: inquiry.id }),
+      }).catch((notificationError) => {
+        console.error("Buyer KYC reminder failed:", notificationError);
+      });
+
       // Store inquiry ID for the suggestions page
       localStorage.setItem("last_inquiry_id", inquiry.id);
 
@@ -1301,7 +1311,7 @@ function ShiftScheduleLocationStep({
           <Input value={formData.city} onChange={(event) => updateFormData("city", event.target.value)} className="mt-2" />
         </label>
         <label className="block">
-          <span className="text-sm font-semibold text-gray-700">Postal code</span>
+          <span className="text-sm font-semibold text-gray-700">Eircode</span>
           <Input value={formData.postalCode} onChange={(event) => updateFormData("postalCode", event.target.value)} className="mt-2" />
         </label>
       </div>
@@ -2045,7 +2055,7 @@ function Step6Location({
           <div className="relative">
             <MapPin className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Textarea
-              placeholder="123 Main St, Apartment 4B..."
+              placeholder="12 O'Connell Street, Apartment 4B..."
               value={formData.address}
               onChange={(e) => {
                 updateFormData("address", e.target.value);
@@ -2062,7 +2072,7 @@ function Step6Location({
             <div className="relative">
               <Home className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Paris"
+                placeholder="Dublin"
                 value={formData.city}
                 onChange={(e) => {
                   updateFormData("city", e.target.value);
@@ -2073,9 +2083,9 @@ function Step6Location({
             </div>
           </div>
           <div>
-            <Label>Postal code</Label>
+            <Label>Eircode</Label>
             <Input
-              placeholder="75001"
+              placeholder="D02 X285"
               value={formData.postal_code}
               onChange={(e) => {
                 updateFormData("postal_code", e.target.value);
@@ -2255,6 +2265,7 @@ function Step8Images({
 }) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -2323,7 +2334,7 @@ function Step8Images({
               Maximum 10MB per file. JPG, PNG, GIF supported.
             </p>
           </div>
-          
+
           <input
             type="file"
             multiple
@@ -2333,34 +2344,65 @@ function Step8Images({
             className="hidden"
             id="image-upload"
           />
-          
-          <Button
-            type="button"
-            onClick={() => document.getElementById('image-upload')?.click()}
-            disabled={uploading}
-            variant="outline"
-            className="mt-4"
-          >
-            {uploading ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Package className="w-4 h-4 mr-2" />
-                Select Images
-              </>
-            )}
-          </Button>
-        </div>
+	          {isMobileCamera ? (
+	            <input
+	              type="file"
+	              accept="image/*"
+	              capture="environment"
+	              onChange={handleFileSelect}
+	              disabled={uploading}
+	              className="hidden"
+	              id="image-camera-upload"
+	            />
+	          ) : null}
+
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Button
+              type="button"
+              onClick={() => document.getElementById('image-upload')?.click()}
+              disabled={uploading}
+              variant="outline"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Package className="w-4 h-4 mr-2" />
+                  Select Images
+                </>
+              )}
+            </Button>
+	            {isMobileCamera ? (
+	              <Button
+	                type="button"
+	                onClick={() => {
+	                  if (uploading || requestingCameraPermission) return;
+	                  void requestCameraCapture("environment", () => document.getElementById('image-camera-upload')?.click());
+	                }}
+	                disabled={uploading || requestingCameraPermission}
+	                variant="outline"
+	              >
+	                <Camera className="w-4 h-4 mr-2" />
+	                {requestingCameraPermission ? "Allow camera..." : "Use Camera"}
+	              </Button>
+	            ) : null}
+	          </div>
+	        </div>
 
         {/* Upload Error */}
-        {uploadError && (
-          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-            <p className="text-sm text-red-600 dark:text-red-400">{uploadError}</p>
-          </div>
-        )}
+	        {uploadError && (
+	          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+	            <p className="text-sm text-red-600 dark:text-red-400">{uploadError}</p>
+	          </div>
+	        )}
+	        {cameraError ? (
+	          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+	            <p className="text-sm text-red-600 dark:text-red-400">{cameraError}</p>
+	          </div>
+	        ) : null}
 
         {/* Image Previews */}
         {formData.work_images.length > 0 && (
@@ -2583,7 +2625,7 @@ function Step9Contact({
           <Label>Phone (optional)</Label>
           <Input
             type="tel"
-            placeholder="06 12 34 56 78"
+            placeholder="+353 87 123 4567"
             value={formData.phone}
             onChange={(e) => updateFormData("phone", e.target.value)}
           />

@@ -17,6 +17,9 @@ export interface Category {
   subcategories?: Subcategory[];
 }
 
+const LAUNCH_COUNTRY = "IE";
+const LAUNCH_COUNTRIES = [LAUNCH_COUNTRY];
+
 export const CATEGORIES: Category[] = [
   {
     id: "1",
@@ -49,7 +52,7 @@ export const CATEGORIES: Category[] = [
       ja: ["清掃", "掃除", "クリーニング", "ハウスキーパー", "清潔"],
       hi: ["सफाई", "सफाई करना", "नौकरानी", "घर साफ", "सफाईकर्मी"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "2",
@@ -82,7 +85,7 @@ export const CATEGORIES: Category[] = [
       ja: ["修理", "修繕", "メンテナンス", "大工", "配管工"],
       hi: ["ठेकेदार", "मरम्मत", "कारीगर", "निर्माण", "सुधार"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "3",
@@ -115,7 +118,7 @@ export const CATEGORIES: Category[] = [
       ja: ["園芸", "庭師", "芝生", "刈り取り", "植物", "景観"],
       hi: ["बागवानी", "माली", "घास", "काटना", "पौधे", "बगीचा"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "4",
@@ -148,7 +151,7 @@ export const CATEGORIES: Category[] = [
       ja: ["引っ越し", "移転", "運送", "ダンボール", "家具", "トラック"],
       hi: ["बदली", "स्थानांतर", "परिवहन", "डिब्बे", "फर्नीचर", "ट्रक"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "5",
@@ -181,7 +184,7 @@ export const CATEGORIES: Category[] = [
       ja: ["子育て", "ベビーシッター", "保育園", "子供", "赤ちゃん"],
       hi: ["बच्चों की देखभाल", "बेबीसिटर", "नर्सरी", "बच्चे", "शिशु"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "6",
@@ -214,7 +217,7 @@ export const CATEGORIES: Category[] = [
       ja: ["ペットケア", "犬", "猫", "ペット", "散歩"],
       hi: ["पालतू देखभाल", "कुत्ता", "बिल्ली", "पालतू", "सैर"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "7",
@@ -247,7 +250,7 @@ export const CATEGORIES: Category[] = [
       ja: ["ITサポート", "コンピューター", "PC", "インターネット", "WiFi"],
       hi: ["आईटी समर्थन", "कंप्यूटर", "पीसी", "इंटरनेट", "वाईफाई"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "8",
@@ -280,7 +283,7 @@ export const CATEGORIES: Category[] = [
       ja: ["在宅介護", "買い物", "食事", "付き添い", "高齢者"],
       hi: ["घरेलू सहायता", "खरीदारी", "भोजन", "साथ", "बुजुर्ग"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "9",
@@ -313,7 +316,7 @@ export const CATEGORIES: Category[] = [
       ja: ["家庭教師", "チューター", "先生", "数学", "英語", "フランス語"],
       hi: ["निजी ट्यूशन", "ट्यूटर", "शिक्षक", "गणित", "अंग्रेजी", "फ्रेंच"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   },
   {
     id: "10",
@@ -346,74 +349,53 @@ export const CATEGORIES: Category[] = [
       ja: ["冬", "雪", "除氷", "暖房", "断熱", "除雪"],
       hi: ["सर्दी", "बर्फ", "बर्फ हटाना", "हीटिंग", "इन्सुलेशन", "बर्फ हटाना"]
     },
-    countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"]
+    countries: LAUNCH_COUNTRIES
   }
 ];
 
 // Language detection and configuration
 export const SUPPORTED_LANGUAGES = [
-  { code: "fr", name: "Français", countries: ["FR", "BE", "CH", "CA", "MA", "TN", "DZ"] },
-  { code: "en", name: "English", countries: ["US", "GB", "AU", "CA", "IN", "IE", "NZ"] },
-  { code: "es", name: "Español", countries: ["ES", "MX", "AR", "CO", "PE", "VE"] },
-  { code: "de", name: "Deutsch", countries: ["DE", "AT", "CH", "LU"] },
-  { code: "it", name: "Italiano", countries: ["IT", "CH", "SM"] },
-  { code: "pt", name: "Português", countries: ["PT", "BR", "AO", "MZ"] },
-  { code: "nl", name: "Nederlands", countries: ["NL", "BE"] },
-  { code: "ar", name: "العربية", countries: ["MA", "TN", "DZ", "EG", "SA"] },
-  { code: "zh", name: "中文", countries: ["CN", "TW", "HK", "SG"] },
-  { code: "ja", name: "日本語", countries: ["JP"] },
-  { code: "hi", name: "हिन्दी", countries: ["IN", "NP"] }
+  { code: "fr", name: "Français" },
+  { code: "en", name: "English" },
+  { code: "es", name: "Español" },
+  { code: "de", name: "Deutsch" },
+  { code: "it", name: "Italiano" },
+  { code: "pt", name: "Português" },
+  { code: "nl", name: "Nederlands" },
+  { code: "ar", name: "العربية" },
+  { code: "zh", name: "中文" },
+  { code: "ja", name: "日本語" },
+  { code: "hi", name: "हिन्दी" }
 ];
 
 // Get user's language and country (synchronous for simplicity)
 export function getUserLanguageAndCountry(): { language: string; country: string } {
   // Server-side default
   if (typeof window === 'undefined') {
-    return { language: 'en', country: 'US' };
+    return { language: 'en', country: LAUNCH_COUNTRY };
   }
 
   // Check for manually selected language
   const savedLang = localStorage.getItem('user_language');
   if (savedLang && SUPPORTED_LANGUAGES.some(l => l.code === savedLang)) {
-    // We still want to detect country if possible
-    let country = 'US';
-    try {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (timezone === 'Europe/Paris' || timezone === 'Europe/Monaco') country = 'FR';
-      else country = navigator.language.split('-')[1]?.toUpperCase() || 'US';
-    } catch (e) {}
-    return { language: savedLang, country };
+    return { language: savedLang, country: LAUNCH_COUNTRY };
   }
 
   try {
-    // Get user's timezone to infer country
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
-    // Check if user is in France based on timezone
-    if (timezone === 'Europe/Paris' || timezone === 'Europe/Monaco') {
-      return { language: 'fr', country: 'FR' };
-    }
-    
-    // Fallback to browser language
+    // Fallback to browser language while keeping the launch country fixed to Ireland.
     const browserLang = navigator.language.split('-')[0];
-    const navCountry = navigator.language.split('-')[1]?.toUpperCase() || '';
-    
-    // If browser indicates France, use French
-    if (navCountry === 'FR' || browserLang === 'fr') {
-      return { language: 'fr', country: 'FR' };
-    }
-    
+
     // Check if language is supported
     const supportedLang = SUPPORTED_LANGUAGES.find(lang => lang.code === browserLang);
     if (supportedLang) {
-      return { language: browserLang, country: navCountry || supportedLang.countries[0] };
+      return { language: browserLang, country: LAUNCH_COUNTRY };
     }
   } catch (error) {
     console.warn('Error detecting language:', error);
   }
 
   // Default to English
-  return { language: 'en', country: 'US' };
+  return { language: 'en', country: LAUNCH_COUNTRY };
 }
 
 // Get categories filtered by user's language and country

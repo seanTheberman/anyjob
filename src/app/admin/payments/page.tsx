@@ -14,7 +14,7 @@ async function PaymentsContent() {
     <AdminTable columns={["Reference", "Type", "Amount", "Status"]} rows={payments} actionLabel="Open" />
   ) : (
     <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-      No live booking payments or subscriptions found.
+      No test payment ledger entries found yet. Accepted bids, shift escrow payments, and plan subscriptions will appear here.
     </div>
   );
 }

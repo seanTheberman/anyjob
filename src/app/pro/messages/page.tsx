@@ -2,7 +2,7 @@
 
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { MessageCircle, Search, Send, Paperclip, User, Share2, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 interface Conversation {
@@ -51,7 +51,18 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const supabase = createClient();
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const supabase = useMemo(() => createClient(), []);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const container = messagesScrollRef.current;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+      return;
+    }
+    messagesEndRef.current?.scrollIntoView({ behavior, block: "end" });
+  }, []);
 
   useEffect(() => {
     const getUser = async () => {
@@ -61,24 +72,14 @@ export default function MessagesPage() {
     getUser();
   }, [supabase]);
 
-  useEffect(() => {
-    fetchConversations();
-  }, []);
-
-  useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages(selectedConversation.id);
-    }
-  }, [selectedConversation]);
-
-  const fetchConversations = async () => {
+  const fetchConversations = useCallback(async () => {
     try {
       const response = await fetch("/api/chat?action=conversations");
       if (response.ok) {
         const data = await response.json();
         setConversations(data.conversations || []);
         if (data.conversations && data.conversations.length > 0) {
-          setSelectedConversation(data.conversations[0]);
+          setSelectedConversation((current) => current || data.conversations[0]);
         }
       }
     } catch (error) {
@@ -86,19 +87,34 @@ export default function MessagesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = useCallback(async (conversationId: string) => {
     try {
       const response = await fetch(`/api/chat?action=messages&conversation_id=${conversationId}`);
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
+        requestAnimationFrame(() => scrollToBottom("auto"));
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
     }
-  };
+  }, [scrollToBottom]);
+
+  useEffect(() => {
+    fetchConversations();
+  }, [fetchConversations]);
+
+  useEffect(() => {
+    if (selectedConversation) {
+      fetchMessages(selectedConversation.id);
+    }
+  }, [fetchMessages, selectedConversation]);
+
+  useLayoutEffect(() => {
+    requestAnimationFrame(() => scrollToBottom("auto"));
+  }, [messages.length, selectedConversation?.id, scrollToBottom]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -145,7 +161,12 @@ export default function MessagesPage() {
       });
 
       if (response.ok) {
+        const data = await response.json().catch(() => null);
         setNewMessage("");
+        if (data?.message) {
+          setMessages((current) => (current.some((message) => message.id === data.message.id) ? current : [...current, data.message]));
+        }
+        requestAnimationFrame(() => scrollToBottom("auto"));
         fetchMessages(selectedConversation.id);
         fetchConversations(); // Refresh conversations to update last message
       }
@@ -168,11 +189,6 @@ export default function MessagesPage() {
     }
     
     return "Client";
-  };
-
-  const getOtherUserName = (conversation: Conversation) => {
-    // For provider view, get client name
-    return getClientName(conversation);
   };
 
   const formatTime = (dateString: string) => {
@@ -212,8 +228,8 @@ export default function MessagesPage() {
           <p className="text-gray-600">Communicate with your clients</p>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="grid grid-cols-1 md:grid-cols-3 h-[600px]">
+        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+          <div className="grid h-[calc(100dvh-11rem)] min-h-[34rem] grid-cols-1 md:grid-cols-3">
             {/* Conversation List */}
             <div className="border-r border-gray-200 flex flex-col">
               <div className="p-4 border-b border-gray-200">
@@ -275,11 +291,11 @@ export default function MessagesPage() {
             </div>
 
             {/* Chat Window */}
-            <div className="md:col-span-2 flex flex-col">
+            <div className="md:col-span-2 flex min-h-0 min-w-0 flex-col">
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className="p-4 border-b border-gray-200">
+                  <div className="shrink-0 border-b border-gray-200 p-4">
                     <a
                       href={`/profile/${selectedConversation.client_id}`}
                       className="flex items-center gap-3 hover:bg-gray-50 rounded-lg p-2 transition-colors"
@@ -295,45 +311,48 @@ export default function MessagesPage() {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  <div ref={messagesScrollRef} className="min-h-0 flex-1 overflow-y-auto p-4">
                     {messages.length === 0 ? (
-                      <div className="text-center text-gray-500 py-8">
+                      <div className="flex h-full items-center justify-center text-center text-gray-500">
                         <p>No messages yet. Start the conversation!</p>
                       </div>
                     ) : (
-                      messages.map((message) => {
-                        const isMine = message.sender_id === currentUserId;
-                        return (
-                          <div
-                            key={message.id}
-                            className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                          >
+                      <div className="space-y-4 pb-2">
+                        {messages.map((message) => {
+                          const isMine = message.sender_id === currentUserId;
+                          return (
                             <div
-                              className={`max-w-[70%] p-3 rounded-lg ${
-                                isMine
-                                  ? "bg-blue-500 text-white"
-                                  : "bg-gray-100 text-gray-900"
-                              }`}
+                              key={message.id}
+                              className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                             >
-                              <p className="text-sm">{message.content}</p>
-                              <p
-                                className={`text-xs mt-1 ${
+                              <div
+                                className={`max-w-[min(72%,44rem)] break-words rounded-2xl px-4 py-2.5 shadow-sm ${
                                   isMine
-                                    ? "text-blue-100"
-                                    : "text-gray-500"
+                                    ? "rounded-br-md bg-red-600 text-white"
+                                    : "rounded-bl-md bg-gray-100 text-gray-900"
                                 }`}
                               >
-                                {formatTime(message.created_at)}
-                              </p>
+                                <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.content}</p>
+                                <p
+                                  className={`mt-1 text-[10px] ${
+                                    isMine
+                                      ? "text-red-100"
+                                      : "text-gray-500"
+                                  }`}
+                                >
+                                  {formatTime(message.created_at)}
+                                </p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })
+                          );
+                        })}
+                        <div ref={messagesEndRef} />
+                      </div>
                     )}
                   </div>
 
                   {/* Message Input */}
-                  <div className="p-4 border-t border-gray-200 space-y-3">
+                  <div className="shrink-0 space-y-3 border-t border-gray-200 p-4">
                     {/* Message Input */}
                     <div className="flex gap-2">
                       <input
@@ -342,11 +361,11 @@ export default function MessagesPage() {
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                        onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                       />
                       <button
                         onClick={selectedFile ? handleSendAttachment : sendMessage}
-                        className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-600 text-white transition-colors hover:bg-red-700"
                         title="Send"
                       >
                         <Send className="w-4 h-4" />

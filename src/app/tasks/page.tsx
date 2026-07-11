@@ -21,10 +21,45 @@ type Task = {
   createdAt: string | null;
   href: string;
   workImages?: Array<{ id: string; image_url: string }>;
+  buyerTrust?: {
+    jobsPosted: number;
+    hires: number;
+    hireRate: number;
+    paidJobs: number;
+    totalSpent: number;
+    totalSpentLabel: string;
+    paymentStatus: "verified" | "unverified";
+    isNewClient: boolean;
+    kycVerified: boolean;
+    badges: Array<{ label: string; tone: "green" | "blue" | "amber" | "purple" | "slate" | "red"; source: string }>;
+  } | null;
 };
 
 function categoryLabel(value: string) {
   return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+const trustToneClass: Record<string, string> = {
+  green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  blue: "bg-blue-50 text-blue-700 ring-blue-100",
+  amber: "bg-amber-50 text-amber-700 ring-amber-100",
+  purple: "bg-purple-50 text-purple-700 ring-purple-100",
+  red: "bg-red-50 text-red-700 ring-red-100",
+  slate: "bg-slate-100 text-slate-700 ring-slate-200",
+};
+
+function BuyerTrustBadges({ trust, compact = false }: { trust?: Task["buyerTrust"]; compact?: boolean }) {
+  const badges = trust?.badges || [];
+  if (!badges.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {badges.slice(0, compact ? 3 : 6).map((badge) => (
+        <span key={badge.label} className={`rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${trustToneClass[badge.tone] || trustToneClass.slate}`}>
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export default function TasksPage() {
@@ -111,7 +146,7 @@ export default function TasksPage() {
               <input
                 value={location}
                 onChange={(event) => setLocation(event.target.value)}
-                placeholder="50km Ajmer RJ 305001"
+                placeholder="50km Dublin D02"
                 className="h-11 w-full rounded-full border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-100"
               />
             </label>
@@ -180,6 +215,11 @@ export default function TasksPage() {
                       </span>
                     ) : null}
                   </div>
+                  {task.source === "buyer" ? (
+                    <div className="mt-3">
+                      <BuyerTrustBadges trust={task.buyerTrust} compact />
+                    </div>
+                  ) : null}
                 </button>
               );
             })}
@@ -194,6 +234,11 @@ export default function TasksPage() {
                     <span className="rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-blue-700">{selectedTask.source === "business" ? "Business post" : "Buyer request"}</span>
                     {selectedTask.remote ? <span className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-slate-600">Remote possible</span> : null}
                   </div>
+                  {selectedTask.source === "buyer" ? (
+                    <div className="mt-4">
+                      <BuyerTrustBadges trust={selectedTask.buyerTrust} />
+                    </div>
+                  ) : null}
                   <h2 className="mt-7 text-4xl font-black leading-tight tracking-tight text-blue-950">{selectedTask.title}</h2>
                   <div className="mt-7 grid gap-5 md:grid-cols-3">
                     <div className="flex gap-3">
@@ -257,6 +302,16 @@ export default function TasksPage() {
                       <p>Use the full job page to make or manage your offer.</p>
                     </div>
                   </div>
+                  {selectedTask.source === "buyer" && selectedTask.buyerTrust ? (
+                    <div className="rounded-lg border border-slate-200 p-5">
+                      <p className="text-sm font-black text-blue-950">Buyer trust</p>
+                      <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+                        <p>{selectedTask.buyerTrust.jobsPosted} posted · {selectedTask.buyerTrust.hires} hired · {selectedTask.buyerTrust.hireRate}% hire rate</p>
+                        <p>{selectedTask.buyerTrust.isNewClient ? "New client" : `${selectedTask.buyerTrust.totalSpentLabel} spent on AnyJob`}</p>
+                        <p>{selectedTask.buyerTrust.paymentStatus === "verified" ? "Payment verified" : "Payment unverified"}</p>
+                      </div>
+                    </div>
+                  ) : null}
                 </aside>
               </div>
             ) : (

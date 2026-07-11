@@ -4,7 +4,7 @@ import { ProviderLayout } from "@/components/provider/ProviderLayout";
 export default function NotificationsPage() {
   return (
     <ProviderLayout>
-      <NotificationCenter accent="green" />
+      <NotificationCenter accent="green" showInsuranceNotice />
     </ProviderLayout>
   );
 }

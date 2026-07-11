@@ -35,7 +35,7 @@ export function SearchBar() {
     const searchBoxRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Detect language based on geolocation (timezone)
+    // Detect language from the browser, while launch geography stays Ireland-only.
     useEffect(() => {
         const savedMode = localStorage.getItem("home_job_mode");
         if (savedMode === "Day to day jobs" || savedMode === "Work shifts") {
@@ -59,21 +59,8 @@ export function SearchBar() {
 
         const detectLanguage = () => {
             try {
-                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                
-                if (timezone === 'Europe/Paris' || timezone === 'Europe/Monaco') {
-                    setSelectedLanguage('fr');
-                    return;
-                }
-                
                 const browserLang = navigator.language.split('-')[0];
-                const navCountry = navigator.language.split('-')[1]?.toUpperCase();
-                
-                if (navCountry === 'FR' || browserLang === 'fr') {
-                    setSelectedLanguage('fr');
-                } else {
-                    setSelectedLanguage(browserLang || 'en');
-                }
+                setSelectedLanguage(browserLang || 'en');
             } catch (error) {
                 console.warn('Error detecting language:', error);
                 setSelectedLanguage('en');
@@ -276,7 +263,7 @@ export function SearchBar() {
             ja: "清掃、修理...",
             hi: "सफाई, ठेकेदार..."
         };
-        return placeholders[selectedLanguage] || placeholders.fr;
+        return placeholders[selectedLanguage] || placeholders.en;
     };
 
     const getNoResultsText = () => {

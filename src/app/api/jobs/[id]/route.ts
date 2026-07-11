@@ -1,6 +1,8 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
+import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
+import { getProviderStatsMap } from "@/lib/provider-stats";
 import { NextRequest, NextResponse } from "next/server";
 
 function coarsePostalCode(postalCode?: string | null) {
@@ -162,7 +164,7 @@ export async function GET(
 
     const imageCount = images?.length || 0;
 
-    const [{ data: bids }, { data: buyerJobs }, { data: buyerReviewsGiven }] = await Promise.all([
+    const [{ data: bids }, { data: buyerJobs }, { data: buyerReviewsGiven }, { data: buyerReviewsReceived }] = await Promise.all([
       adminSupabase
         .from("bids")
         .select("id,inquiry_id,provider_id,amount,message,estimated_duration_hours,available_date,status,created_at")
@@ -182,10 +184,19 @@ export async function GET(
             .eq("reviewer_id", job.user_id)
             .limit(1000)
         : Promise.resolve({ data: [] }),
+      job.user_id
+        ? adminSupabase
+            .from("eloo_reviews")
+            .select("rating")
+            .eq("reviewee_id", job.user_id)
+            .eq("review_type", "seller_to_buyer")
+            .eq("is_public", true)
+            .limit(1000)
+        : Promise.resolve({ data: [] }),
     ]);
 
     const providerIds = Array.from(new Set(((bids || []) as LooseRow[]).map((bid) => String(bid.provider_id || "")).filter(Boolean)));
-    const [{ data: providerProfiles }, { data: providerSellers }, { data: providerReviews }] = providerIds.length
+    const [{ data: providerProfiles }, { data: providerSellers }, providerStatsById] = providerIds.length
       ? await Promise.all([
           adminSupabase
             .from("eloo_profiles")
@@ -193,33 +204,20 @@ export async function GET(
             .in("id", providerIds),
           adminSupabase
             .from("sellers")
-            .select("id,first_name,last_name,profile_image_url,rating,total_jobs,service_category,experience_level")
+            .select("id,first_name,last_name,profile_image_url,service_category,experience_level")
             .in("id", providerIds),
-          adminSupabase
-            .from("eloo_reviews")
-            .select("reviewee_id,rating")
-            .in("reviewee_id", providerIds),
+          getProviderStatsMap(adminSupabase, providerIds),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, new Map()];
 
     const profilesById = new Map(((providerProfiles || []) as LooseRow[]).map((profile) => [String(profile.id), profile]));
     const sellersById = new Map(((providerSellers || []) as LooseRow[]).map((seller) => [String(seller.id), seller]));
-    const reviewsByProvider = new Map<string, LooseRow[]>();
-    for (const review of (providerReviews || []) as LooseRow[]) {
-      const providerId = String(review.reviewee_id || "");
-      if (!providerId) continue;
-      reviewsByProvider.set(providerId, [...(reviewsByProvider.get(providerId) || []), review]);
-    }
 
     const offerDetails = ((bids || []) as LooseRow[]).map((bid) => {
       const providerId = String(bid.provider_id || "");
       const profile = profilesById.get(providerId) || {};
       const seller = sellersById.get(providerId) || {};
-      const reviews = reviewsByProvider.get(providerId) || [];
-      const rating = average(reviews) || Number(seller.rating || 0);
-      const reviewCount = reviews.length || Number(seller.total_jobs || 0);
-      const totalJobs = Number(seller.total_jobs || 0);
-      const completionRate = totalJobs > 0 ? 100 : 0;
+      const providerStats = providerStatsById.get(providerId) || { rating: 0, reviewCount: 0, completedJobs: 0, assignedJobs: 0, completionRate: 0 };
 
       return {
         id: String(bid.id),
@@ -234,10 +232,10 @@ export async function GET(
         provider: {
           name: [seller.first_name || profile.first_name, seller.last_name || profile.last_name].filter(Boolean).join(" ") || "Provider",
           avatar: seller.profile_image_url || profile.profile_image_url || null,
-          rating,
-          reviewCount,
-          totalJobs,
-          completionRate,
+          rating: providerStats.rating,
+          reviewCount: providerStats.reviewCount,
+          totalJobs: providerStats.completedJobs,
+          completionRate: providerStats.completionRate,
           serviceCategory: seller.service_category || null,
           experienceLevel: seller.experience_level || null,
         },
@@ -255,6 +253,12 @@ export async function GET(
       averageRatingGiven: average((buyerReviewsGiven || []) as LooseRow[]),
       ratingsGiven: ((buyerReviewsGiven || []) as LooseRow[]).length,
     };
+    const buyerReceivedReviewRows = (buyerReviewsReceived || []) as LooseRow[];
+    const buyerReceivedReviewCount = buyerReceivedReviewRows.length;
+    const buyerReceivedRating = average(buyerReceivedReviewRows);
+    const buyerTrust = job.user_id
+      ? (await getBuyerTrustForUsers(adminSupabase, [String(job.user_id)])).get(String(job.user_id)) || null
+      : null;
 
     const showContact = myBid?.status === 'accepted';
     const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(', ');
@@ -269,8 +273,8 @@ export async function GET(
         email: user && showContact ? job.email : undefined, // Only after bid accepted
         phone: user && showContact ? job.phone : undefined, // Only after bid accepted
         photo: undefined,
-        rating: undefined,
-        reviewCount: undefined
+        rating: buyerReceivedReviewCount ? buyerReceivedRating : undefined,
+        reviewCount: buyerReceivedReviewCount || undefined
       },
       budget: {
         min: parseFloat(job.budget_range_min) || 0,
@@ -304,7 +308,8 @@ export async function GET(
       work_image_count: imageCount,
       work_images: images || [],
       offers: offerDetails,
-      buyerStats
+      buyerStats,
+      buyerTrust,
     };
 
     return NextResponse.json({ job: transformedJob });

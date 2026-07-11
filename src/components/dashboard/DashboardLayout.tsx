@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
@@ -22,14 +22,14 @@ import {
   Moon,
   Smartphone,
   Heart,
-  Building2
+  Building2,
+  Award
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { logoutClientSession } from "@/lib/auth/logout-client";
-import { InsuranceNotice } from "@/components/safety/InsuranceNotice";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -41,6 +41,7 @@ const sidebarItems = [
   { icon: ClipboardList, label: "My requests", href: "/dashboard/requests" },
   { icon: Building2, label: "Business", href: "/dashboard/business" },
   { icon: Mail, label: "Mail", href: "/dashboard/mail" },
+  { icon: Award, label: "Milestones", href: "/dashboard/milestones" },
   { icon: UserCircle, label: "Account", href: "/dashboard/account" },
   { icon: MessageSquare, label: "Assistance", href: "/dashboard/assistance" },
   { icon: HelpCircle, label: "Help", href: "/dashboard/help" },
@@ -60,6 +61,7 @@ const profileMenuItems = [
   { icon: Settings, label: "Account Settings", href: "/dashboard/account", color: "text-gray-700" },
   { icon: MapPin, label: "Addresses", href: "/dashboard/account?tab=addresses", color: "text-gray-700" },
   { icon: CreditCard, label: "Booking Token Payment", href: "/dashboard/account?tab=payment", color: "text-gray-700" },
+  { icon: Award, label: "Milestones & Badges", href: "/dashboard/milestones", color: "text-gray-700" },
   { icon: Bell, label: "Notifications", href: "/dashboard/notifications", color: "text-gray-700" },
   { icon: Shield, label: "Security & Privacy", href: "/dashboard/account?tab=security", color: "text-gray-700" },
   { icon: FileText, label: "Terms & Policies", href: "/dashboard/help", color: "text-gray-700" },
@@ -67,17 +69,78 @@ const profileMenuItems = [
   { icon: Smartphone, label: "Get the App", href: "#", color: "text-gray-700" },
 ];
 
+function pathOnly(href: string) {
+  return href.split("?")[0] || href;
+}
+
+function matchesNavPath(activePath: string | null | undefined, href: string, rootHref: string) {
+  const itemPath = pathOnly(href);
+  if (!activePath) return false;
+  if (itemPath === rootHref) return activePath === rootHref;
+  return activePath === itemPath || activePath.startsWith(`${itemPath}/`);
+}
+
+function DashboardNavigationPending({ label }: { label: string }) {
+  return (
+    <div className="space-y-5" aria-busy="true" aria-live="polite">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-red-100">
+        <div className="h-full w-1/3 rounded-full bg-red-600 motion-safe:animate-pulse" />
+      </div>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-semibold text-red-600">Opening {label}</p>
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+        </div>
+        <div className="mt-5 h-56 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [optimisticPath, setOptimisticPath] = useState<string | null>(null);
   const pathname = usePathname();
   const router = useRouter();
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const supabase = createClient();
-  const showDashboardInsuranceNotice = !pathname?.includes("/notifications");
+  const supabase = useMemo(() => createClient(), []);
+  const activePath = optimisticPath || pathname;
+  const pendingNavigationLabel = useMemo(() => {
+    const pendingItem = [...sidebarItems, ...bottomNavItems, ...profileMenuItems]
+      .find((item) => pathOnly(item.href) === optimisticPath);
+    return pendingItem?.label || "page";
+  }, [optimisticPath]);
+  const isPendingNavigation = Boolean(optimisticPath && optimisticPath !== pathname);
+
+  const markNavigation = (href: string, event?: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (href === "#") return;
+    if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+    const nextPath = pathOnly(href);
+    setOptimisticPath(nextPath);
+    router.prefetch(nextPath);
+  };
+
+  const isNavActive = (href: string) => matchesNavPath(activePath, href, "/dashboard");
+
+  useEffect(() => {
+    setOptimisticPath(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const hrefs = [...sidebarItems, ...bottomNavItems, ...profileMenuItems]
+      .map((item) => pathOnly(item.href))
+      .filter((href) => href && href !== "#");
+
+    for (const href of Array.from(new Set(hrefs))) {
+      router.prefetch(href);
+    }
+  }, [router]);
 
   const handleLogout = async () => {
     setProfileDropdownOpen(false);
@@ -197,7 +260,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                   <Link
                     href="/dashboard/account"
-                    onClick={() => setProfileDropdownOpen(false)}
+                    onClick={(event) => {
+                      markNavigation("/dashboard/account", event);
+                      setProfileDropdownOpen(false);
+                    }}
                     className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
                     <Settings className="w-4 h-4" />
@@ -279,7 +345,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="p-4 grid grid-cols-3 gap-3 border-b border-gray-100">
                 <Link
                   href="/dashboard/account"
-                  onClick={() => setProfileDropdownOpen(false)}
+                  onClick={(event) => {
+                    markNavigation("/dashboard/account", event);
+                    setProfileDropdownOpen(false);
+                  }}
                   className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
@@ -313,8 +382,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                     <Link
                       key={item.label}
                       href={item.href}
-                      onClick={() => setProfileDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+                      onClick={(event) => {
+                        markNavigation(item.href, event);
+                        setProfileDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 active:bg-gray-100",
+                        isNavActive(item.href) ? "bg-red-50 text-red-600" : "text-gray-700"
+                      )}
                     >
                       <Icon className={`w-5 h-5 ${item.color}`} />
                       <span className="flex-1">{item.label}</span>
@@ -344,14 +419,18 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           <nav className="p-4 pt-12 space-y-1">
             {sidebarItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+              const isActive = isNavActive(item.href);
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
+                  onClick={(event) => markNavigation(item.href, event)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors active:scale-[0.99]",
                     isActive
                       ? "bg-red-50 text-red-600"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -375,12 +454,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
         {/* Main Content */}
         <main className="flex-1 min-h-[calc(100vh-8rem)] lg:ml-64 lg:min-h-[calc(100vh-4rem)] p-4 lg:p-6 pb-24 lg:pb-6">
-          {showDashboardInsuranceNotice ? (
-            <div className="mb-4 lg:mb-6">
-              <InsuranceNotice />
-            </div>
-          ) : null}
-          {children}
+          {isPendingNavigation ? <DashboardNavigationPending label={pendingNavigationLabel} /> : children}
         </main>
       </div>
 
@@ -389,12 +463,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <div className="grid grid-cols-5 h-16">
           {bottomNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const isActive = isNavActive(item.href);
             
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
+                onMouseEnter={() => router.prefetch(item.href)}
+                onFocus={() => router.prefetch(item.href)}
+                onClick={(event) => markNavigation(item.href, event)}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 transition-colors relative",
                   isActive ? "text-red-600" : "text-gray-400 hover:text-gray-600"

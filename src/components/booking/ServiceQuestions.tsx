@@ -34,8 +34,8 @@ const CATEGORY_QUESTIONS: Record<string, QuestionField[]> = {
         { key: "frequency", label: "Fréquence", type: "select", options: ["Ponctuel", "Hebdomadaire", "Bi-mensuel", "Mensuel"] },
     ],
     demenagement: [
-        { key: "pickup_address", label: "Adresse de départ", type: "text", placeholder: "12 Rue de la Paix, Paris", required: true },
-        { key: "dropoff_address", label: "Adresse d'arrivée", type: "text", placeholder: "45 Avenue des Champs, Lyon", required: true },
+        { key: "pickup_address", label: "Adresse de départ", type: "text", placeholder: "12 Grafton Street, Dublin", required: true },
+        { key: "dropoff_address", label: "Adresse d'arrivée", type: "text", placeholder: "45 Patrick Street, Cork", required: true },
         { key: "pickup_floor", label: "Étage de départ", type: "number", placeholder: "3" },
         { key: "dropoff_floor", label: "Étage d'arrivée", type: "number", placeholder: "2" },
         { key: "elevator", label: "Ascenseur disponible ?", type: "toggle" },

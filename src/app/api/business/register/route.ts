@@ -23,7 +23,7 @@ function cleanDocuments(value: unknown) {
       const label = cleanString(record.label);
       const link = cleanString(record.link);
       const fileName = cleanString(upload?.fileName || record.fileName);
-      const dataUrl = cleanString(upload?.dataUrl || record.dataUrl);
+      const dataUrl = cleanString(upload?.dataUrl || upload?.url || record.dataUrl || record.url);
 
       if (!link && !dataUrl) return null;
 
@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
     const address = cleanString(body.address);
     const city = cleanString(body.city);
     const postalCode = cleanString(body.postalCode);
-    const country = cleanString(body.country) || "France";
+    const country = "Ireland";
     const submittedDocuments = cleanDocuments(body.documents);
     const legacyDocumentUrl = cleanString(body.documentUrl) || cleanString(body.documentDataUrl);
     const documentUrl = submittedDocuments.length ? JSON.stringify(submittedDocuments) : legacyDocumentUrl;

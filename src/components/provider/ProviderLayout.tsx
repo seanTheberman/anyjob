@@ -77,7 +77,8 @@ const sidebarItems: ProviderNavItem[] = [
   { icon: CheckCircle, label: "Completed", href: "/pro/completed" },
   { icon: Clock, label: "Pending", href: "/pro/pending" },
   { icon: BarChart3, label: "Analytics", href: "/pro/analytics" },
-  { icon: Award, label: "Badges", href: "/pro/badges" },
+  { icon: Award, label: "Milestones", href: "/pro/milestones" },
+  { icon: FileText, label: "Help & Support", href: "/pro/help" },
 ];
 
 // Mobile bottom nav items (main 5 items only)
@@ -96,7 +97,7 @@ const profileMenuItems = [
   { icon: DollarSign, label: "Earnings", href: "/pro/earnings", color: "text-gray-700" },
   { icon: Star, label: "Reviews & Ratings", href: "/pro/reviews", color: "text-gray-700" },
   { icon: Bell, label: "Notifications", href: "/pro/notifications", color: "text-gray-700" },
-  { icon: Award, label: "Badges & Achievements", href: "/pro/badges", color: "text-gray-700" },
+  { icon: Award, label: "Milestones & Badges", href: "/pro/milestones", color: "text-gray-700" },
   { icon: BarChart3, label: "Analytics", href: "/pro/analytics", color: "text-gray-700" },
   { icon: CreditCard, label: "Collection Settings", href: "/pro/earnings", color: "text-gray-700" },
   { icon: Shield, label: "Verification", href: "/pro/profile?tab=verification", color: "text-gray-700" },
@@ -104,6 +105,37 @@ const profileMenuItems = [
   { icon: Moon, label: "Dark Mode", href: "#", color: "text-gray-700", isToggle: true },
   { icon: Smartphone, label: "Get the App", href: "#", color: "text-gray-700" },
 ];
+
+function pathOnly(href: string) {
+  return href.split("?")[0] || href;
+}
+
+function matchesNavPath(activePath: string | null | undefined, href: string, rootHref: string) {
+  const itemPath = pathOnly(href);
+  if (!activePath) return false;
+  if (itemPath === rootHref) return activePath === rootHref;
+  return activePath === itemPath || activePath.startsWith(`${itemPath}/`);
+}
+
+function ProviderNavigationPending({ label }: { label: string }) {
+  return (
+    <div className="space-y-5" aria-busy="true" aria-live="polite">
+      <div className="h-1 w-full overflow-hidden rounded-full bg-green-100">
+        <div className="h-full w-1/3 rounded-full bg-green-600 motion-safe:animate-pulse" />
+      </div>
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-semibold text-green-700">Opening {label}</p>
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+          <div className="h-24 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+        </div>
+        <div className="mt-5 h-56 rounded-lg bg-gray-100 motion-safe:animate-pulse" />
+      </div>
+    </div>
+  );
+}
 
 export function ProviderLayout({ children }: ProviderLayoutProps) {
   const pathname = usePathname();
@@ -114,8 +146,10 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [canSeeShiftBoard, setCanSeeShiftBoard] = useState(false);
+  const [optimisticPath, setOptimisticPath] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const supabase = useMemo(() => createClient(), []);
+  const activePath = optimisticPath || pathname;
   const showDashboardInsuranceNotice = !pathname?.includes("/notifications");
   const visibleSidebarItems = useMemo(
     () => sidebarItems.filter((item) => !item.requiresShifts || canSeeShiftBoard),
@@ -125,14 +159,56 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
     () => bottomNavItems.filter((item) => !item.requiresShifts || canSeeShiftBoard),
     [canSeeShiftBoard]
   );
+  const pendingNavigationLabel = useMemo(() => {
+    const pendingItem = [...visibleSidebarItems, ...visibleBottomNavItems, ...profileMenuItems]
+      .find((item) => pathOnly(item.href) === optimisticPath);
+    return pendingItem?.label || "page";
+  }, [optimisticPath, visibleBottomNavItems, visibleSidebarItems]);
+  const isPendingNavigation = Boolean(optimisticPath && optimisticPath !== pathname);
+
+  const markNavigation = (href: string, event?: React.MouseEvent<HTMLAnchorElement>) => {
+    if (href === "#") return;
+    if (event && (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0)) return;
+    const nextPath = pathOnly(href);
+    setOptimisticPath(nextPath);
+    router.prefetch(nextPath);
+  };
+
+  const isNavActive = (href: string) => matchesNavPath(activePath, href, "/pro");
 
   useEffect(() => {
+    setOptimisticPath(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const hrefs = [...visibleSidebarItems, ...visibleBottomNavItems, ...profileMenuItems]
+      .map((item) => pathOnly(item.href))
+      .filter((href) => href && href !== "#");
+
+    for (const href of Array.from(new Set(hrefs))) {
+      router.prefetch(href);
+    }
+  }, [router, visibleBottomNavItems, visibleSidebarItems]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadingFallback = window.setTimeout(() => {
+      if (!cancelled) {
+        console.warn("Provider workspace session check timed out.");
+        setCanSeeShiftBoard(false);
+        setLoading(false);
+      }
+    }, 8000);
+
     const fetchUser = async () => {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 6000);
       try {
-        const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" }).catch(() => null);
+        const sessionResponse = await fetch("/api/auth/session", { cache: "no-store", signal: controller.signal }).catch(() => null);
         const sessionPayload = sessionResponse?.ok ? await sessionResponse.json().catch(() => null) : null;
 
         if (sessionPayload?.user) {
+          if (cancelled) return;
           const sessionUser = sessionPayload.user as ProviderSessionUser;
           setUser({
             id: sessionUser.id,
@@ -147,6 +223,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         }
 
         const { data: { user } } = await supabase.auth.getUser();
+        if (cancelled) return;
         setUser(user);
         if (user) {
           const { data: seller } = await supabase
@@ -162,7 +239,8 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
       } catch (error) {
         console.error('Error fetching user:', error);
       } finally {
-        setLoading(false);
+        window.clearTimeout(timeout);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -176,7 +254,11 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(loadingFallback);
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
   const handleLogout = async () => {
@@ -243,9 +325,9 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 flex flex-col overflow-x-clip pt-14 lg:pt-16">
       {/* Desktop Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 lg:block hidden">
+      <header className="fixed inset-x-0 top-0 z-50 bg-white border-b border-gray-200 lg:block hidden">
         <div className="flex items-center justify-between px-4 lg:px-6 h-16">
           {/* Logo */}
           <div className="flex items-center gap-4">
@@ -265,7 +347,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
           {/* Right side - Notifications & Profile */}
           <div className="flex items-center gap-3">
-            <NotificationBell href="/pro/notifications" accent="green" />
+            <NotificationBell href="/pro/notifications" accent="green" showInsuranceNotice />
             
             {/* Profile Dropdown */}
             <div className="relative" ref={dropdownRef}>
@@ -288,7 +370,10 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
                   <Link
                     href="/pro/profile"
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    onClick={() => setProfileDropdownOpen(false)}
+                    onClick={(event) => {
+                      markNavigation("/pro/profile", event);
+                      setProfileDropdownOpen(false);
+                    }}
                   >
                     <User className="w-4 h-4" />
                     Account Settings
@@ -296,7 +381,10 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
                   <Link
                     href="/pro/help"
                     className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                    onClick={() => setProfileDropdownOpen(false)}
+                    onClick={(event) => {
+                      markNavigation("/pro/help", event);
+                      setProfileDropdownOpen(false);
+                    }}
                   >
                     <Settings className="w-4 h-4" />
                     Help & Support
@@ -317,7 +405,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
       </header>
 
       {/* Mobile Header */}
-      <header className="sticky top-0 z-50 bg-white border-b border-gray-200 lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-50 bg-white border-b border-gray-200 lg:hidden">
         <div className="flex items-center justify-between px-4 h-14">
           {/* Logo */}
           <div className="flex items-center gap-2">
@@ -337,7 +425,7 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
 
           {/* Right side - Notifications & Menu */}
           <div className="flex items-center gap-2">
-            <NotificationBell href="/pro/notifications" accent="green" />
+            <NotificationBell href="/pro/notifications" accent="green" showInsuranceNotice />
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
               className="p-2 hover:bg-gray-100 rounded-full"
@@ -383,7 +471,10 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
               <div className="p-4 grid grid-cols-3 gap-3 border-b border-gray-100">
                 <Link
                   href="/pro/profile"
-                  onClick={() => setProfileDropdownOpen(false)}
+                  onClick={(event) => {
+                    markNavigation("/pro/profile", event);
+                    setProfileDropdownOpen(false);
+                  }}
                   className="flex flex-col items-center gap-2 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
                 >
                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
@@ -393,7 +484,10 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
                 </Link>
                 <Link
                   href="/pro/earnings"
-                  onClick={() => setProfileDropdownOpen(false)}
+                  onClick={(event) => {
+                    markNavigation("/pro/earnings", event);
+                    setProfileDropdownOpen(false);
+                  }}
                   className="flex flex-col items-center gap-2 p-3 rounded-xl bg-green-50 hover:bg-green-100 transition-colors"
                 >
                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-sm">
@@ -417,8 +511,14 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
                     <Link
                       key={item.label}
                       href={item.href}
-                      onClick={() => setProfileDropdownOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100"
+                      onClick={(event) => {
+                        markNavigation(item.href, event);
+                        setProfileDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 px-4 py-3 text-sm hover:bg-gray-50 active:bg-gray-100",
+                        isNavActive(item.href) ? "bg-green-50 text-green-700" : "text-gray-700"
+                      )}
                     >
                       <Icon className={`w-5 h-5 ${item.color}`} />
                       <span className="flex-1">{item.label}</span>
@@ -442,20 +542,24 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         )}
       </header>
 
-      <div className="flex flex-1 flex-col lg:flex-row lg:items-start">
+      <div className="flex flex-1 flex-col lg:block">
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:block sticky top-16 left-0 z-40 h-[calc(100vh-4rem)] w-64 bg-white border-r border-gray-200 overflow-y-auto">
-          <nav className="p-4 pt-12 space-y-1">
+        <aside className="fixed bottom-0 left-0 top-16 z-40 hidden w-64 border-r border-gray-200 bg-white lg:block">
+          <nav className="h-full overflow-y-auto px-4 py-5 space-y-1">
             {visibleSidebarItems.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+              const isActive = isNavActive(item.href);
 
               return (
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch
+                  onMouseEnter={() => router.prefetch(item.href)}
+                  onFocus={() => router.prefetch(item.href)}
+                  onClick={(event) => markNavigation(item.href, event)}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors active:scale-[0.99]",
                     isActive
                       ? "bg-red-50 text-red-600"
                       : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -478,13 +582,13 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         )}
 
         {/* Main Content */}
-        <main className="w-full flex-1 min-h-[calc(100vh-8rem)] overflow-visible p-4 lg:p-6 pb-24 lg:pb-6">
+        <main className="w-full flex-1 min-h-[calc(100vh-8rem)] overflow-visible p-4 pb-24 lg:ml-64 lg:w-[calc(100%-16rem)] lg:p-6 lg:pb-6">
           {showDashboardInsuranceNotice ? (
             <div className="mb-4 lg:mb-6">
               <InsuranceNotice accent="green" />
             </div>
           ) : null}
-          {children}
+          {isPendingNavigation ? <ProviderNavigationPending label={pendingNavigationLabel} /> : children}
         </main>
       </div>
 
@@ -496,12 +600,16 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
         >
           {visibleBottomNavItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+            const isActive = isNavActive(item.href);
             
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
+                onMouseEnter={() => router.prefetch(item.href)}
+                onFocus={() => router.prefetch(item.href)}
+                onClick={(event) => markNavigation(item.href, event)}
                 className={cn(
                   "flex flex-col items-center justify-center gap-1 transition-colors relative",
                   isActive ? "text-green-600" : "text-gray-400 hover:text-gray-600"

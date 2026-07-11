@@ -39,6 +39,8 @@ interface ServiceInquiry {
 
 interface Review {
   id: string;
+  reviewer_id?: string;
+  reviewee_id?: string;
   rating: number;
   title: string;
   comment: string;
@@ -191,18 +193,20 @@ export default function RequestDetailPage() {
 
     setUpdatingStatus(status);
     try {
-      const { error } = await supabase
-        .from("service_inquiries")
-        .update({ status, updated_at: new Date().toISOString() })
-        .eq("id", inquiry.id)
-        .eq("user_id", user.id);
+      const response = await fetch(`/api/dashboard/requests/${inquiry.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const payload = await response.json().catch(() => ({}));
 
-      if (error) {
-        console.error("Error updating request status:", error);
-        alert(error.message || "Could not update request status");
-      } else {
-        setInquiry({ ...inquiry, status });
+      if (!response.ok) {
+        alert(payload.error || "Could not update request status");
+        return;
       }
+
+      setInquiry(payload.inquiry || { ...inquiry, status });
+      router.refresh();
     } catch (error) {
       console.error("Error:", error);
       alert("Could not update request status");
@@ -270,8 +274,8 @@ export default function RequestDetailPage() {
 
   const canReview = inquiry && (inquiry.status === "completed" || inquiry.status === "converted") && user;
   const isBuyer = inquiry && user && inquiry.user_id === user.id;
-  const hasBuyerReviewed = reviews.some(r => r.review_type === "buyer_to_seller" && r.reviewer.first_name === user?.user_metadata?.first_name);
-  const hasSellerReviewed = reviews.some(r => r.review_type === "seller_to_buyer" && r.reviewer.first_name === user?.user_metadata?.first_name);
+  const hasBuyerReviewed = reviews.some((review) => review.review_type === "buyer_to_seller" && review.reviewer_id === user?.id);
+  const hasSellerReviewed = reviews.some((review) => review.review_type === "seller_to_buyer" && review.reviewer_id === user?.id);
 
   if (loading) {
     return (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getProviderStats } from "@/lib/provider-stats";
 
 type ProviderProfilePayload = {
   firstName?: string;
@@ -47,7 +48,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const admin = createAdminSupabaseClient() as never as LooseAdminClient;
-  const [{ data: seller, error: sellerError }, { data: files, error: filesError }] = await Promise.all([
+  const [{ data: seller, error: sellerError }, { data: files, error: filesError }, stats] = await Promise.all([
     admin.from("sellers").select("*").eq("id", user.id).maybeSingle(),
     admin
       .from("user_images")
@@ -55,12 +56,13 @@ export async function GET() {
       .eq("user_id", user.id)
       .in("image_type", ["id_document", "selfie_video", "portfolio", "portfolio_video"])
       .order("created_at", { ascending: false }),
+    getProviderStats(admin, user.id),
   ]);
 
   if (sellerError) return NextResponse.json({ error: sellerError.message }, { status: 500 });
   if (filesError) return NextResponse.json({ error: filesError.message }, { status: 500 });
 
-  return NextResponse.json({ user: { id: user.id, email: user.email }, seller, files: files || [] });
+  return NextResponse.json({ user: { id: user.id, email: user.email }, seller, files: files || [], stats });
 }
 
 export async function PATCH(request: NextRequest) {
@@ -114,7 +116,7 @@ export async function PATCH(request: NextRequest) {
     address: text(body.address),
     city: text(body.city),
     postal_code: text(body.postalCode),
-    country: text(body.country) || "France",
+    country: "Ireland",
     hourly_rate: Number.isFinite(hourlyRate) ? hourlyRate : 0,
     profile_image_url: text(body.profileImageUrl) || null,
     updated_at: now,

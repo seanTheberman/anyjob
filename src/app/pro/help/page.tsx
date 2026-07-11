@@ -3,6 +3,7 @@
 import { HelpCircle, Mail, ShieldCheck } from "lucide-react";
 import { ProviderLayout } from "@/components/provider/ProviderLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SupportTicketCenter } from "@/components/support/SupportTicketCenter";
 
 const items = [
   {
@@ -43,6 +44,16 @@ export default function ProHelpPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+
+        <div className="mt-8">
+          <SupportTicketCenter
+            defaultRequesterType="provider"
+            requesterOptions={["provider", "contractor"]}
+            heading="Raise a support ticket"
+            description="Use this for provider, contractor, KYC, job application, payment, and technical issues. Delayed unresolved tickets move upward in the admin support queue."
+            compact
+          />
         </div>
       </div>
     </ProviderLayout>

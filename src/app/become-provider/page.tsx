@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, FileText, Shield, CreditCard, Calendar, Banknote } from "lucide-react";
 
 const CITIES = [
-    "Paris", "Lyon", "Marseille", "Bordeaux", "Lille", "Nantes", "Strasbourg", "Montpellier"
+    "Dublin", "Cork", "Galway", "Limerick", "Waterford", "Kilkenny", "Cavan", "Donegal"
 ];
 
 const CATEGORIES = [
@@ -96,7 +96,7 @@ const FAQS = [
     },
     {
         question: "Where does Anyjob operate?",
-        answer: "Anyjob currently operates in major cities across France including Paris, Lyon, Marseille, Bordeaux, and more."
+        answer: "AnyJob is launching in Ireland first, starting with Dublin, Cork, Galway, Limerick, Waterford, and surrounding counties."
     },
     {
         question: "What categories can I work in?",
@@ -125,7 +125,7 @@ function AppDownloadButton({ store, children }: { store: string; children: React
 
 export default function BecomeProviderPage() {
     const router = useRouter();
-    const [selectedCity, setSelectedCity] = useState("Paris");
+    const [selectedCity, setSelectedCity] = useState("Dublin");
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [accountType, setAccountType] = useState<"individual" | "contractor">("individual");
@@ -406,7 +406,7 @@ export default function BecomeProviderPage() {
                     <blockquote className="text-xl text-gray-700 italic mb-4">
                         &ldquo;I love Anyjob! I was able to get out of debt, tackle bills, provide for my family, and still have enough room to save for future goals.&rdquo;
                     </blockquote>
-                    <p className="font-semibold text-gray-900">Karsheem W., Paris, France</p>
+                    <p className="font-semibold text-gray-900">Karsheem W., Dublin, Ireland</p>
                 </div>
             </section>
 

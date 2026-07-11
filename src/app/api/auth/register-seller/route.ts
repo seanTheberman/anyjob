@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if SIRET already exists (if provided)
+    // Check if tax ID already exists (if provided)
     if (siret) {
       const { data: existingSiret } = await supabase
         .from('sellers')
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
       if (existingSiret) {
         return NextResponse.json(
-          { error: "This SIRET number is already registered" },
+          { error: "This tax ID is already registered" },
           { status: 409 }
         );
       }

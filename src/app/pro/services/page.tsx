@@ -4,6 +4,7 @@ import { CATEGORIES } from "@/lib/categories";
 import {
   ArrowLeft,
   ArrowRight,
+  Camera,
   Check,
   CircleDollarSign,
   Eye,
@@ -19,6 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
 
 type GigPackage = {
   tier: "starter" | "standard" | "premium";
@@ -199,6 +201,7 @@ export default function ServicesPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState<GigStepId>("overview");
+  const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
 
   const activeServices = useMemo(() => services.filter((service) => service.is_active !== false), [services]);
   const inactiveServices = useMemo(() => services.filter((service) => service.is_active === false), [services]);
@@ -717,18 +720,42 @@ export default function ServicesPage() {
                         <div className="border-t border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">{file.title || "Cloudinary image"}</div>
                       </div>
                     ) : (
-                      <label className="flex h-44 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white text-center transition hover:border-blue-300 hover:bg-blue-50">
-                        {saving ? <Loader2 className="mb-2 h-6 w-6 animate-spin text-slate-400" /> : <ImagePlus className="mb-2 h-6 w-6 text-slate-400" />}
-                        <span className="text-sm font-black text-slate-700">Upload image</span>
-                        <span className="mt-1 text-xs font-semibold text-slate-400">JPG, PNG, WebP, GIF · max 10MB</span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,image/gif"
-                          className="sr-only"
-                          disabled={saving}
-                          onChange={(event) => void handleGigImageUpload(index, event.target.files)}
-                        />
-                      </label>
+                      <div className="grid gap-2">
+                        <label className="flex h-36 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white text-center transition hover:border-blue-300 hover:bg-blue-50">
+                          {saving ? <Loader2 className="mb-2 h-6 w-6 animate-spin text-slate-400" /> : <ImagePlus className="mb-2 h-6 w-6 text-slate-400" />}
+                          <span className="text-sm font-black text-slate-700">Upload image</span>
+                          <span className="mt-1 text-xs font-semibold text-slate-400">JPG, PNG, WebP, GIF · max 10MB</span>
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/gif"
+                            className="sr-only"
+                            disabled={saving}
+                            onChange={(event) => void handleGigImageUpload(index, event.target.files)}
+                          />
+                        </label>
+	                        {isMobileCamera ? (
+	                          <label
+	                            onClick={(event) => {
+	                              event.preventDefault();
+	                              if (saving || requestingCameraPermission) return;
+	                              const input = event.currentTarget.querySelector("input") as HTMLInputElement | null;
+	                              void requestCameraCapture("environment", () => input?.click());
+	                            }}
+	                            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+	                          >
+	                            <Camera className="h-4 w-4" />
+	                            {requestingCameraPermission ? "Allow camera..." : "Use camera"}
+	                            <input
+	                              type="file"
+	                              accept="image/*"
+	                              capture="environment"
+	                              className="sr-only"
+	                              disabled={saving}
+	                              onChange={(event) => void handleGigImageUpload(index, event.target.files)}
+	                            />
+	                          </label>
+	                        ) : null}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -751,20 +778,45 @@ export default function ServicesPage() {
                       <div className="border-t border-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">{draft.videoFile.title || "Cloudinary video"}</div>
                     </div>
                   ) : (
-                    <label className="flex h-48 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white text-center transition hover:border-blue-300 hover:bg-blue-50">
-                      {saving ? <Loader2 className="mb-2 h-6 w-6 animate-spin text-slate-400" /> : <Video className="mb-2 h-6 w-6 text-slate-400" />}
-                      <span className="text-sm font-black text-slate-700">Upload one video</span>
-                      <span className="mt-1 text-xs font-semibold text-slate-400">MP4, WebM, MOV · max 100MB</span>
-                      <input
-                        type="file"
-                        accept="video/mp4,video/webm,video/quicktime"
-                        className="sr-only"
-                        disabled={saving}
-                        onChange={(event) => void handleGigVideoUpload(event.target.files)}
-                      />
-                    </label>
-                  )}
-                </div>
+                    <div className="grid gap-2">
+                      <label className="flex h-40 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-300 bg-white text-center transition hover:border-blue-300 hover:bg-blue-50">
+                        {saving ? <Loader2 className="mb-2 h-6 w-6 animate-spin text-slate-400" /> : <Video className="mb-2 h-6 w-6 text-slate-400" />}
+                        <span className="text-sm font-black text-slate-700">Upload one video</span>
+                        <span className="mt-1 text-xs font-semibold text-slate-400">MP4, WebM, MOV · max 100MB</span>
+                        <input
+                          type="file"
+                          accept="video/mp4,video/webm,video/quicktime"
+                          className="sr-only"
+                          disabled={saving}
+                          onChange={(event) => void handleGigVideoUpload(event.target.files)}
+                        />
+                      </label>
+	                      {isMobileCamera ? (
+	                        <label
+	                          onClick={(event) => {
+	                            event.preventDefault();
+	                            if (saving || requestingCameraPermission) return;
+	                            const input = event.currentTarget.querySelector("input") as HTMLInputElement | null;
+	                            void requestCameraCapture("user", () => input?.click());
+	                          }}
+	                          className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-100"
+	                        >
+	                          <Camera className="h-4 w-4" />
+	                          {requestingCameraPermission ? "Allow camera..." : "Record with camera"}
+	                          <input
+	                            type="file"
+	                            accept="video/*"
+	                            capture="user"
+	                            className="sr-only"
+	                            disabled={saving}
+	                            onChange={(event) => void handleGigVideoUpload(event.target.files)}
+	                          />
+	                        </label>
+	                      ) : null}
+	                    </div>
+	                  )}
+	                  {cameraError ? <p className="mt-2 text-xs font-bold text-red-600">{cameraError}</p> : null}
+	                </div>
               </div>
               <p className="mt-3 text-xs font-semibold text-slate-500">Files upload to Cloudinary through AnyJob. Each gig can carry up to 4 images and 1 video. The first image is used as the marketplace thumbnail.</p>
             </div> : null}

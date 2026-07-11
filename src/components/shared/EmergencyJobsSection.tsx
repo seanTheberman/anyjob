@@ -3,8 +3,8 @@
 import Image from "next/image";
 import { PhoneCall, Zap } from "lucide-react";
 
-const ANYJOB_EMERGENCY_PHONE = "+448001234567";
-const ANYJOB_EMERGENCY_DISPLAY = "+44 800 123 4567";
+const ANYJOB_EMERGENCY_PHONE = "+35318001234";
+const ANYJOB_EMERGENCY_DISPLAY = "+353 1 800 1234";
 
 const EMERGENCY_SERVICES = [
   {

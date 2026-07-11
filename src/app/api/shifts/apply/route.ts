@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { getProviderApplicationEntitlement } from "@/lib/plans/provider-plan-server";
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -67,6 +68,29 @@ export async function POST(request: NextRequest) {
 
     if (!workerNiches.includes(String(post.niche))) {
       return NextResponse.json({ error: "This shift does not match your enabled worker niches" }, { status: 403 });
+    }
+
+    const { data: existingApplication } = await admin
+      .from("shift_applications")
+      .select("id")
+      .eq("business_work_post_id", post.id)
+      .eq("provider_user_id", user.id)
+      .maybeSingle();
+
+    if (!existingApplication) {
+      const entitlement = await getProviderApplicationEntitlement(admin, user.id);
+      if (!entitlement.allowed) {
+        return NextResponse.json(
+          {
+            error: entitlement.message,
+            upgradeRequired: true,
+            pricingUrl: "/pricing",
+            plan: entitlement.plan,
+            usage: entitlement.usage,
+          },
+          { status: 402 }
+        );
+      }
     }
 
     const { data: application, error: applyError } = await admin

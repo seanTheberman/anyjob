@@ -1,5 +1,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
+import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
 import { NextRequest, NextResponse } from "next/server";
 
 function coarsePostalCode(postalCode?: string | null) {
@@ -19,6 +21,12 @@ function distanceKm(fromLat?: number | null, fromLng?: number | null, toLat?: nu
       Math.sin(lngDelta / 2) *
       Math.sin(lngDelta / 2);
   return Math.round(radiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+}
+
+function averageRating(rows: Array<{ rating?: number | null }>) {
+  const values = rows.map((row) => Number(row.rating || 0)).filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return 0;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
 }
 
 // GET: Fetch available jobs for providers to browse and bid on
@@ -61,9 +69,39 @@ export async function GET(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle();
 
+    const buyerIds = Array.from(new Set((jobs || []).map((job) => String(job.user_id || "")).filter(Boolean)));
+    const buyerKycByUser = new Map(
+      await Promise.all(
+        buyerIds.map(async (buyerId) => {
+          const status = await getBuyerKycStatus(admin, buyerId);
+          return [buyerId, status] as const;
+        })
+      )
+    );
+    const visibleJobs = (jobs || []).filter((job) => buyerKycByUser.get(String(job.user_id || ""))?.isComplete);
+    const buyerTrustByUser = await getBuyerTrustForUsers(admin, buyerIds);
+    const buyerRatingsResult = buyerIds.length
+      ? await admin
+          .from("eloo_reviews")
+          .select("reviewee_id,rating")
+          .in("reviewee_id", buyerIds)
+          .eq("review_type", "seller_to_buyer")
+          .eq("is_public", true)
+      : { data: [], error: null };
+    const buyerRatingRows = buyerRatingsResult.error ? [] : buyerRatingsResult.data || [];
+    const buyerRatingsByUser = new Map<string, { rating: number; reviewCount: number }>();
+    for (const buyerId of buyerIds) {
+      const rows = ((buyerRatingRows || []) as Array<{ reviewee_id?: string | null; rating?: number | null }>)
+        .filter((row) => row.reviewee_id === buyerId);
+      buyerRatingsByUser.set(buyerId, {
+        rating: averageRating(rows),
+        reviewCount: rows.length,
+      });
+    }
+
     // For each job, get the bid count and whether current provider already bid
     const jobsWithBidInfo = await Promise.all(
-      (jobs || []).map(async (job) => {
+      visibleJobs.map(async (job) => {
         const { count: bidCount } = await supabase
           .from("bids")
           .select("*", { count: "exact", head: true })
@@ -91,6 +129,8 @@ export async function GET(request: NextRequest) {
         delete safeJob.latitude;
         delete safeJob.longitude;
         delete safeJob.postal_code;
+        delete safeJob.user_id;
+        const buyerRating = buyerRatingsByUser.get(String(job.user_id || ""));
 
         return {
           ...safeJob,
@@ -112,6 +152,9 @@ export async function GET(request: NextRequest) {
             id: image.id,
             image_url: image.image_url,
           })),
+          buyer_rating: buyerRating?.reviewCount ? buyerRating.rating : undefined,
+          buyer_review_count: buyerRating?.reviewCount || undefined,
+          buyerTrust: buyerTrustByUser.get(String(job.user_id || "")) || null,
         };
       })
     );

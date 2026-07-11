@@ -10,6 +10,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const expirationResult = await notifyJobEvent({
+    action: "process_job_expirations",
+  });
+
+  if (!expirationResult.ok) {
+    return NextResponse.json({ error: expirationResult.error || "Job expiration job failed" }, { status: 502 });
+  }
+
   const result = await notifyJobEvent({
     action: "process_live_job_reminders",
   });
@@ -18,5 +26,5 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: result.error || "Reminder job failed" }, { status: 502 });
   }
 
-  return NextResponse.json({ ok: true, result: result.body });
+  return NextResponse.json({ ok: true, expirations: expirationResult.body, reminders: result.body });
 }

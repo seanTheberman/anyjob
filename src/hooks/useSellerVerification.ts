@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 interface SellerVerificationStatus {
   isVerified: boolean;
@@ -27,48 +26,21 @@ let cachedVerificationStatus: SellerVerificationStatus | null = null;
 let verificationPromise: Promise<SellerVerificationStatus | null> | null = null;
 
 async function fetchSellerVerificationStatus(): Promise<SellerVerificationStatus | null> {
-  const supabase = createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  const response = await fetch("/api/provider/verification", { cache: "no-store" });
+  if (response.status === 401) {
     return null;
   }
-
-  const { data: seller, error: sellerError } = await supabase
-    .from("sellers")
-    .select("status, email_verified, phone_verified, id_document_url, selfie_video_url, insurance_document_url, background_check_status")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (sellerError || !seller) {
-    return {
-      ...DEFAULT_LOCKED_STATUS,
-      emailVerified: Boolean(user.email_confirmed_at),
-    };
+  if (!response.ok) {
+    throw new Error("Failed to load provider verification status");
   }
 
-  const documentsUploaded = Boolean(
-    seller.id_document_url &&
-    seller.selfie_video_url &&
-    seller.insurance_document_url
-  );
-  const kycComplete = Boolean(seller.email_verified && seller.phone_verified && documentsUploaded);
-
-  return {
-    isVerified: seller.status === "approved",
-    status: seller.status,
-    kycComplete,
-    emailVerified: seller.email_verified || false,
-    phoneVerified: seller.phone_verified || false,
-    documentsUploaded,
-    backgroundCheckStatus: seller.background_check_status,
-  };
+  const payload = await response.json();
+  return payload.verification ?? DEFAULT_LOCKED_STATUS;
 }
 
 export function useSellerVerification() {
   const [verificationStatus, setVerificationStatus] = useState<SellerVerificationStatus | null>(
-    cachedVerificationStatus ?? DEFAULT_LOCKED_STATUS
+    cachedVerificationStatus
   );
   const [loading, setLoading] = useState(!cachedVerificationStatus);
   const [error, setError] = useState<string | null>(null);

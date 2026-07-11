@@ -10,14 +10,14 @@ function isBusinessAction(value: unknown): value is BusinessAction {
   return typeof value === "string" && allowedActions.includes(value as BusinessAction);
 }
 
-async function isAdminRequest() {
+async function getAdminReviewerId() {
   const supabase = await createServerSupabaseClient();
   const {
     data: { user },
     error,
   } = await supabase.auth.getUser();
 
-  if (error || !user) return false;
+  if (error || !user) return null;
 
   const client = supabase as never as {
     from: (table: string) => {
@@ -34,13 +34,13 @@ async function isAdminRequest() {
     client.from("user_profiles").select("role").eq("id", user.id).single(),
   ]);
 
-  return elooProfile.data?.role === "admin" || userProfile.data?.role === "admin";
+  return elooProfile.data?.role === "admin" || userProfile.data?.role === "admin" ? user.id : null;
 }
 
 export async function POST(request: Request) {
   try {
-    const isAdmin = await isAdminRequest();
-    if (!isAdmin) {
+    const reviewerId = await getAdminReviewerId();
+    if (!reviewerId) {
       return NextResponse.json({ error: "Admin authorization required" }, { status: 403 });
     }
 
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
     const businessUpdate = {
       status,
       reviewed_at: action === "request_docs" ? null : now,
-      reviewed_by: null,
+      reviewed_by: action === "request_docs" ? null : reviewerId,
       rejection_reason: action === "approve" ? null : reason || (action === "request_docs" ? "Additional business documents requested" : "Rejected by admin"),
       updated_at: now,
     };

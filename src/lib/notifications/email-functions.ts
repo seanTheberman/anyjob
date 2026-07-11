@@ -43,9 +43,23 @@ export async function invokeEmailFunction({ functionName, payload, useServiceRol
   }
 }
 
+const notificationFunctionByAction: Record<string, string> = {
+  job_marked_live: "job-live-notifications",
+  job_payment_accepted: "job-payment-notifications",
+  job_status_changed: "job-payment-notifications",
+  provider_terms_accepted: "legal-notifications",
+  buyer_kyc_pending: "kyc-notifications",
+  provider_kyc_docs_requested: "kyc-notifications",
+  process_live_job_reminders: "job-reminder-notifications",
+  provider_plan_subscription_success: "billing-notifications",
+  process_job_expirations: "job-expiry-notifications",
+  process_unread_alerts: "unread-alert-notifications",
+};
+
 export async function notifyJobEvent(payload: Record<string, unknown>) {
+  const action = typeof payload.action === "string" ? payload.action : "";
   const result = await invokeEmailFunction({
-    functionName: "job-notifications",
+    functionName: notificationFunctionByAction[action] || "job-notifications",
     payload: {
       tenantSlug: "default",
       ...payload,

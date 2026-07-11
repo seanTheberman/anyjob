@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if SIRET already exists (if provided)
+    // Check if tax ID already exists (if provided)
     if (siret) {
       const { data: existingSiret, error: siretCheckError } = await supabase
         .from('eloo_tasker_registrations')
@@ -74,14 +74,14 @@ export async function POST(request: NextRequest) {
 
       if (siretCheckError && siretCheckError.code !== 'PGRST116') {
         return NextResponse.json(
-          { error: "Erreur lors de la vérification du SIRET" },
+          { error: "Error while checking the tax ID" },
           { status: 500 }
         );
       }
 
       if (existingSiret) {
         return NextResponse.json(
-          { error: "Un compte avec ce numéro SIRET existe déjà" },
+          { error: "An account with this tax ID already exists" },
           { status: 409 }
         );
       }

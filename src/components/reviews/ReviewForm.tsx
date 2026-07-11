@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Star, Send, X } from "lucide-react";
+import { Star, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ReviewFormProps {
@@ -28,6 +27,45 @@ export interface ReviewData {
   punctuality_rating?: number;
   would_hire_again?: boolean;
   would_work_with_again?: boolean;
+}
+
+function StarRating({
+  value,
+  onChange,
+  hoveredRating,
+  setHoveredRating,
+  size = "normal",
+}: {
+  value: number;
+  onChange: (rating: number) => void;
+  hoveredRating: number;
+  setHoveredRating: (rating: number) => void;
+  size?: "small" | "normal";
+}) {
+  const starSize = size === "small" ? "w-4 h-4" : "w-6 h-6";
+
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          aria-label={`Set rating to ${star} star${star === 1 ? "" : "s"}`}
+          title={`${star} star${star === 1 ? "" : "s"}`}
+          className={`${starSize} transition-colors ${
+            star <= (hoveredRating || value)
+              ? "text-yellow-400 fill-yellow-400"
+              : "text-gray-300 fill-gray-300"
+          }`}
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHoveredRating(star)}
+          onMouseLeave={() => setHoveredRating(0)}
+        >
+          <Star className={starSize} />
+        </button>
+      ))}
+    </div>
+  );
 }
 
 export function ReviewForm({ 
@@ -66,7 +104,7 @@ export function ReviewForm({
         communication_rating: communicationRating || undefined,
         professionalism_rating: professionalismRating || undefined,
         quality_rating: qualityRating || undefined,
-        punctualityRating: punctualityRating || undefined,
+        punctuality_rating: punctualityRating || undefined,
         would_hire_again: wouldHireAgain,
       }),
       ...(!isBuyerReviewingSeller && {
@@ -75,39 +113,6 @@ export function ReviewForm({
     };
 
     onSubmit(reviewData);
-  };
-
-  const StarRating = ({ 
-    value, 
-    onChange, 
-    size = "normal" 
-  }: { 
-    value: number; 
-    onChange: (rating: number) => void;
-    size?: "small" | "normal";
-  }) => {
-    const starSize = size === "small" ? "w-4 h-4" : "w-6 h-6";
-    
-    return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            type="button"
-            className={`${starSize} transition-colors ${
-              star <= (hoveredRating || value)
-                ? "text-yellow-400 fill-yellow-400"
-                : "text-gray-300 fill-gray-300"
-            }`}
-            onClick={() => onChange(star)}
-            onMouseEnter={() => setHoveredRating(star)}
-            onMouseLeave={() => setHoveredRating(0)}
-          >
-            <Star className={starSize} />
-          </button>
-        ))}
-      </div>
-    );
   };
 
   const resetForm = () => {
@@ -142,7 +147,12 @@ export function ReviewForm({
             <Label className="text-base font-medium">
               Overall Rating *
             </Label>
-            <StarRating value={rating} onChange={setRating} />
+            <StarRating
+              value={rating}
+              onChange={setRating}
+              hoveredRating={hoveredRating}
+              setHoveredRating={setHoveredRating}
+            />
             {rating > 0 && (
               <p className="text-sm text-gray-600">
                 {rating === 5 && "Excellent"}
@@ -191,6 +201,8 @@ export function ReviewForm({
                   <StarRating 
                     value={communicationRating} 
                     onChange={setCommunicationRating} 
+                    hoveredRating={hoveredRating}
+                    setHoveredRating={setHoveredRating}
                     size="small" 
                   />
                 </div>
@@ -200,6 +212,8 @@ export function ReviewForm({
                   <StarRating 
                     value={professionalismRating} 
                     onChange={setProfessionalismRating} 
+                    hoveredRating={hoveredRating}
+                    setHoveredRating={setHoveredRating}
                     size="small" 
                   />
                 </div>
@@ -209,6 +223,8 @@ export function ReviewForm({
                   <StarRating 
                     value={qualityRating} 
                     onChange={setQualityRating} 
+                    hoveredRating={hoveredRating}
+                    setHoveredRating={setHoveredRating}
                     size="small" 
                   />
                 </div>
@@ -218,6 +234,8 @@ export function ReviewForm({
                   <StarRating 
                     value={punctualityRating} 
                     onChange={setPunctualityRating} 
+                    hoveredRating={hoveredRating}
+                    setHoveredRating={setHoveredRating}
                     size="small" 
                   />
                 </div>

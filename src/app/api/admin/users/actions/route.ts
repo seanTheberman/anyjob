@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { adminForbidden, getAdminApiUser, logAdminAction } from "@/lib/auth/admin-api";
 
-const actions = ["message", "watchlist", "block", "unblock", "open"] as const;
+const actions = ["message", "watchlist", "suspend", "block", "unsuspend", "unblock", "open"] as const;
 type UserAction = (typeof actions)[number];
 
 function isUserAction(value: unknown): value is UserAction {
@@ -31,13 +31,16 @@ export async function POST(request: Request) {
     const supabase = createAdminSupabaseClient() as never as {
       from(table: string): {
         upsert(values: Record<string, unknown>[], options?: { onConflict?: string }): Promise<{ error: { message: string } | null }>;
+        update(values: Record<string, unknown>): {
+          in(column: string, values: string[]): Promise<{ error: { message: string } | null }>;
+        };
       };
     };
     const now = new Date().toISOString();
     let status: "active" | "watchlisted" | "blocked" | null = null;
-    if (action === "block") status = "blocked";
+    if (action === "block" || action === "suspend") status = "blocked";
     if (action === "watchlist") status = "watchlisted";
-    if (action === "unblock") status = "active";
+    if (action === "unblock" || action === "unsuspend") status = "active";
 
     if (status) {
       const rows = userIds.map((userId) => ({
@@ -50,7 +53,22 @@ export async function POST(request: Request) {
       }));
 
       const { error } = await supabase.from("admin_user_flags").upsert(rows, { onConflict: "user_id" });
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      const flagWriteSkipped = error && /admin_user_flags|relation .*does not exist|schema cache/i.test(error.message);
+      if (error && !flagWriteSkipped) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      if (status === "blocked" || status === "active") {
+        const isActive = status === "active";
+        const updates = [
+          supabase.from("user_profiles").update({ is_active: isActive, updated_at: now }).in("id", userIds),
+          supabase.from("eloo_profiles").update({ is_active: isActive, updated_at: now }).in("id", userIds),
+          supabase.from("buyers").update({ is_active: isActive, updated_at: now }).in("id", userIds),
+        ];
+        const results = await Promise.allSettled(updates);
+        const hardError = results.find((result) => result.status === "fulfilled" && result.value.error && !/column .*is_active|schema cache/i.test(result.value.error.message));
+        if (hardError?.status === "fulfilled") {
+          return NextResponse.json({ error: hardError.value.error?.message || "Failed to update user active state" }, { status: 500 });
+        }
+      }
     }
 
     await logAdminAction({

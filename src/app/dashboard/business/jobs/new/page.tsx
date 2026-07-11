@@ -267,7 +267,7 @@ export default function NewBusinessPostPage() {
               <input name="city" value={formData.city} onChange={(e) => updateField("city", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" required />
             </label>
             <label className="block">
-              <span className="text-sm font-semibold text-gray-700">Postal code</span>
+              <span className="text-sm font-semibold text-gray-700">Eircode</span>
               <input name="postalCode" value={formData.postalCode} onChange={(e) => updateField("postalCode", e.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
             </label>
           </div>

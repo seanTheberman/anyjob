@@ -30,6 +30,18 @@ interface Job {
   work_images?: Array<{ id: string; image_url: string }>;
   custom_tags?: string[] | null;
   distance_km?: number | null;
+  buyerTrust?: {
+    jobsPosted: number;
+    hires: number;
+    hireRate: number;
+    paidJobs: number;
+    totalSpent: number;
+    totalSpentLabel: string;
+    paymentStatus: "verified" | "unverified";
+    isNewClient: boolean;
+    kycVerified: boolean;
+    badges: Array<{ label: string; tone: "green" | "blue" | "amber" | "purple" | "slate" | "red"; source: string }>;
+  } | null;
 }
 
 type WorkBoardMode = "day" | "shift";
@@ -83,6 +95,29 @@ const categoryColors: Record<string, string> = {
   hiver: "bg-blue-100 text-blue-700",
   custom: "bg-red-100 text-red-700",
 };
+
+const trustToneClass: Record<string, string> = {
+  green: "bg-emerald-50 text-emerald-700 ring-emerald-100",
+  blue: "bg-blue-50 text-blue-700 ring-blue-100",
+  amber: "bg-amber-50 text-amber-700 ring-amber-100",
+  purple: "bg-purple-50 text-purple-700 ring-purple-100",
+  red: "bg-red-50 text-red-700 ring-red-100",
+  slate: "bg-slate-100 text-slate-700 ring-slate-200",
+};
+
+function BuyerTrustBadges({ trust, compact = false }: { trust?: Job["buyerTrust"]; compact?: boolean }) {
+  const badges = trust?.badges || [];
+  if (!badges.length) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {badges.slice(0, compact ? 3 : 6).map((badge) => (
+        <span key={badge.label} className={`rounded-full px-2.5 py-1 text-[11px] font-black ring-1 ${trustToneClass[badge.tone] || trustToneClass.slate}`}>
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 function hasMeaningfulText(value?: string | null) {
   return /[\p{L}\p{N}]/u.test(value || "");
@@ -421,6 +456,9 @@ export default function BrowseJobsPage() {
                         </span>
                       ) : null}
                     </div>
+                    <div className="mt-3">
+                      <BuyerTrustBadges trust={job.buyerTrust} compact />
+                    </div>
                     {job.my_bid ? (
                       <div className="mt-3 rounded-lg bg-white px-3 py-2 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
                         Your offer: {formatMoney(Number(job.my_bid.amount))} · {job.my_bid.status}
@@ -441,6 +479,9 @@ export default function BrowseJobsPage() {
                         {categoryNames[selectedJob.category_slug] || selectedJob.category_slug}
                       </span>
                       <span className="text-sm font-semibold text-slate-500">Posted {new Date(selectedJob.submitted_at).toLocaleDateString()}</span>
+                    </div>
+                    <div className="mt-4">
+                      <BuyerTrustBadges trust={selectedJob.buyerTrust} />
                     </div>
                     <h2 className="mt-6 text-4xl font-black leading-tight tracking-tight text-blue-950">{jobTitle(selectedJob)}</h2>
 
@@ -555,6 +596,17 @@ export default function BrowseJobsPage() {
                         <p>{selectedJob.work_image_count} photo{selectedJob.work_image_count === 1 ? "" : "s"} attached.</p>
                       </div>
                     </div>
+
+                    {selectedJob.buyerTrust ? (
+                      <div className="rounded-lg border border-slate-200 p-4">
+                        <p className="text-sm font-black text-blue-950">Buyer trust</p>
+                        <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+                          <p>{selectedJob.buyerTrust.jobsPosted} posted · {selectedJob.buyerTrust.hires} hired · {selectedJob.buyerTrust.hireRate}% hire rate</p>
+                          <p>{selectedJob.buyerTrust.isNewClient ? "New client" : `${selectedJob.buyerTrust.totalSpentLabel} spent on AnyJob`}</p>
+                          <p>{selectedJob.buyerTrust.paymentStatus === "verified" ? "Payment verified" : "Payment unverified"}</p>
+                        </div>
+                      </div>
+                    ) : null}
                   </aside>
                 </div>
               </section>

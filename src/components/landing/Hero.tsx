@@ -25,7 +25,7 @@ export function Hero() {
         }
     }, []);
 
-    // Detect language based on geolocation (timezone)
+    // Detect language from the browser, while launch geography stays Ireland-only.
     useEffect(() => {
         if (isClient) {
             const savedLang = localStorage.getItem('user_language');
@@ -36,21 +36,8 @@ export function Hero() {
 
             const detectLanguage = () => {
                 try {
-                    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                    
-                    if (timezone === 'Europe/Paris' || timezone === 'Europe/Monaco') {
-                        setSelectedLanguage('fr');
-                        return;
-                    }
-                    
                     const browserLang = navigator.language.split('-')[0];
-                    const navCountry = navigator.language.split('-')[1]?.toUpperCase();
-                    
-                    if (navCountry === 'FR' || browserLang === 'fr') {
-                        setSelectedLanguage('fr');
-                    } else {
-                        setSelectedLanguage(browserLang || 'en');
-                    }
+                    setSelectedLanguage(browserLang || 'en');
                 } catch (error) {
                     console.warn('Error detecting language:', error);
                     setSelectedLanguage('en');
@@ -84,7 +71,7 @@ export function Hero() {
             ja: "人気:",
             hi: "लोकप्रिय:"
         };
-        return popularTexts[selectedLanguage] || popularTexts.fr;
+        return popularTexts[selectedLanguage] || popularTexts.en;
     };
 
     const getPopularCategories = () => {

@@ -1,4 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { NextRequest, NextResponse } from "next/server";
 
 async function isConversationUnlocked(
@@ -67,6 +69,18 @@ export async function GET(request: NextRequest) {
         .eq("conversation_id", conversationId)
         .neq("sender_id", user.id)
         .eq("is_read", false);
+
+      try {
+        await createAdminSupabaseClient()
+          .from("eloo_notifications")
+          .update({ is_read: true })
+          .eq("user_id", user.id)
+          .eq("type", "new_message")
+          .eq("is_read", false)
+          .contains("data", { conversation_id: conversationId });
+      } catch (notificationError) {
+        console.error("Failed to mark message notifications as read:", notificationError);
+      }
 
       return NextResponse.json({ messages, conversation });
     }
@@ -203,6 +217,49 @@ export async function POST(request: NextRequest) {
       .from("eloo_conversations")
       .update({ last_message_at: new Date().toISOString() })
       .eq("id", conversation_id);
+
+    const recipientUserId = conversation.client_id === user.id ? conversation.provider_id : conversation.client_id;
+
+    if (recipientUserId) {
+      try {
+        const admin = createAdminSupabaseClient();
+        const { data: senderProfile } = await admin
+          .from("eloo_profiles")
+          .select("first_name,last_name,role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        const senderName = [senderProfile?.first_name, senderProfile?.last_name].filter(Boolean).join(" ") || "Someone";
+        const senderRole = String(senderProfile?.role || "").toLowerCase();
+        const recipientMessagesPath = senderRole === "provider" || senderRole === "seller" || senderRole === "contractor" ? "/dashboard/mail" : "/pro/messages";
+
+        await admin.from("eloo_notifications").insert({
+          user_id: recipientUserId,
+          title: "New message",
+          message: `${senderName} sent you a message.`,
+          type: "new_message",
+          action_url: recipientMessagesPath,
+          is_read: false,
+          data: {
+            conversation_id,
+            message_id: message.id,
+            sender_id: user.id,
+          },
+        });
+
+        const emailResult = await notifyJobEvent({
+          action: "process_unread_alerts",
+          userId: recipientUserId,
+          limit: 100,
+        });
+
+        if (!emailResult.ok) {
+          console.error("Unread message email failed:", emailResult);
+        }
+      } catch (notificationError) {
+        console.error("Unread message notification failed:", notificationError);
+      }
+    }
 
     return NextResponse.json({ message }, { status: 201 });
   } catch (error) {

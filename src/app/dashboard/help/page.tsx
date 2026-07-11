@@ -109,10 +109,10 @@ export default function HelpCenterPage() {
               </div>
             </div>
             <a
-              href="tel:+448001234567"
+              href="tel:+35318001234"
               className="block w-full py-2.5 bg-gray-200 text-center text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors"
             >
-              +44 800 123 4567
+              +353 1 800 1234
             </a>
           </div>
         </div>

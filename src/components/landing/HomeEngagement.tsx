@@ -104,7 +104,7 @@ const PATHS: Path[] = [
         ],
         preview: {
             title: "Weekend hospitality cover",
-            meta: "Saturday · Paris · 4 workers",
+            meta: "Saturday · Dublin · 4 workers",
             price: "€130/day",
             status: "Applications open",
         },
@@ -164,7 +164,7 @@ const PATHS: Path[] = [
         ],
         preview: {
             title: "Furniture assembly",
-            meta: "Today · Lyon · 2 hours",
+            meta: "Today · Cork · 2 hours",
             price: "€85 bid",
             status: "New customer request",
         },

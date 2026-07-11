@@ -1,36 +1,10 @@
 import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
-import { getStripe } from "@/lib/stripe/server";
+import { acceptBidAndUnlockChat } from "@/lib/bids/accept-bid";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe/server";
+import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
-
-async function hasBuyerKycForQuoteAcceptance(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  userId: string
-) {
-  const { data: files } = await supabase
-    .from("user_images")
-    .select("image_type")
-    .eq("user_id", userId)
-    .in("image_type", ["id_document", "selfie_video"]);
-
-  const fileTypes = new Set((files || []).map((file) => file.image_type));
-  if (fileTypes.has("id_document") && fileTypes.has("selfie_video")) {
-    return true;
-  }
-
-  const { data: buyer } = await supabase
-    .from("buyers")
-    .select("id_document_url,selfie_video_url,kyc_status")
-    .eq("id", userId)
-    .maybeSingle();
-
-  return Boolean(
-    buyer &&
-    buyer.id_document_url &&
-    buyer.selfie_video_url &&
-    buyer.kyc_status !== "rejected"
-  );
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,10 +41,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only pending bids can be accepted" }, { status: 409 });
     }
 
-    const buyerKycComplete = await hasBuyerKycForQuoteAcceptance(supabase, user.id);
-    if (!buyerKycComplete) {
+    const admin = createAdminSupabaseClient() as never as { from(table: string): any };
+    const buyerKyc = await getBuyerKycStatus(admin, user.id);
+    if (!buyerKyc.isComplete) {
       return NextResponse.json(
-        { error: "Complete buyer KYC before accepting a quote. Upload your ID document and selfie video from Account." },
+        {
+          error: `Complete buyer KYC before accepting a quote. Upload ${buyerKyc.missing.join(", ")} from Account.`,
+          missingKyc: buyerKyc.missing,
+        },
         { status: 403 }
       );
     }
@@ -81,6 +59,15 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = request.nextUrl.origin;
+    if (!getStripeSecretKey()) {
+      const inquiry = Array.isArray(bid.inquiry) ? bid.inquiry[0] : bid.inquiry;
+      await acceptBidAndUnlockChat(supabase, { ...bid, inquiry });
+      return NextResponse.json({
+        checkoutUrl: `${origin}/dashboard/requests/${bid.inquiry_id}?payment=success&mode=dummy`,
+        dummyPayment: true,
+      });
+    }
+
     const stripe = getStripe();
     const session = await stripe.checkout.sessions.create({
       mode: "payment",

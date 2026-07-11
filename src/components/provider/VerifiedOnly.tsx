@@ -14,6 +14,10 @@ interface VerifiedOnlyProps {
 export function VerifiedOnly({ children, fallback, showContent = false }: VerifiedOnlyProps) {
   const { verificationStatus, loading } = useSellerVerification();
 
+  if (loading && showContent) {
+    return <>{children}</>;
+  }
+
   if (loading) {
     return (
       <div className="animate-pulse">

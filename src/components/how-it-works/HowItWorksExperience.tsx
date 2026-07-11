@@ -100,7 +100,7 @@ const AUDIENCES: Audience[] = [
         ],
         highlights: ["Urgent cover", "Recurring shifts", "Verified profiles", "Role matching"],
         demoTitle: "Weekend hospitality cover",
-        demoMeta: "4 workers needed · Paris · Saturday",
+        demoMeta: "4 workers needed · Dublin · Saturday",
         demoPay: "€130 day rate",
     },
     {
@@ -146,7 +146,7 @@ const AUDIENCES: Audience[] = [
         ],
         highlights: ["Profile visibility", "Bid requests", "Verified badge", "Customer reviews"],
         demoTitle: "Furniture assembly request",
-        demoMeta: "Today · 2 hours · Lyon",
+        demoMeta: "Today · 2 hours · Cork",
         demoPay: "Total bid €85",
     },
     {

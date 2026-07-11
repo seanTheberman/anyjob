@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -42,6 +43,46 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Login failed" },
         { status: 401 }
+      );
+    }
+
+    const adminSupabase = createAdminSupabaseClient() as never as {
+      from(table: string): {
+        select(columns: string): {
+          eq(column: string, value: string): {
+            maybeSingle(): Promise<{ data: { status?: string } | null; error: unknown }>;
+          };
+        };
+      };
+    };
+    const [{ data: authProfile }, { data: appProfile }, { data: buyerProfile }, { data: adminFlag }] = await Promise.all([
+      supabase
+        .from("user_profiles")
+        .select("is_active")
+        .eq("id", authData.user.id)
+        .maybeSingle(),
+      supabase
+        .from("eloo_profiles")
+        .select("is_active")
+        .eq("id", authData.user.id)
+        .maybeSingle(),
+      supabase
+        .from("buyers")
+        .select("is_active")
+        .eq("id", authData.user.id)
+        .maybeSingle(),
+      adminSupabase
+        .from("admin_user_flags")
+        .select("status")
+        .eq("user_id", authData.user.id)
+        .maybeSingle(),
+    ]);
+
+    if (authProfile?.is_active === false || appProfile?.is_active === false || buyerProfile?.is_active === false || adminFlag?.status === "blocked") {
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: "This account is suspended. Please contact AnyJob support." },
+        { status: 403 }
       );
     }
 

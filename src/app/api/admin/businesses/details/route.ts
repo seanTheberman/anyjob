@@ -51,10 +51,11 @@ function parseDocuments(value: unknown, source: unknown) {
       return parsed.map((item, index) => {
         const record = item && typeof item === "object" ? item as AnyRecord : {};
         const upload = record.upload && typeof record.upload === "object" ? record.upload as AnyRecord : null;
+        const uploadUrl = upload?.dataUrl || upload?.url;
         return {
           id: String(record.type || index),
           primary: String(record.label || record.type || "Business document"),
-          secondary: record.link ? String(record.link) : upload?.fileName ? String(upload.fileName) : "Uploaded document",
+          secondary: record.link ? String(record.link) : uploadUrl ? String(uploadUrl) : upload?.fileName ? String(upload.fileName) : "Uploaded document",
           meta: record.required ? "Required" : "Recommended",
           status: record.link || upload ? "Added" : "Missing",
         };

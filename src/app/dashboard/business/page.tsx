@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Building2, CheckCircle2, Clock, CreditCard, FileText, Loader2, Plus, ShieldCheck, Users, WalletCards } from "lucide-react";
+import { Building2, CheckCircle2, Clock, CreditCard, FileText, Headphones, Loader2, Plus, ShieldCheck, Star, Users, WalletCards } from "lucide-react";
+import { ReviewForm, type ReviewData } from "@/components/reviews/ReviewForm";
 
 type BusinessProfile = {
   id: string;
@@ -52,6 +53,20 @@ type ShiftApplication = {
     total_charged: number;
     currency: string;
   } | null;
+  reviews?: Array<{
+    id: string;
+    review_type: "buyer_to_seller" | "seller_to_buyer";
+    reviewer_id: string;
+    reviewee_id: string;
+    rating: number;
+    title?: string | null;
+    comment?: string | null;
+  }>;
+};
+
+type ReviewTarget = {
+  application: ShiftApplication;
+  providerName: string;
 };
 
 function StatusPill({ value }: { value: string }) {
@@ -71,6 +86,8 @@ export default function BusinessDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<ReviewTarget | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
 
   useEffect(() => {
     load();
@@ -119,6 +136,35 @@ export default function BusinessDashboardPage() {
     }
   }
 
+  async function submitShiftReview(review: ReviewData) {
+    if (!reviewTarget) return;
+    setReviewLoading(true);
+    setActionError(null);
+    try {
+      const response = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...review,
+          shift_application_id: reviewTarget.application.id,
+          reviewee_id: reviewTarget.application.provider_user_id,
+          review_type: "buyer_to_seller",
+        }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setActionError(payload.error || "Unable to submit shift review");
+        return;
+      }
+      setReviewTarget(null);
+      await load();
+    } catch {
+      setActionError("Unable to submit shift review");
+    } finally {
+      setReviewLoading(false);
+    }
+  }
+
   const applicationsByPost = applications.reduce((map, application) => {
     const current = map.get(application.business_work_post_id) || [];
     current.push(application);
@@ -148,9 +194,18 @@ export default function BusinessDashboardPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-6xl">
         <div className="mb-6">
-          <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
             <h1 className="text-2xl font-bold text-gray-950">Business</h1>
             <p className="text-sm text-gray-600">For companies and organisations that need workers, scheduled cover, or business service support.</p>
+            </div>
+            <Link
+              href="/dashboard/assistance/new?type=business"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <Headphones className="h-4 w-4" />
+              Business support
+            </Link>
           </div>
         </div>
 
@@ -187,7 +242,7 @@ export default function BusinessDashboardPage() {
                 <h3 className="font-semibold text-amber-950">What you need to register</h3>
                 <div className="mt-3 grid gap-3 text-sm text-amber-900 md:grid-cols-2">
                   <p><span className="font-semibold">Business name:</span> the legal or trading name customers/workers should see.</p>
-                  <p><span className="font-semibold">Registration number:</span> company number, SIRET, VAT, tax, or local business identifier.</p>
+                  <p><span className="font-semibold">Registration number:</span> CRO number, company number, VAT, tax, or local business identifier.</p>
                   <p><span className="font-semibold">Business document:</span> registration certificate, tax proof, insurance, or other document admin can verify.</p>
                   <p><span className="font-semibold">Work details:</span> role, location, dates, times, rates, and what the worker must do.</p>
                 </div>
@@ -300,6 +355,7 @@ export default function BusinessDashboardPage() {
                           {postApplications.map((application) => {
                             const providerName = `${application.provider?.first_name || ""} ${application.provider?.last_name || ""}`.trim() || application.provider?.email || "Shift worker";
                             const paymentStatus = application.payment?.status;
+                            const providerReview = (application.reviews || []).find((review) => review.review_type === "buyer_to_seller");
                             return (
                               <div key={application.id} className="rounded-lg border border-gray-200 bg-gray-50 p-4">
                                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -318,6 +374,12 @@ export default function BusinessDashboardPage() {
                                     {application.payment ? (
                                       <p className="mt-1 text-sm font-medium text-gray-900">
                                         Business pays AnyJob: €{application.payment.total_charged} · Provider amount: €{application.payment.agreed_amount}
+                                      </p>
+                                    ) : null}
+                                    {providerReview ? (
+                                      <p className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-amber-700">
+                                        <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                                        Reviewed provider: {providerReview.rating}/5
                                       </p>
                                     ) : null}
                                   </div>
@@ -365,6 +427,16 @@ export default function BusinessDashboardPage() {
                                         Confirm work done
                                       </button>
                                     ) : null}
+                                    {application.status === "completed" && !providerReview ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setReviewTarget({ application, providerName })}
+                                        className="inline-flex items-center rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white hover:bg-amber-600"
+                                      >
+                                        <Star className="mr-2 h-4 w-4" />
+                                        Review provider
+                                      </button>
+                                    ) : null}
                                   </div>
                                 </div>
                               </div>
@@ -387,6 +459,14 @@ export default function BusinessDashboardPage() {
           </div>
         )}
       </div>
+      <ReviewForm
+        isOpen={Boolean(reviewTarget)}
+        onClose={() => setReviewTarget(null)}
+        onSubmit={submitShiftReview}
+        revieweeName={reviewTarget?.providerName || "provider"}
+        reviewType="buyer_to_seller"
+        loading={reviewLoading}
+      />
     </DashboardLayout>
   );
 }

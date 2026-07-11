@@ -10,6 +10,12 @@ export const dynamic = "force-dynamic";
 
 async function OverviewContent() {
   const overview = await getAdminOverview();
+  const controlLinks: Record<string, string> = {
+    "Live database reads": "/admin/reports",
+    "Visible admin routes": "/admin/users",
+    "Write controls": "/admin/history",
+    "Auth protection": "/admin/settings",
+  };
 
   return (
     <>
@@ -28,7 +34,7 @@ async function OverviewContent() {
             </Link>
           </div>
           {overview.riskQueue.length ? (
-            <AdminTable columns={["Priority", "Issue", "Subject", "Status"]} rows={overview.riskQueue} actionLabel="Review" />
+            <AdminTable columns={["Priority", "Issue", "Subject", "Status"]} rows={overview.riskQueue} rowHrefs={overview.riskQueueHrefs} actionLabel="Review" />
           ) : (
             <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
               No live trust or safety items need review.
@@ -44,14 +50,16 @@ async function OverviewContent() {
           <div className="mt-4 space-y-3">
             {controlSummary.map((item) => {
               const Icon = item.icon;
+              const href = controlLinks[item.label] || "/admin/settings";
               return (
-                <div key={item.label} className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
+                <Link key={item.label} href={href} className="group flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 p-3 transition hover:border-red-200 hover:bg-white hover:shadow-sm">
                   <Icon className="mt-0.5 h-4 w-4 text-slate-500" />
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-slate-900">{item.label}</p>
                     <p className="text-sm text-slate-600">{item.value}</p>
                   </div>
-                </div>
+                  <ArrowRight className="mt-0.5 h-4 w-4 text-red-500 opacity-0 transition-opacity group-hover:opacity-100" />
+                </Link>
               );
             })}
           </div>

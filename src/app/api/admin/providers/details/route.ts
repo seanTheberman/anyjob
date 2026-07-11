@@ -81,7 +81,7 @@ export async function GET(request: Request) {
     const providerId = searchParams.get("id") || "";
     if (!providerId) return NextResponse.json({ error: "Missing provider id" }, { status: 400 });
 
-    const [seller, profile, services, bookings, bids, reviews, conversations, badges] = await Promise.all([
+    const [seller, profile, services, bookings, bids, reviews, conversations, badges, kycImages] = await Promise.all([
       singleRow("sellers", "*", "id", providerId),
       singleRow("eloo_profiles", "*", "id", providerId),
       rows("eloo_provider_services", "id,title,description,hourly_rate,min_hours,max_radius_km,is_active,tags,created_at", "provider_id", providerId, 8),
@@ -90,10 +90,13 @@ export async function GET(request: Request) {
       rows("eloo_reviews", "id,rating,comment,created_at,reviewer_id,reviewee_id", "reviewee_id", providerId, 8),
       rows("eloo_conversations", "id,is_active,last_message_at,created_at", "provider_id", providerId, 8),
       rows("provider_badges", "id,badge_id,awarded_reason,awarded_at", "provider_id", providerId, 8),
+      rows("user_images", "id,image_url,image_type,title,created_at", "user_id", providerId, 20),
     ]);
 
     const merged = { ...(profile || {}), ...(seller || {}) };
-    const hasId = Boolean(seller?.id_document_url);
+    const idDocumentCount = kycImages.filter((image) => String(image.image_type || "") === "id_document").length;
+    const hasId = idDocumentCount >= 2;
+    const hasPartialId = Boolean(seller?.id_document_url || idDocumentCount > 0);
     const hasSelfie = Boolean(seller?.selfie_video_url);
     const hasInsurance = Boolean(seller?.insurance_document_url || seller?.insurance_status === "approved");
     const completedBookings = bookings.filter((booking) => String(booking.status || "").toLowerCase() === "completed");
@@ -132,7 +135,7 @@ export async function GET(request: Request) {
         profileVerified: profile?.is_verified === true ? "Verified" : "Not verified",
         emailVerified: seller?.email_verified === true ? "Verified" : "Not verified",
         phoneVerified: seller?.phone_verified === true ? "Verified" : "Not verified",
-        idDocument: hasId ? "Added" : "Missing",
+        idDocument: hasId ? "Front and back added" : hasPartialId ? "Only one side added" : "Missing",
         selfieVideo: hasSelfie ? "Added" : "Missing",
         insurance: hasInsurance ? String(seller?.insurance_status || "Added") : "Missing",
         backgroundCheck: String(seller?.background_check_status || "Not added"),

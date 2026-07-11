@@ -1,8 +1,15 @@
 import "server-only";
 
 import { revalidatePath } from "next/cache";
+import { v2 as cloudinary } from "cloudinary";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+
+cloudinary.config({
+  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export type BlogPost = {
   id: string;
@@ -61,6 +68,39 @@ function rowToPost(row: BlogRow): BlogPost {
 }
 
 const selectColumns = "id,title,slug,excerpt,content,cover_image_url,category,author_name,status,published_at,created_at,updated_at";
+const BLOG_COVER_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const MAX_BLOG_COVER_BYTES = 10 * 1024 * 1024;
+
+async function uploadBlogCover(file: File | null) {
+  if (!file || file.size === 0) return null;
+
+  if (!BLOG_COVER_TYPES.includes(file.type)) {
+    throw new Error("Blog cover image must be JPG, PNG, WebP, or GIF.");
+  }
+
+  if (file.size > MAX_BLOG_COVER_BYTES) {
+    throw new Error("Blog cover image must be under 10MB.");
+  }
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const uploadResult = await new Promise<{ secure_url: string; public_id: string }>((resolve, reject) => {
+    cloudinary.uploader
+      .upload_stream(
+        {
+          folder: "anyjob/blog-covers",
+          resource_type: "image",
+          transformation: [{ width: 1600, height: 1000, crop: "limit", quality: "auto", fetch_format: "auto" }],
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result as { secure_url: string; public_id: string });
+        }
+      )
+      .end(buffer);
+  });
+
+  return uploadResult.secure_url;
+}
 
 export async function getAdminBlogPosts() {
   const supabase = createAdminSupabaseClient();
@@ -116,6 +156,7 @@ export async function createBlogPost(formData: FormData) {
 
   const slug = slugify(String(formData.get("slug") || title)) || `post-${Date.now()}`;
   const status = String(formData.get("status") || "draft") === "published" ? "published" : "draft";
+  const coverImageUrl = await uploadBlogCover(formData.get("cover_image_file") as File | null);
   const supabase = createAdminSupabaseClient();
 
   await (supabase as never as {
@@ -127,7 +168,7 @@ export async function createBlogPost(formData: FormData) {
     slug,
     excerpt: String(formData.get("excerpt") || "").trim(),
     content: String(formData.get("content") || "").trim(),
-    cover_image_url: String(formData.get("cover_image_url") || "").trim() || null,
+    cover_image_url: coverImageUrl,
     category: String(formData.get("category") || "Guides").trim() || "Guides",
     author_name: String(formData.get("author_name") || "AnyJob Team").trim() || "AnyJob Team",
     status,

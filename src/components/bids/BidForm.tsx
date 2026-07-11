@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DollarSign, Clock, Calendar, Send, X, Loader2 } from "lucide-react";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
+import { PROVIDER_QUOTE_TERMS_PATH, PROVIDER_QUOTE_TERMS_VERSION } from "@/lib/legal/provider-terms";
 
 interface BidFormProps {
   inquiryId: string;
@@ -17,6 +18,7 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
   const [message, setMessage] = useState("");
   const [estimatedHours, setEstimatedHours] = useState("");
   const [availableDate, setAvailableDate] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const amountValue = parseFloat(amount);
@@ -43,6 +45,11 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
       return;
     }
 
+    if (!termsAccepted) {
+      setError("Accept the provider service terms before submitting your quote.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -55,6 +62,8 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
           message: message || null,
           estimated_duration_hours: estimatedHours ? parseFloat(estimatedHours) : null,
           available_date: availableDate || null,
+          terms_accepted: termsAccepted,
+          terms_version: PROVIDER_QUOTE_TERMS_VERSION,
         }),
       });
 
@@ -187,6 +196,25 @@ export function BidForm({ inquiryId, budgetMin, budgetMax, onSubmit, onCancel }:
             className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-4 py-3 text-sm outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 resize-none"
           />
         </div>
+
+        <label className="flex gap-3 rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-700 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300">
+          <input
+            type="checkbox"
+            checked={termsAccepted}
+            onChange={(e) => {
+              setTermsAccepted(e.target.checked);
+              setError(null);
+            }}
+            className="mt-1 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+          />
+          <span>
+            I accept the AnyJob provider service{" "}
+            <a href={PROVIDER_QUOTE_TERMS_PATH} target="_blank" rel="noreferrer" className="font-semibold text-red-600 underline">
+              terms and conditions
+            </a>{" "}
+            for this job. My acceptance timestamp and email will be saved and emailed to me for this quote.
+          </span>
+        </label>
 
         <button
           type="submit"

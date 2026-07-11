@@ -1,35 +1,11 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
-
-async function hasBuyerKycForQuoteAcceptance(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  userId: string
-) {
-  const { data: files } = await supabase
-    .from("user_images")
-    .select("image_type")
-    .eq("user_id", userId)
-    .in("image_type", ["id_document", "selfie_video"]);
-
-  const fileTypes = new Set((files || []).map((file) => file.image_type));
-  if (fileTypes.has("id_document") && fileTypes.has("selfie_video")) {
-    return true;
-  }
-
-  const { data: buyer } = await supabase
-    .from("buyers")
-    .select("id_document_url,selfie_video_url,kyc_status")
-    .eq("id", userId)
-    .maybeSingle();
-
-  return Boolean(
-    buyer &&
-    buyer.id_document_url &&
-    buyer.selfie_video_url &&
-    buyer.kyc_status !== "rejected"
-  );
-}
+import { PROVIDER_QUOTE_TERMS_PATH, PROVIDER_QUOTE_TERMS_VERSION } from "@/lib/legal/provider-terms";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
+import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
+import { getProviderApplicationEntitlement } from "@/lib/plans/provider-plan-server";
+import { getProviderStatsMap } from "@/lib/provider-stats";
 
 async function hasSellerKycForQuoting(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -54,6 +30,91 @@ async function hasSellerKycForQuoting(
   return Boolean(profile?.is_verified === true);
 }
 
+function requestIp(request: NextRequest) {
+  const forwardedFor = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  const realIp = request.headers.get("x-real-ip")?.trim();
+  const candidate = forwardedFor || realIp || "";
+  return candidate && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : null;
+}
+
+async function queueProviderTermsFallback(
+  admin: { from(table: string): any },
+  input: {
+    providerUserId: string;
+    providerEmail: string;
+    providerName: string;
+    inquiryId: string;
+    bidId: string;
+    acceptedAt: string;
+    termsVersion: string;
+    termsUrl: string;
+  }
+) {
+  const { data: tenant } = await admin
+    .from("tenants")
+    .select("id,app_url,primary_domain")
+    .eq("slug", "default")
+    .maybeSingle();
+
+  const acceptedLabel = new Intl.DateTimeFormat("en-IE", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Europe/Dublin",
+  }).format(new Date(input.acceptedAt));
+  const baseUrl = String(tenant?.app_url || (tenant?.primary_domain ? `https://${tenant.primary_domain}` : "")).replace(/\/$/, "");
+  const actionUrl = `${baseUrl}${input.termsUrl}`;
+  const htmlBody = [
+    `<p>Hi ${input.providerName || "Provider"},</p>`,
+    `<p>You accepted the AnyJob provider service terms and conditions on <strong>${acceptedLabel}</strong>.</p>`,
+    `<p>Terms version: <strong>${input.termsVersion}</strong></p>`,
+    `<p>This timestamp is saved with your quote record for compliance and audit history.</p>`,
+    actionUrl ? `<p><a href="${actionUrl}">View accepted terms</a></p>` : "",
+  ].join("");
+
+  await admin.from("eloo_notifications").insert({
+    user_id: input.providerUserId,
+    title: "Provider terms accepted",
+    message: `You accepted the provider service terms on ${acceptedLabel}.`,
+    type: "provider_terms_accepted",
+    action_url: `/pro/jobs/${input.inquiryId}`,
+    is_read: false,
+    data: {
+      job_id: input.inquiryId,
+      bid_id: input.bidId,
+      terms_version: input.termsVersion,
+      accepted_at: input.acceptedAt,
+      fallback: true,
+    },
+  });
+
+  if (!tenant?.id) return;
+
+  const { error } = await admin.from("email_outbox").insert({
+    tenant_id: tenant.id,
+    event_key: "legal.provider_terms_accepted",
+    dedupe_key: `provider-terms-accepted:${input.inquiryId}:${input.providerUserId}:${input.termsVersion}`,
+    recipient_user_id: input.providerUserId,
+    recipient_email: input.providerEmail,
+    subject: "You accepted AnyJob provider terms",
+    html_body: htmlBody,
+    text_body: `You accepted the AnyJob provider service terms and conditions on ${acceptedLabel}. Terms version: ${input.termsVersion}.`,
+    status: "pending",
+    source_table: "provider_terms_acceptances",
+    source_id: input.bidId,
+    metadata: {
+      job_id: input.inquiryId,
+      bid_id: input.bidId,
+      terms_version: input.termsVersion,
+      accepted_at: input.acceptedAt,
+      fallback: true,
+    },
+  });
+
+  if (error && error.code !== "23505") {
+    console.error("Provider terms fallback email queue failed:", error);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -64,10 +125,19 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { inquiry_id, amount, message, estimated_duration_hours, available_date } = body;
+    const { inquiry_id, amount, message, estimated_duration_hours, available_date, terms_accepted, terms_version } = body;
 
     if (!inquiry_id || !amount) {
       return NextResponse.json({ error: "inquiry_id and amount are required" }, { status: 400 });
+    }
+
+    if (terms_accepted !== true) {
+      return NextResponse.json({ error: "You must accept the provider service terms before sending a quote." }, { status: 400 });
+    }
+
+    const acceptedTermsVersion = String(terms_version || PROVIDER_QUOTE_TERMS_VERSION);
+    if (acceptedTermsVersion !== PROVIDER_QUOTE_TERMS_VERSION) {
+      return NextResponse.json({ error: "The provider service terms changed. Refresh and accept the latest terms before quoting." }, { status: 409 });
     }
 
     if (amount <= 0) {
@@ -94,10 +164,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "You cannot bid on your own inquiry" }, { status: 403 });
     }
 
+    const admin = createAdminSupabaseClient() as never as { from(table: string): any };
+    const buyerKyc = await getBuyerKycStatus(admin, inquiry.user_id);
+    if (!buyerKyc.isComplete) {
+      return NextResponse.json(
+        {
+          error: `Buyer KYC is pending. The buyer must upload ${buyerKyc.missing.join(", ")} before providers can send quotes.`,
+          missingKyc: buyerKyc.missing,
+        },
+        { status: 409 }
+      );
+    }
+
     // Check if provider is a registered provider
     const { data: provider } = await supabase
       .from("eloo_profiles")
-      .select("id, first_name, last_name")
+      .select("id, first_name, last_name, email")
       .eq("id", user.id)
       .single();
 
@@ -110,6 +192,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Seller account limited. Complete and approve KYC before sending quotes." },
         { status: 403 }
+      );
+    }
+
+    const { data: existingBid } = await supabase
+      .from("bids")
+      .select("id")
+      .eq("inquiry_id", inquiry_id)
+      .eq("provider_id", user.id)
+      .maybeSingle();
+
+    if (existingBid) {
+      return NextResponse.json({ error: "You have already placed a bid on this job" }, { status: 409 });
+    }
+
+    const entitlement = await getProviderApplicationEntitlement(admin, user.id);
+    if (!entitlement.allowed) {
+      return NextResponse.json(
+        {
+          error: entitlement.message,
+          upgradeRequired: true,
+          pricingUrl: "/pricing",
+          plan: entitlement.plan,
+          usage: entitlement.usage,
+        },
+        { status: 402 }
       );
     }
 
@@ -135,7 +242,75 @@ export async function POST(request: NextRequest) {
       throw bidError;
     }
 
-    return NextResponse.json({ bid }, { status: 201 });
+    const acceptedAt = new Date().toISOString();
+    const providerEmail = String(provider.email || user.email || "").trim().toLowerCase();
+    const acceptancePayload = {
+      provider_id: user.id,
+      provider_email: providerEmail,
+      inquiry_id,
+      bid_id: bid.id,
+      terms_version: PROVIDER_QUOTE_TERMS_VERSION,
+      terms_url: PROVIDER_QUOTE_TERMS_PATH,
+      accepted_at: acceptedAt,
+      accepted_ip: requestIp(request),
+      accepted_user_agent: request.headers.get("user-agent") || null,
+    };
+
+    const { data: acceptance, error: acceptanceError } = await admin
+      .from("provider_terms_acceptances")
+      .insert(acceptancePayload)
+      .select("id,accepted_at,terms_version,terms_url,provider_email")
+      .single();
+
+    let termsAcceptance = acceptance;
+    if (acceptanceError?.code === "23505") {
+      const { data: existingAcceptance, error: updateAcceptanceError } = await admin
+        .from("provider_terms_acceptances")
+        .update({ bid_id: bid.id, updated_at: acceptedAt })
+        .eq("provider_id", user.id)
+        .eq("inquiry_id", inquiry_id)
+        .eq("terms_version", PROVIDER_QUOTE_TERMS_VERSION)
+        .select("id,accepted_at,terms_version,terms_url,provider_email")
+        .single();
+
+      if (updateAcceptanceError) {
+        await admin.from("bids").delete().eq("id", bid.id).eq("provider_id", user.id);
+        return NextResponse.json({ error: "Failed to save provider terms acceptance" }, { status: 500 });
+      }
+      termsAcceptance = existingAcceptance;
+    } else if (acceptanceError) {
+      await admin.from("bids").delete().eq("id", bid.id).eq("provider_id", user.id);
+      return NextResponse.json({ error: "Failed to save provider terms acceptance" }, { status: 500 });
+    }
+
+    const emailResult = await notifyJobEvent({
+      action: "provider_terms_accepted",
+      tenantSlug: "default",
+      providerUserId: user.id,
+      providerEmail,
+      providerName: [provider.first_name, provider.last_name].filter(Boolean).join(" "),
+      jobId: inquiry_id,
+      bidId: bid.id,
+      acceptedAt: termsAcceptance?.accepted_at || acceptedAt,
+      termsVersion: termsAcceptance?.terms_version || PROVIDER_QUOTE_TERMS_VERSION,
+      termsUrl: termsAcceptance?.terms_url || PROVIDER_QUOTE_TERMS_PATH,
+    });
+
+    if (!emailResult.ok) {
+      console.error("Provider terms acceptance email failed:", emailResult);
+      await queueProviderTermsFallback(admin, {
+        providerUserId: user.id,
+        providerEmail,
+        providerName: [provider.first_name, provider.last_name].filter(Boolean).join(" "),
+        inquiryId: inquiry_id,
+        bidId: bid.id,
+        acceptedAt: termsAcceptance?.accepted_at || acceptedAt,
+        termsVersion: termsAcceptance?.terms_version || PROVIDER_QUOTE_TERMS_VERSION,
+        termsUrl: termsAcceptance?.terms_url || PROVIDER_QUOTE_TERMS_PATH,
+      });
+    }
+
+    return NextResponse.json({ bid, termsAcceptance }, { status: 201 });
   } catch (error) {
     console.error("Error creating bid:", error);
     return NextResponse.json({ error: "Failed to create bid" }, { status: 500 });
@@ -179,7 +354,7 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminSupabaseClient() as never as { from(table: string): any };
     const providerIds = Array.from(new Set((bids || []).map((bid) => String(bid.provider_id || "")).filter(Boolean)));
-    const [profilesResult, sellersResult, reviewsResult] = providerIds.length
+    const [profilesResult, sellersResult, providerStatsById] = providerIds.length
       ? await Promise.all([
           admin
             .from("eloo_profiles")
@@ -187,34 +362,21 @@ export async function GET(request: NextRequest) {
             .in("id", providerIds),
           admin
             .from("sellers")
-            .select("id, first_name, last_name, profile_image_url, rating, total_jobs, service_category, experience_level")
+            .select("id, first_name, last_name, profile_image_url, service_category, experience_level")
             .in("id", providerIds),
-          admin
-            .from("eloo_reviews")
-            .select("reviewee_id, rating")
-            .in("reviewee_id", providerIds),
+          getProviderStatsMap(admin, providerIds),
         ])
-      : [{ data: [] }, { data: [] }, { data: [] }];
+      : [{ data: [] }, { data: [] }, new Map()];
 
     const profilesById = new Map(((profilesResult.data || []) as Record<string, any>[]).map((profile) => [String(profile.id), profile]));
     const sellersById = new Map(((sellersResult.data || []) as Record<string, any>[]).map((seller) => [String(seller.id), seller]));
-    const reviewsByProvider = new Map<string, Record<string, any>[]>();
-    for (const review of (reviewsResult.data || []) as Record<string, any>[]) {
-      const providerId = String(review.reviewee_id || "");
-      if (!providerId) continue;
-      reviewsByProvider.set(providerId, [...(reviewsByProvider.get(providerId) || []), review]);
-    }
 
     const bidsWithProviders = await Promise.all(
       (bids || []).map(async (bid) => {
         const providerId = String(bid.provider_id || "");
         const profile = profilesById.get(providerId) || {};
         const seller = sellersById.get(providerId) || {};
-        const reviews = reviewsByProvider.get(providerId) || [];
-        const reviewRatings = reviews.map((review) => Number(review.rating || 0)).filter((rating) => rating > 0);
-        const averageRating = reviewRatings.length
-          ? Math.round((reviewRatings.reduce((sum, rating) => sum + rating, 0) / reviewRatings.length) * 10) / 10
-          : Number(seller.rating || 0);
+        const providerStats = providerStatsById.get(providerId) || { rating: 0, reviewCount: 0, completedJobs: 0 };
 
         return {
           ...bid,
@@ -223,9 +385,9 @@ export async function GET(request: NextRequest) {
             first_name: seller.first_name || profile.first_name || "Provider",
             last_name: seller.last_name || profile.last_name || "",
             profile_image_url: seller.profile_image_url || profile.profile_image_url || null,
-            rating: averageRating,
-            total_jobs: Number(seller.total_jobs || 0),
-            review_count: reviews.length || Number(seller.total_jobs || 0),
+            rating: providerStats.rating,
+            total_jobs: providerStats.completedJobs,
+            review_count: providerStats.reviewCount,
             service_category: seller.service_category || null,
             experience_level: seller.experience_level || null,
           },

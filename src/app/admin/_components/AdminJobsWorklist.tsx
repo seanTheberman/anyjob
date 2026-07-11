@@ -1,12 +1,13 @@
 "use client";
 
 import { Fragment, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { BriefcaseBusiness, ChevronDown, CheckCircle2, Clock3, Download, Eye, FileQuestion, FileText, MapPin, MessageCircle, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
 
 import type { AdminLiveJob } from "./admin-data";
 import { getJobStatusLabel } from "@/lib/job-status";
 
-type JobTab = AdminLiveJob["tabStatus"] | "all";
+export type JobTab = AdminLiveJob["tabStatus"] | "all";
 
 const tabs: Array<{ key: JobTab; label: string; icon: typeof BriefcaseBusiness; tone: string }> = [
   { key: "pending_review", label: "Pending review", icon: FileQuestion, tone: "text-yellow-700" },
@@ -18,6 +19,98 @@ const tabs: Array<{ key: JobTab; label: string; icon: typeof BriefcaseBusiness; 
   { key: "cancelled", label: "Cancelled", icon: XCircle, tone: "text-red-700" },
   { key: "all", label: "All jobs", icon: FileText, tone: "text-blue-700" },
 ];
+
+const sourceFilters = [
+  { key: "all", label: "All sources" },
+  { key: "service_inquiry", label: "Customer requests" },
+  { key: "business_work_post", label: "Business posts" },
+] as const;
+
+const quoteFilters = [
+  { key: "all", label: "Any quote status" },
+  { key: "with_quotes", label: "Has quotes" },
+  { key: "no_quotes", label: "No quotes" },
+] as const;
+
+const ageFilters = [
+  { key: "all", label: "Any age" },
+  { key: "fresh_24", label: "New in 24h" },
+  { key: "idle_7", label: "Idle 7d+" },
+] as const;
+
+const irelandRegions = [
+  { key: "region:connacht", label: "Connacht", counties: ["Galway", "Leitrim", "Mayo", "Roscommon", "Sligo"] },
+  {
+    key: "region:leinster",
+    label: "Leinster",
+    counties: ["Carlow", "Dublin", "Kildare", "Kilkenny", "Laois", "Longford", "Louth", "Meath", "Offaly", "Westmeath", "Wexford", "Wicklow"],
+  },
+  { key: "region:munster", label: "Munster", counties: ["Clare", "Cork", "Kerry", "Limerick", "Tipperary", "Waterford"] },
+  { key: "region:ulster", label: "Ulster", counties: ["Antrim", "Armagh", "Cavan", "Derry", "Donegal", "Down", "Fermanagh", "Monaghan", "Tyrone"] },
+] as const;
+
+const irelandCounties = Array.from(new Set(irelandRegions.flatMap((region) => region.counties))).sort();
+const irelandCountyNames = new Set(irelandCounties.map((county) => county.toLowerCase()));
+const irelandRegionKeys = new Set<string>(irelandRegions.map((region) => region.key));
+
+function normalizeIrelandAreaFilter(value?: string) {
+  const normalized = String(value || "").trim();
+  if (!normalized || normalized === "all") return "all";
+  if (irelandRegionKeys.has(normalized)) return normalized;
+  if (normalized.startsWith("county:")) {
+    const county = normalized.replace("county:", "");
+    return irelandCountyNames.has(county.toLowerCase()) ? `county:${county}` : "all";
+  }
+  return irelandCountyNames.has(normalized.toLowerCase()) ? `county:${normalized}` : "all";
+}
+
+function matchesIrelandArea(job: AdminLiveJob, areaFilter: string) {
+  if (areaFilter === "all") return true;
+  const locationParts = [job.county, job.town].map((part) => String(part || "").trim().toLowerCase()).filter(Boolean);
+
+  if (areaFilter.startsWith("county:")) {
+    const county = areaFilter.replace("county:", "").toLowerCase();
+    return locationParts.includes(county);
+  }
+
+  const region = irelandRegions.find((item) => item.key === areaFilter);
+  if (!region) return true;
+  const regionCounties = new Set(region.counties.map((county) => county.toLowerCase()));
+  return locationParts.some((part) => regionCounties.has(part));
+}
+
+const irelandLocationWords = new Set([
+  ...irelandCountyNames,
+  ...irelandRegions.map((region) => region.label.toLowerCase()),
+  "ireland",
+]);
+const eircodePattern = /\b[A-Z]\d{2}\s?[A-Z0-9]{4}\b/i;
+
+function hasIrelandLocationSignal(value: string) {
+  const normalized = value.toLowerCase();
+  return eircodePattern.test(value) || Array.from(irelandLocationWords).some((word) => normalized.includes(word));
+}
+
+function safeIrelandLocationPart(value?: string) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed || trimmed.toLowerCase() === "unknown") return "";
+  return hasIrelandLocationSignal(trimmed) ? trimmed : "";
+}
+
+function safeIrelandJobLocation(job: AdminLiveJob) {
+  const parts = Array.from(new Set([
+    safeIrelandLocationPart(job.town),
+    safeIrelandLocationPart(job.county),
+  ].filter(Boolean)));
+  return parts.join(", ") || "Ireland launch area";
+}
+
+function safeIrelandJobFullLocation(job: AdminLiveJob) {
+  const location = safeIrelandJobLocation(job);
+  const address = String(job.address || "").trim();
+  const safeAddress = address && (location !== "Ireland launch area" || hasIrelandLocationSignal(address)) ? address : "";
+  return Array.from(new Set([safeAddress, location].filter(Boolean))).join(", ") || "Ireland launch area";
+}
 
 function includesQuery(job: AdminLiveJob, query: string) {
   const normalized = query.trim().toLowerCase();
@@ -39,13 +132,13 @@ function includesQuery(job: AdminLiveJob, query: string) {
 }
 
 function statusClass(job: AdminLiveJob) {
-  if (job.tabStatus === "pending_review") return "bg-yellow-100 text-yellow-800";
-  if (job.tabStatus === "expired") return "bg-slate-100 text-slate-700";
-  if (job.tabStatus === "completed") return "bg-emerald-50 text-emerald-700";
-  if (job.tabStatus === "cancelled") return "bg-red-100 text-red-700";
-  if (job.tabStatus === "no_quotes") return "bg-red-50 text-red-700";
-  if (job.tabStatus === "awaiting_buyer") return "bg-amber-50 text-amber-700";
-  return "bg-green-50 text-green-700";
+  const normalized = String(job.status || "").toLowerCase();
+  if (["approved", "submitted", "matched", "bid_accepted"].includes(normalized)) return "bg-green-50 text-green-700";
+  if (["completed", "converted"].includes(normalized)) return "bg-emerald-50 text-emerald-700";
+  if (["expired", "cancelled", "rejected"].includes(normalized)) return "bg-slate-100 text-slate-700";
+  if (["more_info_needed", "needs_more_info"].includes(normalized)) return "bg-amber-50 text-amber-700";
+  if (["pending_for_review", "pending", "draft"].includes(normalized)) return "bg-yellow-100 text-yellow-800";
+  return "bg-slate-100 text-slate-700";
 }
 
 function tabLabel(job: AdminLiveJob) {
@@ -56,6 +149,16 @@ function tabLabel(job: AdminLiveJob) {
   if (job.tabStatus === "cancelled") return "Cancelled";
   if (job.tabStatus === "awaiting_buyer") return "Waiting";
   return "No quotes";
+}
+
+function tabBadgeClass(tab: JobTab) {
+  if (tab === "pending_review") return "bg-yellow-500";
+  if (tab === "live") return "bg-green-500";
+  if (tab === "expired") return "bg-slate-500";
+  if (tab === "awaiting_buyer") return "bg-amber-500";
+  if (tab === "completed") return "bg-emerald-500";
+  if (tab === "no_quotes" || tab === "cancelled") return "bg-red-500";
+  return "bg-blue-500";
 }
 
 function tabStatusForRawStatus(status?: string): AdminLiveJob["tabStatus"] {
@@ -72,18 +175,65 @@ function canApproveJob(job: AdminLiveJob) {
   return ["pending_for_review", "pending", "draft", "more_info_needed", "needs_more_info", "rejected", "expired"].includes(String(job.status || "").toLowerCase());
 }
 
-export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
+function AdminJobFormActionButton({
+  action,
+  job,
+  redirectTab,
+  disabled,
+  title,
+  className,
+  children,
+}: {
+  action: "refresh" | "approve" | "mark_live" | "start" | "complete" | "reject" | "cancel" | "expire";
+  job: AdminLiveJob;
+  redirectTab?: JobTab;
+  disabled?: boolean;
+  title: string;
+  className: string;
+  children: ReactNode;
+}) {
+  const targetTab = redirectTab || (action === "expire" ? "expired" : "all");
+  const redirectTo = `/admin/jobs?tab=${encodeURIComponent(targetTab)}&q=${encodeURIComponent(job.shortId)}`;
+
+  return (
+    <form method="post" action="/api/admin/jobs/actions" className="contents">
+      <input type="hidden" name="action" value={action} />
+      <input type="hidden" name="jobId" value={job.id} />
+      <input type="hidden" name="source" value={job.source} />
+      <input type="hidden" name="redirectTo" value={redirectTo} />
+      <button type="submit" title={title} disabled={disabled} className={className}>
+        {children}
+      </button>
+    </form>
+  );
+}
+
+export function AdminJobsWorklist({
+  jobs,
+  initialTab = "pending_review",
+  initialCounty = "all",
+  initialQuery = "",
+}: {
+  jobs: AdminLiveJob[];
+  initialTab?: JobTab;
+  initialCounty?: string;
+  initialQuery?: string;
+}) {
   const [rows, setRows] = useState(jobs);
-  const [activeTab, setActiveTab] = useState<JobTab>("pending_review");
-  const [query, setQuery] = useState("");
-  const [county, setCounty] = useState("all");
+  const [activeTab, setActiveTab] = useState<JobTab>(initialTab);
+  const [query, setQuery] = useState(initialQuery);
+  const [areaFilter, setAreaFilter] = useState(normalizeIrelandAreaFilter(initialCounty));
+  const [sourceFilter, setSourceFilter] = useState<(typeof sourceFilters)[number]["key"]>("all");
+  const [quoteFilter, setQuoteFilter] = useState<(typeof quoteFilters)[number]["key"]>("all");
+  const [ageFilter, setAgeFilter] = useState<(typeof ageFilters)[number]["key"]>("all");
   const [message, setMessage] = useState<string | null>(null);
   const [pendingJob, setPendingJob] = useState<string | null>(null);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [chatJobId, setChatJobId] = useState<string | null>(null);
 
-  const counties = useMemo(() => Array.from(new Set(rows.map((job) => job.county).filter(Boolean))).sort(), [rows]);
   const summary = useMemo(() => {
     const live = rows.filter((job) => job.tabStatus === "live").length;
     const pendingReview = rows.filter((job) => job.tabStatus === "pending_review").length;
@@ -100,10 +250,19 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
   const filtered = useMemo(() => {
     return rows.filter((job) => {
       const tabMatch = activeTab === "all" || job.tabStatus === activeTab;
-      const countyMatch = county === "all" || job.county === county;
-      return tabMatch && countyMatch && includesQuery(job, query);
+      const areaMatch = matchesIrelandArea(job, areaFilter);
+      const sourceMatch = sourceFilter === "all" || job.source === sourceFilter;
+      const quoteMatch =
+        quoteFilter === "all" ||
+        (quoteFilter === "with_quotes" && job.quotes > 0) ||
+        (quoteFilter === "no_quotes" && job.quotes === 0);
+      const ageMatch =
+        ageFilter === "all" ||
+        (ageFilter === "idle_7" && job.idleDays >= 7) ||
+        (ageFilter === "fresh_24" && job.idleDays === 0);
+      return tabMatch && areaMatch && sourceMatch && quoteMatch && ageMatch && includesQuery(job, query);
     });
-  }, [activeTab, county, rows, query]);
+  }, [activeTab, ageFilter, areaFilter, quoteFilter, rows, query, sourceFilter]);
 
   const tabCounts: Record<JobTab, number> = {
     pending_review: summary.pendingReview,
@@ -115,6 +274,14 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
     cancelled: summary.cancelled,
     all: summary.total,
   };
+  const activeTabConfig = tabs.find((tab) => tab.key === activeTab) || tabs[0];
+  const ActiveTabIcon = activeTabConfig.icon;
+  const activeAdvancedFilterCount = [
+    areaFilter !== "all",
+    sourceFilter !== "all",
+    quoteFilter !== "all",
+    ageFilter !== "all",
+  ].filter(Boolean).length;
   const chatJob = rows.find((job) => job.id === chatJobId) || null;
 
   async function runJobAction(action: "refresh" | "approve" | "request_info" | "mark_live" | "start" | "complete" | "reject" | "cancel" | "expire", job: AdminLiveJob) {
@@ -143,13 +310,23 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
       return;
     }
     if (payload.status) {
+      const nextTabStatus = tabStatusForRawStatus(payload.status);
       setRows((current) =>
         current.map((item) =>
           item.id === job.id
-            ? { ...item, status: payload.status, tabStatus: tabStatusForRawStatus(payload.status), lastActivity: "Now", idleDays: 0 }
+            ? {
+                ...item,
+                status: payload.status,
+                tabStatus: nextTabStatus,
+                lastActivity: action === "refresh" ? "Now" : item.lastActivity,
+                idleDays: action === "refresh" ? 0 : item.idleDays,
+              }
             : item
         )
       );
+      if (nextTabStatus === "expired") {
+        setActiveTab("expired");
+      }
     } else {
       setRows((current) => current.map((item) => item.id === job.id ? { ...item, lastActivity: "Now", idleDays: 0 } : item));
     }
@@ -202,28 +379,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <nav className="grid border-b border-slate-200 bg-white xl:grid-cols-8">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex min-h-14 items-center gap-2.5 border-b-2 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide transition ${active ? "border-green-600 bg-green-50 text-slate-950" : "border-transparent text-slate-500 hover:bg-slate-50"}`}
-              >
-                <Icon className={`h-4 w-4 ${active ? tab.tone : "text-slate-500"}`} />
-                <span className="min-w-0 truncate">{tab.label}</span>
-                <span className={`ml-auto rounded-full px-2.5 py-1 text-xs font-bold text-white ${tab.key === "pending_review" ? "bg-yellow-500" : tab.key === "live" ? "bg-green-500" : tab.key === "expired" ? "bg-slate-500" : tab.key === "awaiting_buyer" ? "bg-amber-500" : tab.key === "completed" ? "bg-emerald-500" : tab.key === "no_quotes" || tab.key === "cancelled" ? "bg-red-500" : "bg-blue-500"}`}>
-                  {tabCounts[tab.key]}
-                </span>
-              </button>
-            );
-          })}
-        </nav>
-
-        <div className="grid gap-3 border-b border-slate-200 bg-white p-4 lg:grid-cols-[1fr_220px_auto]">
+        <div className="grid gap-3 border-b border-slate-200 bg-white p-4 lg:grid-cols-[minmax(0,1fr)_240px_220px_auto]">
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
             <input
@@ -233,25 +389,175 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
               className="h-11 w-full rounded-lg border border-slate-200 pl-10 pr-3 text-base outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100"
             />
           </label>
-          <label className="relative block">
-            <MapPin className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-            <select
-              value={county}
-              onChange={(event) => setCounty(event.target.value)}
-              className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-10 pr-3 text-base font-semibold text-slate-700 outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100"
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setStatusMenuOpen((open) => !open);
+                setFiltersOpen(false);
+              }}
+              className="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 focus:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-100"
             >
-              <option value="all">All counties</option>
-              {counties.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </select>
-          </label>
+              <span className="flex min-w-0 items-center gap-2">
+                <ActiveTabIcon className={`h-4 w-4 shrink-0 ${activeTabConfig.tone}`} />
+                <span className="truncate">{activeTabConfig.label}</span>
+              </span>
+              <span className={`rounded-full px-2.5 py-1 text-xs font-black text-white ${tabBadgeClass(activeTab)}`}>{tabCounts[activeTab]}</span>
+            </button>
+            {statusMenuOpen ? (
+              <div className="absolute right-0 top-12 z-40 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-2xl shadow-slate-900/15">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  const active = activeTab === tab.key;
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab(tab.key);
+                        setStatusMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-bold ${active ? "bg-green-50 text-slate-950 ring-1 ring-green-200" : "text-slate-700 hover:bg-slate-50"}`}
+                    >
+                      <Icon className={`h-4 w-4 shrink-0 ${active ? tab.tone : "text-slate-400"}`} />
+                      <span className="min-w-0 flex-1">{tab.label}</span>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-black text-white ${tabBadgeClass(tab.key)}`}>{tabCounts[tab.key]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setFiltersOpen((open) => !open);
+                setStatusMenuOpen(false);
+              }}
+              className="flex h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 text-left text-sm font-bold text-slate-800 hover:bg-slate-50 focus:border-green-300 focus:outline-none focus:ring-2 focus:ring-green-100"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <SlidersHorizontal className="h-4 w-4 shrink-0 text-slate-500" />
+                <span className="truncate">{activeAdvancedFilterCount ? `${activeAdvancedFilterCount} filter${activeAdvancedFilterCount === 1 ? "" : "s"}` : "Filters"}</span>
+              </span>
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+            </button>
+            {filtersOpen ? (
+              <div className="absolute right-0 top-12 z-40 w-[min(420px,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white p-4 shadow-2xl shadow-slate-900/15">
+                <div>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-500" htmlFor="admin-job-area-filter">Country / area</label>
+                  <div className="relative mt-2">
+                    <MapPin className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <select
+                      id="admin-job-area-filter"
+                      value={areaFilter}
+                      onChange={(event) => setAreaFilter(event.target.value)}
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm font-semibold text-slate-700 outline-none focus:border-green-300 focus:ring-2 focus:ring-green-100"
+                    >
+                      <option value="all">All Ireland</option>
+                      <optgroup label="Regions">
+                        {irelandRegions.map((region) => (
+                          <option key={region.key} value={region.key}>{region.label}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Counties">
+                        {irelandCounties.map((county) => (
+                          <option key={county} value={`county:${county}`}>{county}</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-slate-500">Source</p>
+                  <div className="mt-2 grid gap-2">
+                    {sourceFilters.map((filter) => (
+                      <button
+                        key={filter.key}
+                        type="button"
+                        onClick={() => setSourceFilter(filter.key)}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm font-bold ${sourceFilter === filter.key ? "border-green-200 bg-green-50 text-green-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                      >
+                        {filter.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Quote coverage</p>
+                    <div className="mt-2 grid gap-2">
+                      {quoteFilters.map((filter) => (
+                        <button
+                          key={filter.key}
+                          type="button"
+                          onClick={() => setQuoteFilter(filter.key)}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm font-bold ${quoteFilter === filter.key ? "border-green-200 bg-green-50 text-green-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wide text-slate-500">Age</p>
+                    <div className="mt-2 grid gap-2">
+                      {ageFilters.map((filter) => (
+                        <button
+                          key={filter.key}
+                          type="button"
+                          onClick={() => setAgeFilter(filter.key)}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm font-bold ${ageFilter === filter.key ? "border-green-200 bg-green-50 text-green-800" : "border-slate-200 text-slate-700 hover:bg-slate-50"}`}
+                        >
+                          {filter.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-end gap-2 border-t border-slate-100 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAreaFilter("all");
+                      setSourceFilter("all");
+                      setQuoteFilter("all");
+                      setAgeFilter("all");
+                    }}
+                    className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Clear filters
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFiltersOpen(false)}
+                    className="h-9 rounded-lg bg-slate-950 px-3 text-sm font-bold text-white hover:bg-slate-800"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+
           <button
             type="button"
             onClick={() => {
               setQuery("");
-              setCounty("all");
+              setAreaFilter("all");
+              setSourceFilter("all");
+              setQuoteFilter("all");
+              setAgeFilter("all");
               setActiveTab("pending_review");
+              setStatusMenuOpen(false);
+              setFiltersOpen(false);
             }}
             className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
@@ -279,7 +585,11 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {filtered.map((job) => (
+            {filtered.map((job) => {
+              const safeLocation = safeIrelandJobLocation(job);
+              const safeFullLocation = safeIrelandJobFullLocation(job);
+
+              return (
               <Fragment key={job.id}>
               <tr className="hover:bg-slate-50">
                 <td className="px-4 py-4">
@@ -303,8 +613,8 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                 <td className="px-4 py-4">
                   <p className="truncate text-sm font-black text-slate-950" title={job.customer}>{job.customer}</p>
                   <p className="truncate text-sm text-slate-500" title={job.email}>{job.email || job.phone || "No contact saved"}</p>
-                  <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={[job.town, job.county].filter(Boolean).join(", ") || job.address}>
-                    {[job.town, job.county].filter(Boolean).join(", ") || job.address || "Location not set"}
+                  <p className="mt-1 truncate text-xs font-semibold text-slate-500" title={safeLocation}>
+                    {safeLocation}
                   </p>
                 </td>
                 <td className="px-4 py-4">
@@ -410,23 +720,20 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                         Done
                       </button>
                     ) : null}
-                    <button
-                      type="button"
+                    <AdminJobFormActionButton
+                      action="expire"
+                      job={job}
                       title="Expire job"
-                      disabled={pendingJob === `expire:${job.id}` || job.tabStatus === "expired"}
-                      onClick={() => {
-                        setOpenActionMenuId(null);
-                        runJobAction("expire", job);
-                      }}
+                      disabled={pendingJob === `expire:${job.id}` || String(job.status || "").toLowerCase() === "expired"}
                       className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-bold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <Trash2 className="h-4 w-4" />
                       Expire
-                    </button>
+                    </AdminJobFormActionButton>
                     <button
                       type="button"
                       title="Cancel job"
-                      disabled={pendingJob === `cancel:${job.id}` || job.tabStatus === "cancelled"}
+                      disabled={pendingJob === `cancel:${job.id}` || ["cancelled", "rejected"].includes(String(job.status || "").toLowerCase())}
                       onClick={() => {
                         setOpenActionMenuId(null);
                         runJobAction("cancel", job);
@@ -558,7 +865,7 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                           ["Customer / Business", job.customer],
                           ["Email", job.email || "Not provided"],
                           ["Phone", job.phone || "Not provided"],
-                          ["Location", [job.address, job.town, job.county].filter(Boolean).join(", ")],
+                          ["Location", safeFullLocation],
                           ["Schedule", job.schedule],
                           ["Budget / Rate", job.budget],
                           ["Duration / Date", job.size],
@@ -583,7 +890,8 @@ export function AdminJobsWorklist({ jobs }: { jobs: AdminLiveJob[] }) {
                 </tr>
               ) : null}
               </Fragment>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         </div>

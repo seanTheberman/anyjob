@@ -38,8 +38,8 @@ export default function ProviderDashboard() {
         client: {
           name: `${job.first_name} ${job.last_name}`,
           photo: undefined, // We don't have client photos in the current data
-          rating: undefined,
-          reviewCount: undefined
+          rating: job.buyer_rating,
+          reviewCount: job.buyer_review_count
         },
         budget: {
           min: parseFloat(job.budget_range_min) || 0,

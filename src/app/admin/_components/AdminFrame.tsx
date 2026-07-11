@@ -10,7 +10,7 @@ import { Bell, LogOut, Search, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminNavItems } from "./admin-data";
 import { logoutClientSession } from "@/lib/auth/logout-client";
-import { InsuranceNotice } from "@/components/safety/InsuranceNotice";
+import { AdminAssistant } from "./AdminAssistant";
 
 function AdminPendingContent({ path }: { path: string }) {
   const target = adminNavItems.find((item) => item.href === path);
@@ -87,6 +87,8 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
 
     const target = query.includes("provider") || query.includes("seller") || query.includes("kyc")
       ? "/admin/providers"
+      : query.includes("review") || query.includes("rating")
+        ? "/admin/reviews"
       : query.includes("badge")
         ? "/admin/badges"
         : query.includes("business")
@@ -206,12 +208,11 @@ export function AdminFrame({ children, unreadNotifications }: { children: React.
         </header>
 
         <div>
-          <div className="px-4 pt-6 sm:px-6 lg:px-8">
-            <InsuranceNotice accent="slate" />
-          </div>
           {pathname !== optimisticPath ? <AdminPendingContent path={optimisticPath} /> : children}
         </div>
       </div>
+
+      <AdminAssistant />
     </div>
   );
 }

@@ -64,12 +64,33 @@ export async function GET() {
 
     const profiles = new Map(((profilesResult.data || []) as LooseRow[]).map((profile: LooseRow) => [profile.id, profile]));
     const sellers = new Map(((sellersResult.data || []) as LooseRow[]).map((seller: LooseRow) => [seller.id, seller]));
+    const applicationIds = applicationRows.map((application: LooseRow) => String(application.id)).filter(Boolean);
+    const { data: reviews, error: reviewsError } = applicationIds.length
+      ? await admin
+          .from("eloo_reviews")
+          .select("id,shift_application_id,review_type,reviewer_id,reviewee_id,rating,title,comment,created_at")
+          .in("shift_application_id", applicationIds)
+      : { data: [], error: null };
+
+    if (reviewsError) {
+      return NextResponse.json({ error: reviewsError.message }, { status: 500 });
+    }
+
+    const reviewsByApplication = new Map<string, LooseRow[]>();
+    ((reviews || []) as LooseRow[]).forEach((review) => {
+      const applicationId = String(review.shift_application_id || "");
+      if (!applicationId) return;
+      const current = reviewsByApplication.get(applicationId) || [];
+      current.push(review);
+      reviewsByApplication.set(applicationId, current);
+    });
 
     const enriched = applicationRows.map((application: LooseRow) => ({
       ...application,
       provider: profiles.get(application.provider_user_id) || sellers.get(application.provider_user_id) || null,
       seller: sellers.get(application.provider_user_id) || null,
       payment: Array.isArray(application.payment) ? application.payment[0] || null : application.payment || null,
+      reviews: reviewsByApplication.get(String(application.id)) || [],
     }));
 
     return NextResponse.json({ applications: enriched });

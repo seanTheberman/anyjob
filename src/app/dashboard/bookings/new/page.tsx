@@ -254,7 +254,7 @@ export default function NewBookingPage() {
                                         <MapPin className="w-3.5 h-3.5" /> Address <span className="text-red-500">*</span>
                                     </Label>
                                     <Input
-                                        placeholder="12 Rue de la Paix"
+                                        placeholder="12 O'Connell Street"
                                         value={address}
                                         onChange={(e) => setAddress(e.target.value)}
                                         className="rounded-xl border-gray-200 dark:border-gray-700 py-5"
@@ -266,7 +266,7 @@ export default function NewBookingPage() {
                                     <div className="space-y-1.5">
                                         <Label className="text-sm font-medium">City <span className="text-red-500">*</span></Label>
                                         <Input
-                                            placeholder="London"
+                                            placeholder="Dublin"
                                             value={city}
                                             onChange={(e) => setCity(e.target.value)}
                                             className="rounded-xl border-gray-200 dark:border-gray-700 py-5"
@@ -274,9 +274,9 @@ export default function NewBookingPage() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-sm font-medium">Zip code</Label>
+                                        <Label className="text-sm font-medium">Eircode</Label>
                                         <Input
-                                            placeholder="75001"
+                                            placeholder="D02 X285"
                                             value={postalCode}
                                             onChange={(e) => setPostalCode(e.target.value)}
                                             className="rounded-xl border-gray-200 dark:border-gray-700 py-5"

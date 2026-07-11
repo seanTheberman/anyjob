@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
+import { PROVIDER_QUOTE_TERMS_PATH, PROVIDER_QUOTE_TERMS_VERSION } from "@/lib/legal/provider-terms";
 import { 
   MapPin, 
   Calendar, 
@@ -26,6 +27,25 @@ import {
   Percent,
   Award
 } from "lucide-react";
+
+type BuyerTrustBadge = {
+  label: string;
+  tone: "green" | "blue" | "amber" | "purple" | "slate" | "red";
+  source: "system" | "admin" | "rule";
+};
+
+type BuyerTrustSummary = {
+  jobsPosted: number;
+  hires: number;
+  hireRate: number;
+  paidJobs: number;
+  totalSpent: number;
+  totalSpentLabel: string;
+  paymentStatus: "verified" | "unverified";
+  isNewClient: boolean;
+  kycVerified: boolean;
+  badges: BuyerTrustBadge[];
+};
 
 interface JobDetails {
   id: string;
@@ -100,6 +120,32 @@ interface JobDetails {
     averageRatingGiven: number;
     ratingsGiven: number;
   };
+  buyerTrust?: BuyerTrustSummary | null;
+}
+
+function trustToneClass(tone: BuyerTrustBadge["tone"]) {
+  if (tone === "green") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (tone === "blue") return "bg-blue-50 text-blue-700 border-blue-200";
+  if (tone === "amber") return "bg-amber-50 text-amber-700 border-amber-200";
+  if (tone === "purple") return "bg-purple-50 text-purple-700 border-purple-200";
+  if (tone === "red") return "bg-red-50 text-red-700 border-red-200";
+  return "bg-slate-50 text-slate-700 border-slate-200";
+}
+
+function BuyerTrustBadges({ trust }: { trust?: BuyerTrustSummary | null }) {
+  if (!trust?.badges?.length) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {trust.badges.slice(0, 8).map((badge) => (
+        <span
+          key={`${badge.source}-${badge.label}`}
+          className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${trustToneClass(badge.tone)}`}
+        >
+          {badge.label}
+        </span>
+      ))}
+    </div>
+  );
 }
 
 export default function JobDetailsPage() {
@@ -112,6 +158,7 @@ export default function JobDetailsPage() {
   const [submittingBid, setSubmittingBid] = useState(false);
   const [bidAmount, setBidAmount] = useState("");
   const [bidMessage, setBidMessage] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeInsightTab, setActiveInsightTab] = useState<"offers" | "buyer">("offers");
 
@@ -164,6 +211,10 @@ export default function JobDetailsPage() {
       setError(`Your bid is above the client budget maximum of ${job?.budget.currency || "€"}${maxBudget}.`);
       return;
     }
+    if (!termsAccepted) {
+      setError("Accept the provider service terms before submitting your quote.");
+      return;
+    }
 
     try {
       setSubmittingBid(true);
@@ -178,6 +229,8 @@ export default function JobDetailsPage() {
           inquiry_id: jobId,
           amount,
           message: bidMessage,
+          terms_accepted: termsAccepted,
+          terms_version: PROVIDER_QUOTE_TERMS_VERSION,
         }),
       });
 
@@ -193,6 +246,7 @@ export default function JobDetailsPage() {
       // Reset form
       setBidAmount("");
       setBidMessage("");
+      setTermsAccepted(false);
       
     } catch (error) {
       console.error('Error submitting bid:', error);
@@ -245,6 +299,7 @@ export default function JobDetailsPage() {
           : null;
   const offers = job.offers || [];
   const buyerStats = job.buyerStats || { jobsPosted: 0, hires: 0, hireRate: 0, averageRatingGiven: 0, ratingsGiven: 0 };
+  const buyerTrust = job.buyerTrust || null;
 
   return (
     <ProviderLayout>
@@ -263,6 +318,9 @@ export default function JobDetailsPage() {
                 <span className="rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-blue-700">{job.bid_count} offer{job.bid_count === 1 ? "" : "s"}</span>
               </div>
               <h1 className="mt-8 max-w-4xl text-5xl font-black leading-tight tracking-tight text-blue-950">{job.title}</h1>
+              <div className="mt-5">
+                <BuyerTrustBadges trust={buyerTrust} />
+              </div>
               <div className="mt-8 grid gap-6 md:grid-cols-3">
                 <div className="flex gap-3">
                   <MapPin className="mt-1 h-6 w-6 text-blue-950" />
@@ -364,13 +422,15 @@ export default function JobDetailsPage() {
                                 <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
                                 {offer.provider.rating ? offer.provider.rating.toFixed(1) : "New"} {offer.provider.reviewCount ? `(${offer.provider.reviewCount})` : ""}
                               </span>
-                              <span className="inline-flex items-center gap-1">
-                                <Percent className="h-4 w-4 text-blue-600" />
-                                {offer.provider.completionRate}% completion rate
-                              </span>
+                              {offer.provider.totalJobs > 0 ? (
+                                <span className="inline-flex items-center gap-1">
+                                  <Percent className="h-4 w-4 text-blue-600" />
+                                  {offer.provider.completionRate}% completion rate
+                                </span>
+                              ) : null}
                               <span className="inline-flex items-center gap-1">
                                 <BriefcaseBusiness className="h-4 w-4 text-blue-600" />
-                                {offer.provider.totalJobs} previous job{offer.provider.totalJobs === 1 ? "" : "s"}
+                                {offer.provider.totalJobs > 0 ? `${offer.provider.totalJobs} completed job${offer.provider.totalJobs === 1 ? "" : "s"}` : "No completed jobs yet"}
                               </span>
                             </div>
                             {(offer.provider.serviceCategory || offer.provider.experienceLevel) ? (
@@ -409,7 +469,8 @@ export default function JobDetailsPage() {
                 </div>
               ) : (
                 <div className="mt-7 rounded-lg border border-slate-200 bg-slate-50 p-5">
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <BuyerTrustBadges trust={buyerTrust} />
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="rounded-lg bg-white p-4">
                       <BriefcaseBusiness className="h-5 w-5 text-blue-700" />
                       <p className="mt-3 text-3xl font-black text-blue-950">{buyerStats.jobsPosted}</p>
@@ -420,16 +481,25 @@ export default function JobDetailsPage() {
                       <p className="mt-3 text-3xl font-black text-blue-950">{buyerStats.hireRate}%</p>
                       <p className="text-sm font-bold text-slate-500">Hire rate</p>
                     </div>
+                    {buyerStats.ratingsGiven ? (
                     <div className="rounded-lg bg-white p-4">
                       <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
-                      <p className="mt-3 text-3xl font-black text-blue-950">{buyerStats.averageRatingGiven ? buyerStats.averageRatingGiven.toFixed(1) : "New"}</p>
+                      <p className="mt-3 text-3xl font-black text-blue-950">{buyerStats.averageRatingGiven.toFixed(1)}</p>
                       <p className="text-sm font-bold text-slate-500">Avg rating given</p>
                     </div>
+                    ) : null}
                   </div>
                   <p className="mt-5 text-sm font-semibold leading-6 text-slate-600">
                     This buyer has hired providers for {buyerStats.hires} of {buyerStats.jobsPosted} posted job{buyerStats.jobsPosted === 1 ? "" : "s"}.
                     {buyerStats.ratingsGiven ? ` They have left ${buyerStats.ratingsGiven} provider rating${buyerStats.ratingsGiven === 1 ? "" : "s"}.` : " They have not left provider ratings yet."}
                   </p>
+                  {buyerTrust ? (
+                    <div className="mt-4 rounded-lg bg-white p-4 text-sm font-semibold leading-6 text-slate-600">
+                      <p>{buyerTrust.paymentStatus === "verified" ? "Payment verified" : "Payment unverified"}</p>
+                      <p>{buyerTrust.isNewClient ? "New client with no completed payments yet." : `${buyerTrust.totalSpentLabel} spent across ${buyerTrust.paidJobs} paid job${buyerTrust.paidJobs === 1 ? "" : "s"}.`}</p>
+                      <p>{buyerTrust.kycVerified ? "Buyer KYC verified." : "Buyer KYC has not been verified yet."}</p>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </section>
@@ -512,6 +582,25 @@ export default function JobDetailsPage() {
                       />
                     </div>
 
+                    <label className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => {
+                          setTermsAccepted(e.target.checked);
+                          setError(null);
+                        }}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>
+                        I accept the AnyJob provider service{" "}
+                        <a href={PROVIDER_QUOTE_TERMS_PATH} target="_blank" rel="noreferrer" className="font-black text-blue-700 underline">
+                          terms and conditions
+                        </a>{" "}
+                        for this job. My acceptance timestamp and email will be saved and emailed to me for this quote.
+                      </span>
+                    </label>
+
                     {error && (
                       <div className="p-3 bg-red-50 border border-red-200 rounded-md">
                         <p className="text-sm text-red-600">{error}</p>
@@ -591,6 +680,7 @@ export default function JobDetailsPage() {
                     )}
                   </div>
                 </div>
+                <BuyerTrustBadges trust={buyerTrust} />
                 
                 {job.client.phone && (
                   <div className="flex items-center gap-2 text-sm text-gray-600">

@@ -7,6 +7,7 @@ import { useSellerVerification } from "@/hooks/useSellerVerification";
 export function KYCVerificationBanner() {
   const { verificationStatus, loading } = useSellerVerification();
 
+  if (loading) return null;
   if (!verificationStatus) return null;
 
   // If already verified, don't show banner
@@ -24,11 +25,7 @@ export function KYCVerificationBanner() {
   let message = "Complete your verification to start accepting jobs.";
   let Icon = AlertCircle;
 
-  if (loading) {
-    title = "Checking Provider Verification";
-    message = "Bidding stays locked until your approved KYC status is confirmed.";
-    Icon = Shield;
-  } else if (isRejected) {
+  if (isRejected) {
     bgColor = "bg-red-50 border-red-200";
     iconColor = "text-red-600";
     title = "Verification Rejected";

@@ -1,54 +1,35 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Send } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
+
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { SupportTicketCenter } from "@/components/support/SupportTicketCenter";
 
 export default function NewAssistanceRequestPage() {
-  const [subject, setSubject] = useState("");
-  const [details, setDetails] = useState("");
-  const [submitted, setSubmitted] = useState(false);
+  const [type, setType] = useState<"user" | "business">("user");
 
-  function submitRequest(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!subject.trim() || !details.trim()) return;
-    setSubmitted(true);
-  }
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setType(params.get("type") === "business" ? "business" : "user");
+  }, []);
 
   return (
     <DashboardLayout>
-      <div className="max-w-3xl mx-auto px-4 py-8">
-        <Link href="/dashboard/assistance" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6">
-          <ArrowLeft className="w-4 h-4" />
+      <div className="mx-auto max-w-5xl px-4 py-8">
+        <Link href="/dashboard/assistance" className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900">
+          <ArrowLeft className="h-4 w-4" />
           Back to assistance
         </Link>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>New support request</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {submitted ? (
-              <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">
-                Your support request was recorded for this test session. The support team can now review the submitted details.
-              </div>
-            ) : (
-              <form onSubmit={submitRequest} className="space-y-4">
-                <Input placeholder="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} required />
-                <Textarea placeholder="Tell us what happened" className="min-h-40" value={details} onChange={(event) => setDetails(event.target.value)} required />
-                <Button type="submit">
-                  <Send className="w-4 h-4 mr-2" />
-                  Submit request
-                </Button>
-              </form>
-            )}
-          </CardContent>
-        </Card>
+        <SupportTicketCenter
+          key={type}
+          defaultRequesterType={type}
+          requesterOptions={["user", "business"]}
+          heading="New support ticket"
+          description="Tell AnyJob what happened. The admin support queue will prioritize unresolved and delayed tickets automatically."
+          initialShowForm
+        />
       </div>
     </DashboardLayout>
   );

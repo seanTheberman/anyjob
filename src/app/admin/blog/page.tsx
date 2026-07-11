@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { BookOpen, Eye, Send } from "lucide-react";
 
 import { AdminShell } from "../_components/AdminShell";
@@ -68,8 +69,14 @@ export default async function AdminBlogPage() {
               </label>
             </div>
             <label className="block">
-              <span className="text-sm font-medium text-slate-700">Cover image URL</span>
-              <input name="cover_image_url" className="mt-2 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+              <span className="text-sm font-medium text-slate-700">Cover image</span>
+              <input
+                name="cover_image_file"
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="mt-2 block w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-950 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:border-red-200 focus:border-red-300 focus:outline-none focus:ring-2 focus:ring-red-100"
+              />
+              <span className="mt-2 block text-xs leading-5 text-slate-500">Upload JPG, PNG, WebP, or GIF. Max 10MB.</span>
             </label>
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Excerpt</span>
@@ -91,7 +98,12 @@ export default async function AdminBlogPage() {
           {posts.length ? posts.map((post) => (
             <article key={post.id} className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
+                <div className="min-w-0">
+                  {post.coverImageUrl ? (
+                    <div className="relative mb-4 aspect-[16/7] overflow-hidden rounded-lg bg-slate-100">
+                      <Image src={post.coverImageUrl} alt="" fill sizes="(min-width: 1280px) 45vw, 100vw" className="object-cover" />
+                    </div>
+                  ) : null}
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-lg font-semibold text-slate-950">{post.title}</h2>
                     <StatusBadge value={post.status} />

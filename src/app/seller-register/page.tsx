@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2, Camera } from "lucide-react";
 import { getShiftNiche, SHIFT_NICHES } from "@/lib/shift-work";
+import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
 
 type ProviderAccountType = "" | "individual" | "business" | "agency";
 type ProviderWorkMode = "none" | "freelance" | "shift" | "both";
@@ -87,7 +88,7 @@ export default function SellerRegisterPage() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadedIdFiles, setUploadedIdFiles] = useState<File[]>([]);
   const [uploadedDocumentDataUrl, setUploadedDocumentDataUrl] = useState<string>("");
   const [selfieVideoFile, setSelfieVideoFile] = useState<File | null>(null);
   const [selfieVideoPreviewUrl, setSelfieVideoPreviewUrl] = useState<string>("");
@@ -96,6 +97,7 @@ export default function SellerRegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [workModePreselected, setWorkModePreselected] = useState(false);
+  const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
 
   const SERVICE_CATEGORIES = [
     "Cleaning",
@@ -197,20 +199,29 @@ export default function SellerRegisterPage() {
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.type === 'application/pdf' || file.type === 'image/jpeg' || file.type === 'image/png') {
-        setUploadedFile(file);
-        setErrors(prev => ({ ...prev, document: "" }));
-        const reader = new FileReader();
-        reader.onload = () => {
-          setUploadedDocumentDataUrl(typeof reader.result === "string" ? reader.result : "");
-        };
-        reader.readAsDataURL(file);
-      } else {
-        setErrors(prev => ({ ...prev, document: "Invalid file format. PDF, JPG or PNG required." }));
-      }
+    const selectedFiles = Array.from(e.target.files || []);
+    if (!selectedFiles.length) return;
+
+    const validTypes = ["application/pdf", "image/jpeg", "image/png", "image/webp"];
+    const invalidFile = selectedFiles.find((file) => !validTypes.includes(file.type));
+    if (invalidFile) {
+      setErrors(prev => ({ ...prev, document: "Invalid file format. PDF, JPG, PNG, or WebP required." }));
+      return;
     }
+
+    const nextFiles = [...uploadedIdFiles, ...selectedFiles].slice(0, 2);
+    setUploadedIdFiles(nextFiles);
+    setErrors(prev => ({ ...prev, document: "" }));
+
+    const firstFile = nextFiles[0];
+    if (firstFile) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setUploadedDocumentDataUrl(typeof reader.result === "string" ? reader.result : "");
+      };
+      reader.readAsDataURL(firstFile);
+    }
+    e.currentTarget.value = "";
   };
 
   const handleSelfieVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -263,12 +274,12 @@ export default function SellerRegisterPage() {
       if (!formData.confirmPassword) newErrors.confirmPassword = "Confirmation is required";
       else if (formData.password !== formData.confirmPassword) newErrors.confirmPassword = "Passwords do not match";
     } else if (step === 3) {
-      if (!formData.address.trim()) newErrors.address = "L'adresse est requise";
-      if (!formData.city.trim()) newErrors.city = "La ville est requise";
-      if (!formData.postalCode.trim()) newErrors.postalCode = "Le code postal est requis";
-      if (!formData.birthDate) newErrors.birthDate = "La date de naissance est requise";
+      if (!formData.address.trim()) newErrors.address = "Address is required";
+      if (!formData.city.trim()) newErrors.city = "City is required";
+      if (!formData.postalCode.trim()) newErrors.postalCode = "Eircode is required";
+      if (!formData.birthDate) newErrors.birthDate = "Date of birth is required";
       else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.birthDate)) newErrors.birthDate = "Use YYYY-MM-DD format";
-      if (!formData.serviceCategory) newErrors.serviceCategory = "La catégorie de service est requise";
+      if (!formData.serviceCategory) newErrors.serviceCategory = "Service category is required";
       if ((formData.workMode === "shift" || formData.workMode === "both") && formData.shiftRoles.length === 0) {
         newErrors.shiftRoles = "Choose at least one shift role";
       }
@@ -276,15 +287,15 @@ export default function SellerRegisterPage() {
         newErrors.shiftRate = "Set an hourly or day fee";
       }
     } else if (step === 4) {
-      if (!formData.siret.trim()) newErrors.siret = "Le numéro SIRET est requis";
-      if (!uploadedFile && !formData.documentUrl.trim()) newErrors.document = "Le document est requis";
+      if (!formData.siret.trim()) newErrors.siret = "Tax ID or business registration number is required";
+      if (uploadedIdFiles.length < 2 && !formData.documentUrl.trim()) newErrors.document = "Upload the front and back of your identity document";
       if (!formData.selfieVideoUrl.trim() && !selfieVideoFile) newErrors.selfieVideoUrl = "Selfie video is required";
       if (formData.insurance === "yes" && !formData.insuranceDocumentUrl.trim()) {
         newErrors.insuranceDocumentUrl = "Insurance document URL is required";
       }
       // Remove terms validation from step 3 - it should be validated in step 4
     } else if (step === 5) {
-      if (!formData.termsAccepted) newErrors.terms = "Les conditions doivent être acceptées";
+      if (!formData.termsAccepted) newErrors.terms = "Terms must be accepted";
     }
 
     setErrors(newErrors);
@@ -341,7 +352,7 @@ export default function SellerRegisterPage() {
             openToRecurringShifts: formData.openToRecurringShifts,
             siret: formData.siret,
             insurance: formData.insurance,
-            idDocumentUrl: uploadedDocumentDataUrl || formData.documentUrl,
+            idDocumentUrl: formData.documentUrl,
             selfieVideoUrl: formData.selfieVideoUrl,
             insuranceDocumentUrl: formData.insuranceDocumentUrl,
             termsAccepted: formData.termsAccepted,
@@ -359,6 +370,25 @@ export default function SellerRegisterPage() {
             access_token: data.session.access_token,
             refresh_token: data.session.refresh_token,
           });
+
+          for (const [index, idFile] of uploadedIdFiles.entries()) {
+            const uploadData = new FormData();
+            uploadData.append("file", idFile);
+            uploadData.append("image_type", "id_document");
+            uploadData.append("title", index === 0 ? "Government ID front" : "Government ID back");
+            uploadData.append("description", index === 0 ? "KYC document front side" : "KYC document back side");
+
+            const uploadResponse = await fetch("/api/upload", {
+              method: "POST",
+              body: uploadData,
+            });
+
+            if (!uploadResponse.ok) {
+              const uploadError = await uploadResponse.json().catch(() => ({}));
+              setSubmitError(uploadError.error || "Your account was created, but ID document upload failed. Please upload it from your profile.");
+              return;
+            }
+          }
 
           if (selfieVideoFile) {
             const uploadData = new FormData();
@@ -639,7 +669,7 @@ export default function SellerRegisterPage() {
                       className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.phone ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="555-0123"
+                      placeholder="+353 87 123 4567"
                     />
                     {errors.phone && (
                       <p className="text-red-500 text-xs mt-1">{errors.phone}</p>
@@ -722,7 +752,7 @@ export default function SellerRegisterPage() {
                       className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.address ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="123 Main St"
+                      placeholder="12 O'Connell Street"
                     />
                     {errors.address && (
                       <p className="text-red-500 text-xs mt-1">{errors.address}</p>
@@ -742,7 +772,7 @@ export default function SellerRegisterPage() {
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.city ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="New York"
+                      placeholder="Dublin"
                     />
                     {errors.city && (
                       <p className="text-red-500 text-xs mt-1">{errors.city}</p>
@@ -751,7 +781,7 @@ export default function SellerRegisterPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Zip Code *
+                      Eircode *
                     </label>
                     <input
                       type="text"
@@ -760,7 +790,7 @@ export default function SellerRegisterPage() {
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.postalCode ? "border-red-500" : "border-gray-300"
                       }`}
-                      placeholder="10001"
+                      placeholder="D02 X285"
                     />
                     {errors.postalCode && (
                       <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
@@ -992,7 +1022,7 @@ export default function SellerRegisterPage() {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tax ID (SIRET) *
+                    Tax ID / business registration number *
                   </label>
                   <div className="relative">
                     <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -1003,8 +1033,8 @@ export default function SellerRegisterPage() {
                       className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                         errors.siret ? "border-red-500" : "border-gray-300"
                       }`}
-                    placeholder="12345678900012"
-                    maxLength={14}
+                    placeholder="Tax ID or CRO number"
+                    maxLength={32}
                   />
                   {errors.siret && (
                     <p className="text-red-500 text-xs mt-1">{errors.siret}</p>
@@ -1033,17 +1063,17 @@ export default function SellerRegisterPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Identity Document *
+                    Identity document front and back *
                   </label>
                   <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
                     <Upload className="mx-auto h-12 w-12 text-gray-400" />
                     <div className="mt-4">
                       <label htmlFor="file-upload" className="cursor-pointer">
                         <span className="mt-2 block text-sm font-medium text-gray-900">
-                          Upload your ID
+                          Upload front and back
                         </span>
                         <span className="mt-1 block text-xs text-gray-500">
-                          PDF, JPG or PNG (Max 5MB)
+                          PDF, JPG, PNG or WebP. Select two files, or capture each side with camera.
                         </span>
                       </label>
                       <input
@@ -1051,19 +1081,63 @@ export default function SellerRegisterPage() {
                         name="file-upload"
                         type="file"
                         className="sr-only"
-                        accept=".pdf,.jpg,.jpeg,.png"
+                        accept=".pdf,.jpg,.jpeg,.png,.webp"
+                        multiple
                         onChange={handleFileUpload}
                       />
                     </div>
-                    {uploadedFile && (
-                      <div className="mt-4 flex items-center justify-center">
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      <label htmlFor="file-upload" className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                        <Upload className="h-4 w-4" />
+                        Browse files
+                      </label>
+	                      {isMobileCamera ? (
+	                        <label
+	                          onClick={(event) => {
+	                            event.preventDefault();
+	                            if (requestingCameraPermission) return;
+	                            const input = event.currentTarget.querySelector("input") as HTMLInputElement | null;
+	                            void requestCameraCapture("environment", () => input?.click());
+	                          }}
+	                          className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+	                        >
+	                          <Camera className="h-4 w-4" />
+	                          {requestingCameraPermission ? "Allow camera..." : "Capture side"}
+	                          <input
+	                            type="file"
+	                            className="sr-only"
+	                            accept="image/*"
+	                            capture="environment"
+	                            onChange={handleFileUpload}
+	                          />
+	                        </label>
+	                      ) : null}
+	                    </div>
+                    {uploadedIdFiles.length > 0 && (
+                      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+                        {uploadedIdFiles.map((file, index) => (
+                          <div key={`${file.name}-${index}`} className="flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                            <Check className="w-4 h-4" />
+                            <span>{index === 0 ? "Front" : "Back"}: {file.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUploadedIdFiles((files) => files.filter((_, fileIndex) => fileIndex !== index));
+                                setUploadedDocumentDataUrl("");
+                              }}
+                              className="ml-2 text-green-500 hover:text-green-700"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
                         <div className="flex items-center space-x-2 bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
                           <Check className="w-4 h-4" />
-                          <span>{uploadedFile.name}</span>
+                          <span>{uploadedIdFiles.length}/2 sides ready</span>
                           <button
                             type="button"
                             onClick={() => {
-                              setUploadedFile(null);
+                              setUploadedIdFiles([]);
                               setUploadedDocumentDataUrl("");
                             }}
                             className="ml-2 text-green-500 hover:text-green-700"
@@ -1122,14 +1196,32 @@ export default function SellerRegisterPage() {
                         </div>
                       </div>
                     ) : (
-                      <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-white p-5 text-center hover:bg-blue-50">
-                        <Upload className="h-6 w-6 text-blue-600" />
-                        <span className="text-sm font-semibold text-gray-900">Upload selfie video</span>
-                        <span className="text-xs text-gray-500">MP4, WebM or MOV up to 100MB</span>
-                        <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={handleSelfieVideoUpload} />
-                      </label>
-                    )}
-                  </div>
+                      <div className="grid gap-2">
+                        <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg bg-white p-5 text-center hover:bg-blue-50">
+                          <Upload className="h-6 w-6 text-blue-600" />
+                          <span className="text-sm font-semibold text-gray-900">Upload selfie video</span>
+                          <span className="text-xs text-gray-500">MP4, WebM or MOV up to 100MB</span>
+                          <input type="file" accept="video/mp4,video/webm,video/quicktime" className="hidden" onChange={handleSelfieVideoUpload} />
+                        </label>
+	                        {isMobileCamera ? (
+	                          <label
+	                            onClick={(event) => {
+	                              event.preventDefault();
+	                              if (requestingCameraPermission) return;
+	                              const input = event.currentTarget.querySelector("input") as HTMLInputElement | null;
+	                              void requestCameraCapture("user", () => input?.click());
+	                            }}
+	                            className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 hover:bg-red-100"
+	                          >
+	                            <Camera className="h-4 w-4" />
+	                            {requestingCameraPermission ? "Allow camera..." : "Record with camera"}
+	                            <input type="file" accept="video/*" capture="user" className="hidden" onChange={handleSelfieVideoUpload} />
+	                          </label>
+	                        ) : null}
+	                      </div>
+	                    )}
+	                  </div>
+	                  {cameraError ? <p className="mt-2 text-xs font-semibold text-red-600">{cameraError}</p> : null}
                   <div className="mt-3">
                     <label className="block text-xs font-semibold text-gray-500">Or paste a selfie video URL</label>
                     <input
@@ -1209,7 +1301,7 @@ export default function SellerRegisterPage() {
                       <p className="font-medium">{formData.city}</p>
                     </div>
                     <div>
-                      <span className="text-gray-600">SIRET:</span>
+                      <span className="text-gray-600">Tax ID:</span>
                       <p className="font-medium">{formData.siret}</p>
                     </div>
                   </div>
@@ -1239,11 +1331,11 @@ export default function SellerRegisterPage() {
                   />
                   <label htmlFor="terms" className="text-sm text-gray-600">
                     I accept the{" "}
-                    <a href="#" className="text-blue-600 hover:text-blue-800 underline">
+                    <a href="/terms-of-use" className="text-blue-600 hover:text-blue-800 underline">
                       terms and conditions
                     </a>{" "}
                     and the{" "}
-                    <a href="#" className="text-blue-600 hover:text-blue-800 underline">
+                    <a href="/privacy-policy" className="text-blue-600 hover:text-blue-800 underline">
                       privacy policy
                     </a>{" "}
                     *

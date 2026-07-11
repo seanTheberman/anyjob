@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { MessageSquare, Loader2, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,12 +20,20 @@ interface ConversationListProps {
   currentUserId: string;
   selectedId?: string;
   onSelect: (conversation: Conversation) => void;
+  autoSelectFirst?: boolean;
 }
 
-export function ConversationList({ currentUserId, selectedId, onSelect }: ConversationListProps) {
+export function ConversationList({ currentUserId, selectedId, onSelect, autoSelectFirst = false }: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
+  const selectedIdRef = useRef(selectedId);
+  const onSelectRef = useRef(onSelect);
+  const supabase = useMemo(() => createClient(), []);
+
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+    onSelectRef.current = onSelect;
+  }, [onSelect, selectedId]);
 
   useEffect(() => {
     const fetchConversations = async () => {
@@ -34,7 +42,12 @@ export function ConversationList({ currentUserId, selectedId, onSelect }: Conver
         const res = await fetch("/api/chat?action=conversations");
         if (res.ok) {
           const data = await res.json();
-          setConversations(data.conversations || []);
+          const nextConversations = data.conversations || [];
+          setConversations(nextConversations);
+          const shouldAutoSelect = autoSelectFirst && !selectedIdRef.current && typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+          if (shouldAutoSelect && nextConversations.length > 0) {
+            onSelectRef.current(nextConversations[0]);
+          }
         }
       } catch (error) {
         console.error("Error fetching conversations:", error);
@@ -64,7 +77,7 @@ export function ConversationList({ currentUserId, selectedId, onSelect }: Conver
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase]);
+  }, [autoSelectFirst, supabase]);
 
   if (loading) {
     return (

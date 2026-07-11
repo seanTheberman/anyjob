@@ -50,6 +50,59 @@ function TruncatedCell({ children, className = "" }: { children: React.ReactNode
   );
 }
 
+function BusinessStatusAction({
+  business,
+  pendingAction,
+  onApprove,
+}: {
+  business: AdminBusiness;
+  pendingAction: string | null;
+  onApprove: () => void;
+}) {
+  if (business.status === "approved") {
+    return (
+      <button
+        type="button"
+        disabled
+        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700"
+        title="This business has already been reviewed and approved"
+      >
+        <ShieldCheck className="h-4 w-4" />
+        Approved
+      </button>
+    );
+  }
+
+  if (business.status === "suspended") {
+    return (
+      <div className="flex flex-col items-start gap-1.5">
+        <StatusBadge value="suspended" />
+        <button
+          type="button"
+          disabled={Boolean(pendingAction)}
+          onClick={onApprove}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+        >
+          <ShieldCheck className="h-4 w-4" />
+          Approve again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={Boolean(pendingAction)}
+      onClick={onApprove}
+      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+    >
+      <ShieldCheck className="h-4 w-4" />
+      Approve
+    </button>
+  );
+}
+
 type UserDetails = {
   profile: {
     id: string;
@@ -384,7 +437,7 @@ function ProviderDetailsPanel({ details }: { details: ProviderDetails }) {
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Selfie video:</span> {details.verification.selfieVideo}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Insurance:</span> {details.verification.insurance}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Background:</span> {details.verification.backgroundCheck}</p>
-            <p className="text-sm text-slate-600 sm:col-span-2"><span className="font-medium text-slate-900">SIRET:</span> {details.verification.siret}</p>
+            <p className="text-sm text-slate-600 sm:col-span-2"><span className="font-medium text-slate-900">Tax ID:</span> {details.verification.siret}</p>
           </div>
         </div>
       </div>
@@ -446,7 +499,7 @@ function BusinessDetailsPanel({ details }: { details: BusinessDetails }) {
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Industry:</span> {details.profile.industry}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Location:</span> {details.profile.city} · {details.profile.country}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Address:</span> {details.profile.address}</p>
-            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Postal code:</span> {details.profile.postalCode}</p>
+            <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Eircode:</span> {details.profile.postalCode}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Joined:</span> {details.profile.joined}</p>
             <p className="text-sm text-slate-600"><span className="font-medium text-slate-900">Updated:</span> {details.profile.updated}</p>
           </div>
@@ -526,12 +579,22 @@ function BusinessDetailsPanel({ details }: { details: BusinessDetails }) {
   );
 }
 
-export function UsersWorklist({ users }: { users: AdminUser[] }) {
+export function UsersWorklist({
+  users,
+  initialStatus = "all",
+  initialRisk = "all",
+  initialQuery = "",
+}: {
+  users: AdminUser[];
+  initialStatus?: string;
+  initialRisk?: string;
+  initialQuery?: string;
+}) {
   const router = useRouter();
   const [rows, setRows] = useState(users);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<FilterOption>("all");
-  const [risk, setRisk] = useState<FilterOption>("all");
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState<FilterOption>(initialStatus);
+  const [risk, setRisk] = useState<FilterOption>(initialRisk);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
@@ -553,7 +616,7 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
     setRows(users);
   }, [users]);
 
-  async function runBulkAction(action: "message" | "watchlist" | "block" | "open", userIds = Array.from(selected)) {
+  async function runBulkAction(action: "message" | "watchlist" | "suspend" | "unsuspend" | "open", userIds = Array.from(selected)) {
     if (!userIds.length) return;
     setMessage(null);
     const response = await fetch("/api/admin/users/actions", {
@@ -571,7 +634,7 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
     if (payload.status) {
       setRows((current) => current.map((user) => {
         if (!userIds.includes(user.id)) return user;
-        if (payload.status === "blocked") return { ...user, status: "Blocked", risk: "High" };
+        if (payload.status === "blocked") return { ...user, status: "Suspended", risk: "High" };
         if (payload.status === "watchlisted") return { ...user, status: "Watchlisted", risk: "Medium" };
         return { ...user, status: "Active", risk: "Low" };
       }));
@@ -636,7 +699,7 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
             <option value="Watchlisted">Watchlisted</option>
             <option value="Pending email">Pending email</option>
             <option value="VIP">VIP</option>
-            <option value="Blocked">Blocked</option>
+            <option value="Suspended">Suspended</option>
           </select>
           <select value={risk} onChange={(event) => setRisk(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
             <option value="all">All risk</option>
@@ -657,8 +720,8 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
         <button type="button" onClick={() => runBulkAction("watchlist")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
           <ShieldAlert className="h-4 w-4" /> Watchlist
         </button>
-        <button type="button" onClick={() => runBulkAction("block")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
-          <UserX className="h-4 w-4" /> Block
+        <button type="button" onClick={() => runBulkAction("suspend")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100">
+          <UserX className="h-4 w-4" /> Suspend
         </button>
       </BulkBar>
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
@@ -675,7 +738,7 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
               <col className="w-[120px]" />
               <col className="w-[145px]" />
               <col className="w-[120px]" />
-              <col className="w-[113px]" />
+              <col className="w-[235px]" />
             </colgroup>
             <thead className="bg-slate-50">
               <tr>
@@ -703,10 +766,23 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
                     <td className="px-4 py-4"><StatusBadge value={user.status} /></td>
                     <td className="px-4 py-4 text-sm text-slate-700">{user.lastSeen}</td>
                     <td className="px-4 py-4 text-right">
-                      <button type="button" onClick={() => openUser(user)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                        {expandedUserId === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        {expandedUserId === user.id ? "Close" : "Open"}
-                      </button>
+                      <div className="inline-flex items-center justify-end gap-2">
+                        <button type="button" onClick={() => openUser(user)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                          {expandedUserId === user.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          {expandedUserId === user.id ? "Close" : "Open"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => runBulkAction(user.status === "Suspended" ? "unsuspend" : "suspend", [user.id])}
+                          className={user.status === "Suspended"
+                            ? "inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                            : "inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50"}
+                          aria-label={`${user.status === "Suspended" ? "Unsuspend" : "Suspend"} ${user.name}`}
+                        >
+                          <UserX className="h-4 w-4" />
+                          {user.status === "Suspended" ? "Unsuspend" : "Suspend"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   {expandedUserId === user.id ? (
@@ -738,11 +814,22 @@ export function UsersWorklist({ users }: { users: AdminUser[] }) {
   );
 }
 
-export function ProvidersWorklist({ providers }: { providers: AdminProvider[] }) {
+export function ProvidersWorklist({
+  providers,
+  initialKyc = "all",
+  initialService = "all",
+  initialQuery = "",
+}: {
+  providers: AdminProvider[];
+  initialKyc?: string;
+  initialService?: string;
+  initialQuery?: string;
+}) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [kyc, setKyc] = useState<FilterOption>("all");
-  const [service, setService] = useState<FilterOption>("all");
+  const [rows, setRows] = useState(providers);
+  const [query, setQuery] = useState(initialQuery);
+  const [kyc, setKyc] = useState<FilterOption>(initialKyc);
+  const [service, setService] = useState<FilterOption>(initialService);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -751,18 +838,22 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
   const [loadingProviderDetails, setLoadingProviderDetails] = useState<string | null>(null);
   const [providerDetailsError, setProviderDetailsError] = useState<string | null>(null);
 
-  const services = Array.from(new Set(providers.map((provider) => provider.service)));
+  useEffect(() => {
+    setRows(providers);
+  }, [providers]);
+
+  const services = Array.from(new Set(rows.map((provider) => provider.service)));
   const filtered = useMemo(() => {
-    return providers.filter((provider) => {
+    return rows.filter((provider) => {
       const kycMatch = kyc === "all" || provider.kycStatus === kyc;
       const serviceMatch = service === "all" || provider.service === service;
       return kycMatch && serviceMatch && includesQuery(Object.values(provider), query);
     });
-  }, [kyc, providers, query, service]);
+  }, [kyc, query, rows, service]);
   const allVisibleSelected = filtered.length > 0 && filtered.every((provider) => selected.has(provider.id));
-  const selectedProviders = providers.filter((provider) => selected.has(provider.id));
+  const selectedProviders = rows.filter((provider) => selected.has(provider.id));
   const hasSelectedInactiveProviders = selectedProviders.some((provider) => provider.accountStatus !== "Active" && provider.docsSubmitted);
-  const hasSelectedActiveProviders = selectedProviders.some((provider) => provider.accountStatus === "Active");
+  const hasSelectedSuspendableProviders = selectedProviders.some((provider) => provider.accountStatus !== "Blocked" && provider.kycStatus !== "Suspended");
 
   function toggleAll() {
     setSelected((current) => {
@@ -784,12 +875,12 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
 
   function eligibleProviderIds(providerIds: string[], action: "approve" | "request_docs" | "reject" | "suspend") {
     if (action === "suspend") {
-      return providers
-        .filter((provider) => providerIds.includes(provider.id) && provider.accountStatus === "Active")
+      return rows
+        .filter((provider) => providerIds.includes(provider.id) && provider.accountStatus !== "Blocked" && provider.kycStatus !== "Suspended")
         .map((provider) => provider.id);
     }
     if (action === "request_docs") return providerIds;
-    return providers
+    return rows
       .filter((provider) => providerIds.includes(provider.id) && provider.docsSubmitted && provider.accountStatus !== "Active")
       .map((provider) => provider.id);
   }
@@ -816,8 +907,28 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
       return;
     }
 
+    const emailResult = payload.emailResult;
+    const emailError = Array.isArray(emailResult?.errors) && emailResult.errors.length ? ` ${emailResult.errors[0]}` : "";
+    const emailMessage =
+      action === "request_docs" && emailResult
+        ? emailResult.failed
+          ? ` Docs email sent to ${emailResult.sent}/${emailResult.attempted}; ${emailResult.failed} failed.${emailError}`
+          : ` Docs email sent to ${emailResult.sent}/${emailResult.attempted}.`
+        : "";
     setSelected(new Set());
-    setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.`);
+    setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.${emailMessage}`);
+    if (["approve", "reject", "suspend"].includes(action)) {
+      setRows((current) => current.map((provider) => {
+        if (!providerIds.includes(provider.id)) return provider;
+        if (action === "suspend") {
+          return { ...provider, kycStatus: "Suspended", verification: "Suspended", accountStatus: "Blocked" };
+        }
+        if (action === "approve") {
+          return { ...provider, kycStatus: "Approved", verification: "Verified", accountStatus: "Active" };
+        }
+        return { ...provider, kycStatus: "Rejected", verification: "Rejected", accountStatus: "Blocked" };
+      }));
+    }
     router.refresh();
   }
 
@@ -872,7 +983,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
             <ShieldCheck className="h-4 w-4" /> Approve KYC
           </button>
         ) : null}
-        {hasSelectedActiveProviders ? (
+        {hasSelectedSuspendableProviders ? (
           <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("suspend")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
             <UserX className="h-4 w-4" /> Suspend
           </button>
@@ -933,7 +1044,7 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
                     <td className="px-4 py-4"><StatusBadge value={provider.accountStatus} /></td>
                     <td className="px-4 py-4 text-right">
                       <div className="flex flex-nowrap justify-end gap-2 whitespace-nowrap">
-                        {provider.accountStatus === "Active" ? (
+                        {provider.accountStatus !== "Blocked" && provider.kycStatus !== "Suspended" ? (
                           <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("suspend", [provider.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Suspend</button>
                         ) : provider.docsSubmitted ? (
                           <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [provider.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
@@ -976,11 +1087,22 @@ export function ProvidersWorklist({ providers }: { providers: AdminProvider[] })
   );
 }
 
-export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[] }) {
+export function BusinessesWorklist({
+  businesses,
+  initialStatus = "all",
+  initialKind = "all",
+  initialQuery = "",
+}: {
+  businesses: AdminBusiness[];
+  initialStatus?: string;
+  initialKind?: string;
+  initialQuery?: string;
+}) {
   const router = useRouter();
   const [rows, setRows] = useState(businesses);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<FilterOption>("all");
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState<FilterOption>(initialStatus);
+  const [kind, setKind] = useState<FilterOption>(initialKind);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -996,13 +1118,20 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
   const filtered = useMemo(() => {
     return rows.filter((business) => {
       const statusMatch = status === "all" || business.status === status;
-      return statusMatch && includesQuery(Object.values(business), query);
+      const kindMatch = kind === "all" || business.kind === kind;
+      return statusMatch && kindMatch && includesQuery(Object.values(business), query);
     });
-  }, [query, rows, status]);
+  }, [kind, query, rows, status]);
   const allVisibleSelected = filtered.length > 0 && filtered.every((business) => selected.has(business.id));
   const selectedBusinesses = rows.filter((business) => selected.has(business.id));
   const hasSelectedApprovedBusinesses = selectedBusinesses.some((business) => business.status === "approved");
-  const hasSelectedUnapprovedBusinesses = selectedBusinesses.some((business) => business.status !== "approved");
+  const selectedReviewableBusinesses = selectedBusinesses.filter((business) => business.status !== "approved");
+  const hasSelectedReviewableBusinesses = selectedReviewableBusinesses.length > 0;
+  const kindCounts = useMemo(() => ({
+    all: rows.length,
+    hiring: rows.filter((business) => business.kind === "hiring").length,
+    contractor: rows.filter((business) => business.kind === "contractor").length,
+  }), [rows]);
 
   function toggleAll() {
     setSelected((current) => {
@@ -1027,28 +1156,53 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
     setPendingAction(action);
     setMessage(null);
 
-    const response = await fetch("/api/admin/businesses/review", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, businessIds }),
-    });
-    const payload = await response.json().catch(() => ({}));
+    const targetRows = rows.filter((business) => businessIds.includes(business.id));
+    const hiringBusinessIds = targetRows.filter((business) => business.source === "business_profile").map((business) => business.id);
+    const contractorProviderIds = targetRows.filter((business) => business.source === "provider_account").map((business) => business.id);
+    const nextStatus =
+      action === "approve" ? "approved" :
+      action === "reject" ? "rejected" :
+      action === "suspend" ? "suspended" :
+      null;
+
+    const results = await Promise.all([
+      hiringBusinessIds.length
+        ? fetch("/api/admin/businesses/review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, businessIds: hiringBusinessIds }),
+          }).then(async (response) => ({ source: "business", response, payload: await response.json().catch(() => ({})) }))
+        : Promise.resolve(null),
+      contractorProviderIds.length
+        ? fetch("/api/admin/providers/kyc", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, providerIds: contractorProviderIds }),
+          }).then(async (response) => ({ source: "contractor", response, payload: await response.json().catch(() => ({})) }))
+        : Promise.resolve(null),
+    ]);
     setPendingAction(null);
 
-    if (!response.ok) {
-      setMessage(payload.error || "Business review update failed");
+    const failed = results.find((result) => result && !result.response.ok);
+    if (failed) {
+      setMessage(failed.payload.error || `${failed.source === "contractor" ? "Contractor" : "Business"} review update failed`);
       return;
     }
 
     setSelected(new Set());
     setRows((current) => current.map((business) => (
-      businessIds.includes(business.id) ? { ...business, status: payload.status || business.status } : business
+      businessIds.includes(business.id) && nextStatus ? { ...business, status: nextStatus } : business
     )));
     setMessage(`Updated ${businessIds.length} business${businessIds.length === 1 ? "" : "es"}.`);
     router.refresh();
   }
 
   async function openBusiness(business: AdminBusiness) {
+    if (business.source === "provider_account") {
+      router.push(`/admin/providers?q=${encodeURIComponent(business.name)}`);
+      return;
+    }
+
     if (expandedBusinessId === business.id) {
       setExpandedBusinessId(null);
       return;
@@ -1073,7 +1227,7 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
   return (
     <>
       <div className="mb-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="grid gap-2 lg:grid-cols-[1fr_190px_auto]">
+        <div className="grid gap-2 lg:grid-cols-[1fr_190px_210px_auto]">
           <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-9 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" placeholder="Search business, registration number, city, contact" />
           <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
             <option value="all">All statuses</option>
@@ -1082,15 +1236,20 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
             <option value="rejected">Rejected</option>
             <option value="suspended">Suspended</option>
           </select>
-          <button onClick={() => { setQuery(""); setStatus("all"); }} className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <select value={kind} onChange={(event) => setKind(event.target.value)} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="all">All business types ({kindCounts.all})</option>
+            <option value="hiring">Hiring businesses ({kindCounts.hiring})</option>
+            <option value="contractor">Contractors / agencies ({kindCounts.contractor})</option>
+          </select>
+          <button onClick={() => { setQuery(""); setStatus("all"); setKind("all"); }} className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
             Reset
           </button>
         </div>
       </div>
 
       <BulkBar selectedCount={selected.size} onClear={() => setSelected(new Set())}>
-        {hasSelectedUnapprovedBusinesses ? (
-          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+        {hasSelectedReviewableBusinesses ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", selectedReviewableBusinesses.map((business) => business.id))} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-50 disabled:opacity-60">
             <ShieldCheck className="h-4 w-4" /> Approve
           </button>
         ) : null}
@@ -1102,8 +1261,8 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
         <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
           <Mail className="h-4 w-4" /> Request docs
         </button>
-        {hasSelectedUnapprovedBusinesses ? (
-          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject")} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
+        {hasSelectedReviewableBusinesses ? (
+          <button disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("reject", selectedReviewableBusinesses.map((business) => business.id))} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-3 font-medium text-red-700 ring-1 ring-red-200 hover:bg-red-100 disabled:opacity-60">
             <ShieldAlert className="h-4 w-4" /> Reject
           </button>
         ) : null}
@@ -1112,23 +1271,24 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
 
       <div className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1040px] table-fixed divide-y divide-slate-200">
+          <table className="w-full min-w-[1160px] table-fixed divide-y divide-slate-200">
             <colgroup>
               <col className="w-11" />
               <col className="w-[190px]" />
               <col className="w-[145px]" />
-              <col className="w-[250px]" />
+              <col className="w-[145px]" />
+              <col className="w-[230px]" />
               <col className="w-[165px]" />
               <col className="w-[80px]" />
-              <col className="w-[95px]" />
-              <col className="w-[88px]" />
+              <col className="w-[150px]" />
+              <col className="w-[104px]" />
             </colgroup>
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-3 py-3">
                   <input aria-label="Select all businesses" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Business", "Registration", "Contact", "Work types", "Created", "Status", "Action"].map((column) => (
+                {["Business", "Type", "Registration", "Contact", "Work types", "Created", "Status", "Action"].map((column) => (
                   <th
                     key={column}
                     className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 ${column === "Action" ? "text-right" : ""}`}
@@ -1157,22 +1317,36 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
                         {business.industry} · {business.city}
                       </p>
                     </td>
+                    <td className="px-3 py-4">
+                      <span
+                        className={`inline-flex max-w-full rounded-full px-2.5 py-1 text-xs font-semibold ${
+                          business.kind === "contractor"
+                            ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+                            : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+                        }`}
+                        title={business.source === "provider_account" ? "Provider-side contractor or agency account" : "Business account that posts jobs and shifts"}
+                      >
+                        <span className="truncate">{business.kindLabel}</span>
+                      </span>
+                    </td>
                     <TruncatedCell>{business.registrationNumber}</TruncatedCell>
                     <TruncatedCell>{business.contact}</TruncatedCell>
                     <TruncatedCell>{business.workTypes}</TruncatedCell>
                     <TruncatedCell>{business.created}</TruncatedCell>
-                    <td className="px-3 py-4"><StatusBadge value={business.status} /></td>
+                    <td className="px-3 py-4">
+                      <BusinessStatusAction
+                        business={business}
+                        pendingAction={pendingAction}
+                        onApprove={() => runBusinessAction("approve", [business.id])}
+                      />
+                    </td>
                     <td className="px-3 py-4">
                       <div className="flex flex-nowrap justify-end gap-1.5 whitespace-nowrap">
                         {business.status === "approved" ? (
                           <button title="Suspend business" aria-label={`Suspend ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("suspend", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-red-200 text-red-700 hover:bg-red-50 disabled:opacity-60">
                             <UserX className="h-4 w-4" />
                           </button>
-                        ) : (
-                          <button title="Approve business" aria-label={`Approve ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("approve", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">
-                            <ShieldCheck className="h-4 w-4" />
-                          </button>
-                        )}
+                        ) : null}
                         <button title="Request documents" aria-label={`Request documents from ${business.name}`} disabled={Boolean(pendingAction)} onClick={() => runBusinessAction("request_docs", [business.id])} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-60">
                           <Mail className="h-4 w-4" />
                         </button>
@@ -1186,7 +1360,7 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
                   </tr>
                   {expandedBusinessId === business.id ? (
                     <tr>
-                      <td colSpan={8} className="bg-slate-50 p-0">
+                      <td colSpan={9} className="bg-slate-50 p-0">
                         <div className="w-full px-4 py-4">
                           {loadingBusinessDetails === business.id ? (
                             <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
@@ -1213,11 +1387,61 @@ export function BusinessesWorklist({ businesses }: { businesses: AdminBusiness[]
   );
 }
 
-export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
+function KycDocumentSummary({ review }: { review: KycReview }) {
+  const submitted = review.submittedDocuments.length ? review.submittedDocuments : ["none"];
+
+  return (
+    <div className="min-w-0 space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {submitted.map((document) => (
+          <span
+            key={`submitted-${review.id}-${document}`}
+            className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+              document === "none" ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100"
+            }`}
+          >
+            {document}
+          </span>
+        ))}
+      </div>
+      {review.missingDocuments.length ? (
+        <p className="line-clamp-2 text-xs leading-5 text-red-700">
+          <span className="font-semibold">Missing:</span> {review.missingDocuments.join(", ")}
+        </p>
+      ) : (
+        <p className="text-xs font-medium text-emerald-700">Ready for admin decision</p>
+      )}
+    </div>
+  );
+}
+
+function KycReviewState({ review }: { review: KycReview }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        <StatusBadge value={review.status} />
+        {review.priority === "High" ? <StatusBadge value="High priority" /> : null}
+      </div>
+      <p className="line-clamp-2 text-xs leading-5 text-slate-600">{review.accountImpact}</p>
+    </div>
+  );
+}
+
+export function KycWorklist({
+  reviews,
+  initialStatus = "all",
+  initialPriority = "all",
+  initialQuery = "",
+}: {
+  reviews: KycReview[];
+  initialStatus?: string;
+  initialPriority?: string;
+  initialQuery?: string;
+}) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<FilterOption>("all");
-  const [priority, setPriority] = useState<FilterOption>("all");
+  const [query, setQuery] = useState(initialQuery);
+  const [status, setStatus] = useState<FilterOption>(initialStatus);
+  const [priority, setPriority] = useState<FilterOption>(initialPriority);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [message, setMessage] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -1282,8 +1506,16 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
       return;
     }
 
+    const emailResult = payload.emailResult;
+    const emailError = Array.isArray(emailResult?.errors) && emailResult.errors.length ? ` ${emailResult.errors[0]}` : "";
+    const emailMessage =
+      action === "request_docs" && emailResult
+        ? emailResult.failed
+          ? ` Docs email sent to ${emailResult.sent}/${emailResult.attempted}; ${emailResult.failed} failed.${emailError}`
+          : ` Docs email sent to ${emailResult.sent}/${emailResult.attempted}.`
+        : "";
     setSelected(new Set());
-    setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.`);
+    setMessage(`Updated ${providerIds.length} provider${providerIds.length === 1 ? "" : "s"}.${emailMessage}`);
     router.refresh();
   }
 
@@ -1325,43 +1557,51 @@ export function KycWorklist({ reviews }: { reviews: KycReview[] }) {
       {message ? <div className="mb-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+        <div>
+          <table className="w-full table-fixed divide-y divide-slate-200">
+            <colgroup>
+              <col className="w-10" />
+              <col className="w-[26%]" />
+              <col className="w-[34%]" />
+              <col className="w-[22%]" />
+              <col className="w-[18%]" />
+            </colgroup>
             <thead className="bg-slate-50">
               <tr>
-                <th className="w-12 px-4 py-3">
+                <th className="px-3 py-3">
                   <input aria-label="Select all KYC reviews" type="checkbox" checked={allVisibleSelected} onChange={toggleAll} />
                 </th>
-                {["Provider", "Issue", "Document", "Docs submitted", "Priority", "Status", "Submitted", "Account impact", "Action"].map((column) => (
-                  <th key={column} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
+                {["Provider", "Documents", "Review", "Action"].map((column) => (
+                  <th key={column} className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">{column}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filtered.map((review) => (
                 <tr key={review.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-4"><input aria-label={`Select ${review.provider} KYC review`} type="checkbox" checked={selected.has(review.id)} onChange={() => toggleOne(review.id)} /></td>
-                  <td className="px-4 py-4">
-                    <p className="text-sm font-medium text-slate-950">{review.provider}</p>
-                    <p className="text-xs text-slate-500">{review.id}</p>
+                  <td className="px-3 py-4 align-top">
+                    <input aria-label={`Select ${review.provider} KYC review`} type="checkbox" checked={selected.has(review.id)} onChange={() => toggleOne(review.id)} />
                   </td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{review.issue}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{review.document}</td>
-                  <td className="px-4 py-4"><StatusBadge value={review.docsSubmitted ? "Submitted" : "Not submitted"} /></td>
-                  <td className="px-4 py-4"><StatusBadge value={review.priority} /></td>
-                  <td className="px-4 py-4"><StatusBadge value={review.status} /></td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{review.submitted}</td>
-                  <td className="px-4 py-4 text-sm text-slate-700">{review.accountImpact}</td>
-                  <td className="px-4 py-4">
-                    <div className="flex flex-nowrap gap-2 whitespace-nowrap">
+                  <td className="min-w-0 px-3 py-4 align-top">
+                    <p className="truncate text-sm font-semibold text-slate-950" title={review.provider}>{review.provider}</p>
+                    <p className="mt-1 truncate font-mono text-xs text-slate-500" title={review.providerId}>{review.providerId}</p>
+                  </td>
+                  <td className="px-3 py-4 align-top">
+                    <KycDocumentSummary review={review} />
+                  </td>
+                  <td className="px-3 py-4 align-top">
+                    <KycReviewState review={review} />
+                  </td>
+                  <td className="px-3 py-4 align-top">
+                    <div className="flex flex-wrap gap-1.5">
                       {review.docsSubmitted ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-3 py-1.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("approve", [review.id])} className="rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-60">Approve</button>
                       ) : null}
-                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                      <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("request_docs", [review.id])} className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
                         {review.docsSubmitted ? "Review docs" : "Request docs"}
                       </button>
                       {review.docsSubmitted ? (
-                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
+                        <button disabled={Boolean(pendingAction)} onClick={() => runKycAction("reject", [review.id])} className="rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60">Reject</button>
                       ) : null}
                     </div>
                   </td>

@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { Headphones, MessageSquare } from "lucide-react";
-import { AdminActionButton } from "../_components/AdminActionButton";
 import { AdminShell } from "../_components/AdminShell";
-import { AdminButtonLink, AdminTable, Toolbar } from "../_components/AdminPrimitives";
+import { AdminButtonLink } from "../_components/AdminPrimitives";
+import { AdminSupportTickets } from "../_components/AdminSupportTickets";
 import { getAdminSupport } from "../_lib/admin-live-data";
 
 export const dynamic = "force-dynamic";
@@ -10,13 +10,7 @@ export const dynamic = "force-dynamic";
 async function SupportContent() {
   const supportTickets = await getAdminSupport();
 
-  return supportTickets.length ? (
-    <AdminTable columns={["Ticket", "Requester", "Topic", "Priority", "Status"]} rows={supportTickets} actionLabel="Reply" />
-  ) : (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm">
-      No live notification or conversation support items found.
-    </div>
-  );
+  return <AdminSupportTickets tickets={supportTickets} />;
 }
 
 function SupportFallback() {
@@ -50,10 +44,6 @@ export default function AdminSupportPage() {
         </>
       }
     >
-      <Toolbar>
-        <AdminActionButton label="Assign selected" context="visible support tickets" />
-        <AdminActionButton label="Send macro" context="visible support tickets" />
-      </Toolbar>
       <Suspense fallback={<SupportFallback />}>
         <SupportContent />
       </Suspense>

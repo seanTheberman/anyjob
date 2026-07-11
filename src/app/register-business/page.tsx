@@ -25,6 +25,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { SHIFT_NICHES, WORK_TYPES } from "@/lib/shift-work";
+import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
 
 type BusinessProfile = {
   id: string;
@@ -34,17 +35,17 @@ type BusinessProfile = {
   rejection_reason?: string | null;
 };
 
-const EUROPE_BUSINESS_DOCUMENTS = [
+const IRELAND_BUSINESS_DOCUMENTS = [
   {
     key: "registration",
-    label: "Company registration / Kbis / Companies House / Handelsregister",
-    help: "Official company certificate, business register extract, or self-employed registration proof.",
+    label: "Company registration / CRO certificate",
+    help: "Companies Registration Office certificate, business name registration, or self-employed registration proof.",
     required: true,
   },
   {
     key: "tax",
-    label: "VAT / tax number / SIRET / UTR proof",
-    help: "VAT certificate, tax office proof, SIREN/SIRET evidence, UTR, Steuernummer, or equivalent.",
+    label: "VAT / tax registration proof",
+    help: "Irish VAT certificate, Revenue registration proof, tax reference evidence, or equivalent.",
     required: false,
   },
   {
@@ -56,7 +57,7 @@ const EUROPE_BUSINESS_DOCUMENTS = [
   {
     key: "license",
     label: "Trade license / regulated activity permit",
-    help: "Required where applicable for healthcare, security, transport, childcare, food service, or other regulated work.",
+    help: "Required where applicable in Ireland for healthcare, security, transport, childcare, food service, or other regulated work.",
     required: false,
   },
   {
@@ -73,7 +74,7 @@ const EUROPE_BUSINESS_DOCUMENTS = [
   },
 ] as const;
 
-type BusinessDocumentKey = (typeof EUROPE_BUSINESS_DOCUMENTS)[number]["key"];
+type BusinessDocumentKey = (typeof IRELAND_BUSINESS_DOCUMENTS)[number]["key"];
 type BusinessDocumentRecord = Record<BusinessDocumentKey, string>;
 
 type BusinessRegistrationForm = {
@@ -170,7 +171,7 @@ const APPROVAL_REQUIREMENTS = [
 ];
 
 function emptyDocumentRecord(): BusinessDocumentRecord {
-  return EUROPE_BUSINESS_DOCUMENTS.reduce((record, document) => {
+  return IRELAND_BUSINESS_DOCUMENTS.reduce((record, document) => {
     record[document.key] = "";
     return record;
   }, {} as BusinessDocumentRecord);
@@ -189,7 +190,7 @@ function defaultForm(): BusinessRegistrationForm {
     address: "",
     city: "",
     postalCode: "",
-    country: "France",
+    country: "Ireland",
     documentLinks: emptyDocumentRecord(),
     documentDataUrls: emptyDocumentRecord(),
     documentFileNames: emptyDocumentRecord(),
@@ -206,7 +207,7 @@ function hasRequiredBusinessDocument(formData: BusinessRegistrationForm) {
 }
 
 function buildBusinessDocuments(formData: BusinessRegistrationForm) {
-  return EUROPE_BUSINESS_DOCUMENTS.map((document) => ({
+  return IRELAND_BUSINESS_DOCUMENTS.map((document) => ({
     type: document.key,
     label: document.label,
     required: document.required,
@@ -232,6 +233,8 @@ export default function RegisterBusinessPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState<BusinessRegistrationForm>(defaultForm);
+  const [uploadingDocumentKey, setUploadingDocumentKey] = useState<BusinessDocumentKey | null>(null);
+  const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
 
   const selectedNiche = useMemo(
     () => SHIFT_NICHES.find((item) => item.industry === formData.industry) || SHIFT_NICHES[0],
@@ -325,22 +328,45 @@ export default function RegisterBusinessPage() {
     }));
   }
 
-  function handleFileUpload(key: BusinessDocumentKey, event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFileUpload(key: BusinessDocumentKey, event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    const input = event.currentTarget;
     if (!file) return;
-    if (!["application/pdf", "image/jpeg", "image/png"].includes(file.type)) {
-      setError("Upload a PDF, JPG, or PNG business document.");
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Upload a PDF, JPG, PNG, or WebP business document.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
+
+    setUploadingDocumentKey(key);
+    setError(null);
+    setMessage(null);
+
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", file);
+      uploadData.append("folder", "anyjob/business-documents");
+
+      const response = await fetch("/api/upload/document", {
+        method: "POST",
+        body: uploadData,
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload.error || "Business document upload failed.");
+      }
+
       setFormData((current) => ({
         ...current,
-        documentDataUrls: { ...current.documentDataUrls, [key]: typeof reader.result === "string" ? reader.result : "" },
-        documentFileNames: { ...current.documentFileNames, [key]: file.name },
+        documentDataUrls: { ...current.documentDataUrls, [key]: String(payload.url) },
+        documentFileNames: { ...current.documentFileNames, [key]: String(payload.fileName || file.name) },
       }));
-    };
-    reader.readAsDataURL(file);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Business document upload failed.");
+    } finally {
+      setUploadingDocumentKey(null);
+      input.value = "";
+    }
   }
 
   function validateStep(step = currentStep) {
@@ -364,7 +390,7 @@ export default function RegisterBusinessPage() {
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!validateStep(5)) {
-      setError("Company registration / Kbis / Companies House document is required before admin review.");
+      setError("Company registration / CRO certificate is required before admin review.");
       return;
     }
 
@@ -531,7 +557,16 @@ export default function RegisterBusinessPage() {
               <StepContact formData={formData} updateField={updateField} />
             ) : null}
             {currentStep === 5 ? (
-              <StepDocuments formData={formData} handleFileUpload={handleFileUpload} updateDocumentLink={updateDocumentLink} />
+              <StepDocuments
+                formData={formData}
+                handleFileUpload={handleFileUpload}
+                updateDocumentLink={updateDocumentLink}
+                uploadingDocumentKey={uploadingDocumentKey}
+                isMobileCamera={isMobileCamera}
+                requestingCameraPermission={requestingCameraPermission}
+                cameraError={cameraError}
+                requestCameraCapture={requestCameraCapture}
+              />
             ) : null}
 
             {error ? <div className="mt-5 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div> : null}
@@ -922,23 +957,23 @@ function StepContact({ formData, updateField }: { formData: BusinessRegistration
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-gray-700">Contact phone *</span>
-          <input value={formData.contactPhone} onChange={(event) => updateField("contactPhone", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+          <input value={formData.contactPhone} onChange={(event) => updateField("contactPhone", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="+353 87 123 4567" />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-gray-700">Country</span>
-          <input value={formData.country} onChange={(event) => updateField("country", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+          <input value="Ireland" readOnly className="mt-2 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-gray-600" />
         </label>
         <label className="block md:col-span-2">
           <span className="text-sm font-semibold text-gray-700">Business address *</span>
-          <input value={formData.address} onChange={(event) => updateField("address", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+          <input value={formData.address} onChange={(event) => updateField("address", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="12 O'Connell Street, Dublin 1" />
         </label>
         <label className="block">
           <span className="text-sm font-semibold text-gray-700">City *</span>
-          <input value={formData.city} onChange={(event) => updateField("city", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+          <input value={formData.city} onChange={(event) => updateField("city", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Dublin" />
         </label>
         <label className="block">
-          <span className="text-sm font-semibold text-gray-700">Postal code</span>
-          <input value={formData.postalCode} onChange={(event) => updateField("postalCode", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" />
+          <span className="text-sm font-semibold text-gray-700">Eircode</span>
+          <input value={formData.postalCode} onChange={(event) => updateField("postalCode", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="D01 F5P2" />
         </label>
       </div>
       <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600">
@@ -953,10 +988,20 @@ function StepDocuments({
   formData,
   handleFileUpload,
   updateDocumentLink,
+  uploadingDocumentKey,
+  isMobileCamera,
+  requestingCameraPermission,
+  cameraError,
+  requestCameraCapture,
 }: {
   formData: BusinessRegistrationForm;
   handleFileUpload: (key: BusinessDocumentKey, event: React.ChangeEvent<HTMLInputElement>) => void;
   updateDocumentLink: (key: BusinessDocumentKey, value: string) => void;
+  uploadingDocumentKey: BusinessDocumentKey | null;
+  isMobileCamera: boolean;
+  requestingCameraPermission: boolean;
+  cameraError: string | null;
+  requestCameraCapture: (captureMode: "user" | "environment", openCaptureInput: () => void) => Promise<boolean>;
 }) {
   const submittedDocuments = buildBusinessDocuments(formData);
 
@@ -964,7 +1009,7 @@ function StepDocuments({
     <div>
       <h3 className="text-xl font-bold text-gray-950">Business verification documents</h3>
       <p className="mt-2 text-sm leading-6 text-gray-600">
-        Add the documents admins normally need for Europe-based businesses. The registration document is required; the
+        Add the documents admins normally need for Ireland-based businesses. The registration document is required; the
         other fields help verify tax, insurance, licensing, identity, and address where applicable.
       </p>
       <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -979,7 +1024,7 @@ function StepDocuments({
         </div>
       </div>
       <div className="mt-5 grid gap-4">
-        {EUROPE_BUSINESS_DOCUMENTS.map((document) => (
+        {IRELAND_BUSINESS_DOCUMENTS.map((document) => (
           <div key={document.key} className="rounded-lg border border-gray-200 bg-white p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -1002,17 +1047,34 @@ function StepDocuments({
                   aria-label={`${document.label} document link`}
                 />
               </label>
-              <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-5 py-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100">
-                <FileUp className="mb-2 h-5 w-5" />
-                Upload {document.key} document
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="sr-only" aria-label={`Upload ${document.label}`} onChange={(event) => handleFileUpload(document.key, event)} />
-                {formData.documentFileNames[document.key] ? (
-                  <span className="mt-2 max-w-48 break-all text-xs font-medium text-emerald-700">{formData.documentFileNames[document.key]}</span>
+              <div className="grid gap-2">
+                <label className="flex min-h-20 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-5 py-4 text-center text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                  {uploadingDocumentKey === document.key ? <Loader2 className="mb-2 h-5 w-5 animate-spin" /> : <FileUp className="mb-2 h-5 w-5" />}
+                  {uploadingDocumentKey === document.key ? "Uploading..." : `Upload ${document.key} document`}
+                  <input type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="sr-only" aria-label={`Upload ${document.label}`} onChange={(event) => handleFileUpload(document.key, event)} />
+                  {formData.documentFileNames[document.key] ? (
+                    <span className="mt-2 max-w-48 break-all text-xs font-medium text-emerald-700">{formData.documentFileNames[document.key]}</span>
+                  ) : null}
+                </label>
+                {isMobileCamera ? (
+                  <label
+                    onClick={(event) => {
+                      event.preventDefault();
+                      if (uploadingDocumentKey || requestingCameraPermission) return;
+                      const input = event.currentTarget.querySelector("input") as HTMLInputElement | null;
+                      void requestCameraCapture("environment", () => input?.click());
+                    }}
+                    className="flex cursor-pointer items-center justify-center rounded-lg border border-red-100 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100"
+                  >
+                    {requestingCameraPermission ? "Allow camera..." : "Capture with camera"}
+                    <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Capture ${document.label}`} onChange={(event) => handleFileUpload(document.key, event)} />
+                  </label>
                 ) : null}
-              </label>
+              </div>
             </div>
           </div>
         ))}
+        {cameraError ? <p className="text-sm font-semibold text-red-600">{cameraError}</p> : null}
       </div>
       <div className="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
         <p className="text-sm font-bold text-gray-950">Review summary</p>

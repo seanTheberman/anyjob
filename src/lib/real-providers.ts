@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { getProviderStatsMap, type ProviderStats } from "@/lib/provider-stats";
 
 export type ProviderCardData = {
   id: string;
@@ -105,6 +106,7 @@ type ProviderMedia = {
 };
 
 type BadgeAwardRow = {
+  user_id?: string | null;
   provider_id: string | null;
   badge_id: string | null;
 };
@@ -112,6 +114,7 @@ type BadgeAwardRow = {
 type BadgeDefinitionRow = {
   id: string;
   name: string | null;
+  slug?: string | null;
   is_active: boolean | null;
 };
 
@@ -189,6 +192,15 @@ function normalize(value: string | null | undefined) {
     .trim();
 }
 
+function isPlatformLevelLabel(value: string | null | undefined) {
+  const normalized = normalize(value).replace(/[-_]+/g, " ");
+  return normalized === "top pro" || /^level\s+\d+$/.test(normalized);
+}
+
+function publicExperienceLabel(provider: SellerRow) {
+  return isPlatformLevelLabel(provider.experience_level) ? "" : provider.experience_level || "";
+}
+
 function providerMetadata(provider: SellerRow) {
   return (provider.availability && typeof provider.availability === "object" ? provider.availability : {}) as {
     providerAccountType?: string;
@@ -240,7 +252,7 @@ function providerMatchesCategory(provider: SellerRow, categorySlug?: string) {
 function serviceTags(provider: SellerRow) {
   return [
     provider.service_category,
-    provider.experience_level,
+    publicExperienceLabel(provider),
     provider.city,
   ].filter((tag): tag is string => Boolean(tag && tag.trim()));
 }
@@ -274,14 +286,17 @@ function providerAccountBadges(provider: SellerRow) {
 }
 
 function providerLevelFromBadges(badges: string[]) {
-  return badges.find((badge) => ["Top Pro", "Level 2", "Level 1"].includes(badge)) || "";
+  if (badges.includes("Top Pro")) return "Top Pro";
+  if (badges.includes("Level 2")) return "Level 2";
+  if (badges.includes("Level 1")) return "Level 1";
+  return "";
 }
 
 function serviceList(provider: SellerRow) {
   return serviceTags(provider).filter((value, index, array) => value && array.indexOf(value) === index);
 }
 
-function mapSellerToCard(provider: SellerRow): ProviderCardData {
+function mapSellerToCard(provider: SellerRow, providerStats?: ProviderStats): ProviderCardData {
   return {
     id: provider.id,
     slug: provider.id,
@@ -289,7 +304,7 @@ function mapSellerToCard(provider: SellerRow): ProviderCardData {
     category: provider.service_category || "Service provider",
     rate: provider.hourly_rate && provider.hourly_rate > 0 ? provider.hourly_rate : 0,
     image: provider.profile_image_url || null,
-    isNew: Number(provider.total_jobs || 0) === 0,
+    isNew: (providerStats?.completedJobs || 0) === 0,
     tags: serviceTags(provider),
   };
 }
@@ -298,6 +313,7 @@ function mapSellerToMarketplace(
   provider: SellerRow,
   media?: ProviderMedia,
   ratingStats?: RatingStats,
+  providerStats?: ProviderStats,
   badges: string[] = [],
 ): ProviderMarketplaceData {
   const category = provider.service_category || "Service provider";
@@ -305,8 +321,9 @@ function mapSellerToMarketplace(
   const services = serviceList(provider);
   const city = provider.city || "";
   const country = provider.country || "";
-  const rating = ratingStats?.rating || 0;
-  const reviewCount = ratingStats?.reviewCount || 0;
+  const rating = providerStats?.rating ?? ratingStats?.rating ?? 0;
+  const reviewCount = providerStats?.reviewCount ?? ratingStats?.reviewCount ?? 0;
+  const completedJobs = providerStats?.completedJobs || 0;
   const level = providerLevelFromBadges(badges);
   const accountBadges = providerAccountBadges(provider);
   const displayBadges = [...accountBadges, ...badges].filter((value, index, array) => value && array.indexOf(value) === index);
@@ -325,7 +342,7 @@ function mapSellerToMarketplace(
     city,
     country,
     description,
-    provider.experience_level,
+    publicExperienceLabel(provider),
     level,
     availability,
     ...displayBadges,
@@ -333,7 +350,7 @@ function mapSellerToMarketplace(
   ].filter(Boolean).join(" ").toLowerCase();
 
   return {
-    ...mapSellerToCard(provider),
+    ...mapSellerToCard(provider, providerStats),
     category,
     categorySlug,
     city,
@@ -341,7 +358,7 @@ function mapSellerToMarketplace(
     location: [city, country].filter(Boolean).join(", "),
     rating,
     reviewCount,
-    completedJobs: Number(provider.total_jobs || 0),
+    completedJobs,
     level,
     badges: displayBadges,
     availability,
@@ -400,6 +417,7 @@ function mapSellerToProfile(
   provider: SellerRow,
   media: ProviderMedia,
   ratingStats: RatingStats,
+  providerStats: ProviderStats,
   writtenReviews: ProviderWrittenReview[] = [],
   relatedProviders: ProviderMarketplaceData[] = [],
   badges: string[] = [],
@@ -410,8 +428,8 @@ function mapSellerToProfile(
   const location = [provider.city, provider.country].filter(Boolean).join(", ") || "Location not provided";
   const serviceList = serviceTags(provider);
   const heroImage = media.heroImage || provider.profile_image_url || null;
-  const rating = ratingStats.rating;
-  const completedJobs = Number(provider.total_jobs || 0);
+  const rating = providerStats.rating;
+  const completedJobs = providerStats.completedJobs;
   const displayBadges = [...providerAccountBadges(provider), ...badges].filter((value, index, array) => value && array.indexOf(value) === index);
 
   return {
@@ -423,7 +441,7 @@ function mapSellerToProfile(
     profileVideo: media.profileVideo,
     avatar: provider.profile_image_url || null,
     rating,
-    reviewCount: ratingStats.reviewCount,
+    reviewCount: providerStats.reviewCount,
     completedJobs,
     level: providerLevelFromBadges(badges),
     badges: displayBadges,
@@ -431,7 +449,7 @@ function mapSellerToProfile(
     email: provider.email || "",
     phone: provider.phone || "",
     location,
-    experience: provider.experience_level || "",
+    experience: publicExperienceLabel(provider),
     biography: provider.description || "",
     services: serviceList,
     responseTime: providerResponseTime(provider),
@@ -463,15 +481,20 @@ async function getApprovedSellers() {
 
 export async function getProviderCards(categorySlug?: string) {
   const providers = await getApprovedSellers();
-  return providers.filter((provider) => providerMatchesCategory(provider, categorySlug)).map(mapSellerToCard);
+  const filteredProviders = providers.filter((provider) => providerMatchesCategory(provider, categorySlug));
+  const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
+  const statsMap = await getProviderStatsMap(supabase, filteredProviders.map((provider) => provider.id));
+  return filteredProviders.map((provider) => mapSellerToCard(provider, statsMap.get(provider.id)));
 }
 
 export async function getMarketplaceProviders() {
   const providers = await getApprovedSellers();
   const providerIds = providers.map((provider) => provider.id);
-  const [mediaMap, ratingMap, badgeMap] = await Promise.all([
+  const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
+  const [mediaMap, ratingMap, statsMap, badgeMap] = await Promise.all([
     getProviderMediaMap(providerIds),
     getProviderRatingMap(providerIds),
+    getProviderStatsMap(supabase, providerIds),
     getProviderBadgeMap(providerIds),
   ]);
 
@@ -479,6 +502,7 @@ export async function getMarketplaceProviders() {
     provider,
     mediaMap.get(provider.id),
     ratingMap.get(provider.id),
+    statsMap.get(provider.id),
     badgeMap.get(provider.id) || [],
   ));
 }
@@ -562,9 +586,10 @@ async function getProviderRatingMap(providerIds: string[]) {
   const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
   const { data, error } = await supabase
     .from("eloo_reviews")
-    .select("reviewee_id,rating,is_public")
+    .select("reviewee_id,rating,is_public,booking_id")
     .in("reviewee_id", providerIds)
-    .eq("is_public", true) as { data: Array<{ reviewee_id: string | null; rating: number | null }> | null; error: { message: string } | null };
+    .eq("is_public", true)
+    .not("booking_id", "is", null) as { data: Array<{ reviewee_id: string | null; rating: number | null }> | null; error: { message: string } | null };
 
   if (error) {
     console.error("Failed to load provider ratings:", error.message);
@@ -589,22 +614,29 @@ async function getProviderBadgeMap(providerIds: string[]) {
   if (!providerIds.length) return badges;
 
   const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
-  const { data: awards, error: awardError } = await supabase
-    .from("provider_badges")
-    .select("provider_id,badge_id")
-    .in("provider_id", providerIds) as { data: BadgeAwardRow[] | null; error: { message: string } | null };
+  const [userAwardResult, legacyAwardResult] = await Promise.all([
+    supabase
+      .from("user_badges")
+      .select("user_id,badge_id,target_role")
+      .in("user_id", providerIds)
+      .eq("target_role", "provider") as Promise<{ data: Array<BadgeAwardRow & { target_role?: string | null }> | null; error: { message: string } | null }>,
+    supabase
+      .from("provider_badges")
+      .select("provider_id,badge_id")
+      .in("provider_id", providerIds) as Promise<{ data: BadgeAwardRow[] | null; error: { message: string } | null }>,
+  ]);
 
-  if (awardError) {
-    console.error("Failed to load provider badge awards:", awardError.message);
-    return badges;
-  }
+  if (userAwardResult.error) console.error("Failed to load unified provider badge awards:", userAwardResult.error.message);
+  if (legacyAwardResult.error) console.error("Failed to load legacy provider badge awards:", legacyAwardResult.error.message);
 
-  const badgeIds = Array.from(new Set((awards || []).map((award) => award.badge_id).filter((id): id is string => Boolean(id))));
+  const unifiedAwards = userAwardResult.data || [];
+  const legacyAwards = legacyAwardResult.data || [];
+  const badgeIds = Array.from(new Set([...unifiedAwards, ...legacyAwards].map((award) => award.badge_id).filter((id): id is string => Boolean(id))));
   if (!badgeIds.length) return badges;
 
   const { data: definitions, error: definitionError } = await supabase
     .from("badge_definitions")
-    .select("id,name,is_active")
+    .select("id,name,slug,is_active")
     .in("id", badgeIds)
     .eq("is_active", true) as { data: BadgeDefinitionRow[] | null; error: { message: string } | null };
 
@@ -613,12 +645,30 @@ async function getProviderBadgeMap(providerIds: string[]) {
     return badges;
   }
 
-  const definitionMap = new Map((definitions || []).map((definition) => [definition.id, definition.name || ""]));
-  for (const award of awards || []) {
-    if (!award.provider_id || !award.badge_id) continue;
-    const name = definitionMap.get(award.badge_id);
-    if (!name) continue;
-    badges.set(award.provider_id, [...(badges.get(award.provider_id) || []), name]);
+  const definitionMap = new Map((definitions || []).map((definition) => [definition.id, definition]));
+  const addBadge = (providerId: string | null | undefined, badgeId: string | null | undefined, options: { allowLevel: boolean }) => {
+    if (!providerId || !badgeId) return;
+    const definition = definitionMap.get(badgeId);
+    const name = definition?.name || "";
+    if (!name) return;
+    if (!options.allowLevel && providerLevelFromBadges([name])) return;
+    const current = badges.get(providerId) || [];
+    if (current.includes(name)) return;
+    badges.set(providerId, [...current, name]);
+  };
+
+  for (const award of unifiedAwards) {
+    addBadge(award.user_id, award.badge_id, { allowLevel: true });
+  }
+
+  for (const award of legacyAwards) {
+    addBadge(award.provider_id, award.badge_id, { allowLevel: false });
+  }
+
+  for (const [providerId, providerBadges] of badges.entries()) {
+    const level = providerLevelFromBadges(providerBadges);
+    if (!level) continue;
+    badges.set(providerId, providerBadges.filter((badge) => !providerLevelFromBadges([badge]) || badge === level));
   }
 
   return badges;
@@ -647,11 +697,11 @@ export async function getProviderProfileById(id: string) {
       .eq("user_id", id)
       .in("image_type", ["portfolio", "portfolio_video"])
       .order("created_at", { ascending: false }),
-    supabase
-      .from("eloo_reviews")
+    (supabase.from("eloo_reviews") as any)
       .select("id,rating,comment,created_at,reviewer_id,reviewer:eloo_profiles!eloo_reviews_reviewer_id_fkey(first_name,last_name)")
       .eq("reviewee_id", id)
       .eq("is_public", true)
+      .not("booking_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(8),
     getApprovedSellers(),
@@ -674,9 +724,10 @@ export async function getProviderProfileById(id: string) {
   const sameCategoryProviders = possibleRelatedProviders.filter((seller) => providerMatchesCategory(seller, categorySlugFor(providerRow.service_category)));
   const relatedSellerRows = (sameCategoryProviders.length ? sameCategoryProviders : possibleRelatedProviders).slice(0, 4);
   const relatedIds = relatedSellerRows.map((seller) => seller.id);
-  const [relatedMediaMap, relatedRatingMap, relatedBadgeMap] = await Promise.all([
+  const [relatedMediaMap, relatedRatingMap, relatedStatsMap, relatedBadgeMap] = await Promise.all([
     getProviderMediaMap(relatedIds),
     getProviderRatingMap(relatedIds),
+    getProviderStatsMap(supabase, relatedIds),
     getProviderBadgeMap(relatedIds),
   ]);
   const relatedProviders = relatedSellerRows
@@ -684,10 +735,18 @@ export async function getProviderProfileById(id: string) {
       seller,
       relatedMediaMap.get(seller.id),
       relatedRatingMap.get(seller.id),
+      relatedStatsMap.get(seller.id),
       relatedBadgeMap.get(seller.id) || [],
     ))
     .slice(0, 4);
   const writtenReviews = mapReviewRows(reviewResult.data || [], providerRow);
+  const providerStats = (await getProviderStatsMap(supabase, [id])).get(id) || {
+    rating: 0,
+    reviewCount: 0,
+    completedJobs: 0,
+    assignedJobs: 0,
+    completionRate: 0,
+  };
 
-  return mapSellerToProfile(providerRow, media, ratings, writtenReviews, relatedProviders, badges);
+  return mapSellerToProfile(providerRow, media, ratings, providerStats, writtenReviews, relatedProviders, badges);
 }
