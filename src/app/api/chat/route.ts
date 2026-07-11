@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -22,9 +23,9 @@ async function isConversationUnlocked(
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const user = await getFastAuthUser(supabase);
 
-    if (authError || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -95,60 +96,86 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
 
-    const unlockedConversations = [];
-    for (const conversation of conversations || []) {
-      if (await isConversationUnlocked(supabase, conversation)) {
-        unlockedConversations.push(conversation);
+    const allConversations = conversations || [];
+    const bidIds = Array.from(new Set(allConversations.map((conversation) => conversation.bid_id).filter(Boolean)));
+    const acceptedBidIds = new Set<string>();
+
+    if (bidIds.length) {
+      const { data: bids, error: bidsError } = await supabase
+        .from("bids")
+        .select("id,status")
+        .in("id", bidIds);
+
+      if (bidsError) throw bidsError;
+      for (const bid of bids || []) {
+        if (bid.status === "accepted") acceptedBidIds.add(String(bid.id));
       }
     }
 
-    // Get last message and unread count for each conversation
-    const conversationsWithMeta = await Promise.all(
-      unlockedConversations.map(async (conv) => {
-        const { data: lastMsg } = await supabase
+    const unlockedConversations = allConversations.filter((conversation) => (
+      !conversation.bid_id || acceptedBidIds.has(String(conversation.bid_id))
+    ));
+    const conversationIds = unlockedConversations.map((conversation) => conversation.id);
+    const participantIds = Array.from(new Set(unlockedConversations.flatMap((conversation) => [
+      conversation.client_id,
+      conversation.provider_id,
+    ]).filter(Boolean)));
+
+    const [messagesResult, unreadResult, profilesResult] = await Promise.all([
+      conversationIds.length
+        ? supabase
           .from("eloo_messages")
-          .select("content, created_at, sender_id")
-          .eq("conversation_id", conv.id)
+          .select("conversation_id,content,created_at,sender_id")
+          .in("conversation_id", conversationIds)
           .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        const { count } = await supabase
+        : Promise.resolve({ data: [], error: null }),
+      conversationIds.length
+        ? supabase
           .from("eloo_messages")
-          .select("*", { count: "exact", head: true })
-          .eq("conversation_id", conv.id)
+          .select("conversation_id")
+          .in("conversation_id", conversationIds)
           .neq("sender_id", user.id)
-          .eq("is_read", false);
-
-        // Fetch client and provider info
-        const { data: client, error: clientError } = await supabase
+          .eq("is_read", false)
+        : Promise.resolve({ data: [], error: null }),
+      participantIds.length
+        ? supabase
           .from("eloo_profiles")
-          .select("id, first_name, last_name")
-          .eq("id", conv.client_id)
-          .single();
+          .select("id, first_name, last_name, profile_image_url")
+          .in("id", participantIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
-        const { data: provider, error: providerError } = await supabase
-          .from("eloo_profiles")
-          .select("id, first_name, last_name")
-          .eq("id", conv.provider_id)
-          .single();
+    if (messagesResult.error) throw messagesResult.error;
+    if (unreadResult.error) throw unreadResult.error;
+    if (profilesResult.error) throw profilesResult.error;
 
-        if (clientError) {
-          console.error("Error fetching client:", clientError);
-        }
-        if (providerError) {
-          console.error("Error fetching provider:", providerError);
-        }
+    const latestMessageByConversation = new Map<string, unknown>();
+    for (const message of messagesResult.data || []) {
+      const conversationKey = String(message.conversation_id);
+      if (!latestMessageByConversation.has(conversationKey)) {
+        latestMessageByConversation.set(conversationKey, {
+          content: message.content,
+          created_at: message.created_at,
+          sender_id: message.sender_id,
+        });
+      }
+    }
 
-        return {
-          ...conv,
-          client,
-          provider,
-          last_message: lastMsg,
-          unread_count: count || 0,
-        };
-      })
-    );
+    const unreadCountByConversation = new Map<string, number>();
+    for (const message of unreadResult.data || []) {
+      const conversationKey = String(message.conversation_id);
+      unreadCountByConversation.set(conversationKey, (unreadCountByConversation.get(conversationKey) || 0) + 1);
+    }
+
+    const profilesById = new Map((profilesResult.data || []).map((profile) => [String(profile.id), profile]));
+
+    const conversationsWithMeta = unlockedConversations.map((conv) => ({
+      ...conv,
+      client: profilesById.get(String(conv.client_id)) || null,
+      provider: profilesById.get(String(conv.provider_id)) || null,
+      last_message: latestMessageByConversation.get(String(conv.id)) || null,
+      unread_count: unreadCountByConversation.get(String(conv.id)) || 0,
+    }));
 
     return NextResponse.json({ conversations: conversationsWithMeta });
   } catch (error) {

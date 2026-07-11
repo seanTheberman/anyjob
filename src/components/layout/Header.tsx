@@ -243,6 +243,7 @@ export function Header() {
         ? "text-gray-600 dark:text-gray-300 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50"
         : "text-white/90 hover:text-white hover:bg-white/10";
     const isAuthenticated = Boolean(user || account);
+    const isAuthPending = !authResolved && !isAuthenticated;
     const dashboardHref = userRole === "admin" ? "/admin" : userRole === "provider" || userRole === "seller" ? "/pro" : hasBusinessProfile ? "/dashboard/business" : "/dashboard";
     const isProviderAccount = userRole === "provider" || userRole === "seller";
     const canWorkShifts = Boolean(account?.canWorkShifts || account?.providerWorkMode === "shift" || account?.providerWorkMode === "both");
@@ -258,11 +259,7 @@ export function Header() {
         { href: "/pro/services", label: "My gigs" },
         { href: "/pro/profile", label: "Profile" },
     ];
-    const visibleNavLinks = isAuthenticated && isProviderAccount ? providerNavLinks : NAV_LINKS.filter((link) => {
-        if (!authResolved && !isAuthenticated) {
-            return link.href === "/search";
-        }
-
+    const visibleNavLinks = isAuthPending ? [] : isAuthenticated && isProviderAccount ? providerNavLinks : NAV_LINKS.filter((link) => {
         if (link.href === "/tasks") {
             return isAuthenticated && isProviderAccount;
         }
@@ -314,7 +311,7 @@ export function Header() {
 
                     {/* Desktop Nav */}
                     <nav className="hidden lg:flex items-center gap-1">
-                        {!isProviderAccount ? <div ref={categoriesMenuRef} className="relative">
+                        {!isAuthPending && !isProviderAccount ? <div ref={categoriesMenuRef} className="relative">
                             <button
                                 type="button"
                                 aria-haspopup="menu"
@@ -376,7 +373,7 @@ export function Header() {
 
                     {/* Desktop Actions */}
                     <div className="hidden lg:flex items-center gap-3">
-                        {!authResolved && !isAuthenticated ? (
+                        {isAuthPending ? (
                             <div className="h-10 w-24 rounded-full bg-gray-100/80 ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-800" aria-hidden="true" />
                         ) : isAuthenticated ? (
                             <div ref={accountMenuRef} className="relative">
@@ -480,7 +477,7 @@ export function Header() {
                             </button>
                         </div>
                         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 py-4">
-                            {!isProviderAccount ? (
+                            {!isAuthPending && !isProviderAccount ? (
                               <button
                                   type="button"
                                   aria-expanded={mobileCategoriesOpen}
@@ -494,7 +491,7 @@ export function Header() {
                                   />
                               </button>
                             ) : null}
-                            {!isProviderAccount && mobileCategoriesOpen && (
+                            {!isAuthPending && !isProviderAccount && mobileCategoriesOpen && (
                                 <div className="mb-2 max-h-96 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
                                     {TASKRABBIT_CATEGORIES.map((category) => (
                                         <details key={category.slug} className="group rounded-lg">
@@ -546,7 +543,7 @@ export function Header() {
                             className="shrink-0 space-y-2 border-t border-gray-100 bg-white px-4 pt-4 shadow-[0_-16px_32px_rgba(15,23,42,0.08)] dark:border-gray-800 dark:bg-gray-950"
                             style={{ paddingBottom: "max(env(safe-area-inset-bottom), 16px)" }}
                         >
-                            {!authResolved && !isAuthenticated ? (
+                            {isAuthPending ? (
                                 <div className="h-11 w-full rounded-xl bg-gray-100" aria-hidden="true" />
                             ) : isAuthenticated ? (
                                 <>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   SUPPORT_CATEGORIES,
@@ -83,12 +84,9 @@ async function resolveRequester(admin: AdminClient, userId: string, email: strin
 export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+    const user = await getFastAuthUser(supabase);
 
-    if (error || !user) {
+    if (!user) {
       return NextResponse.json({ error: "Sign in to view support tickets" }, { status: 401 });
     }
 
@@ -108,7 +106,15 @@ export async function GET() {
       .map(mapSupportTicketRow)
       .sort((left, right) => right.priorityScore - left.priorityScore || new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
 
-    return NextResponse.json({ tickets });
+    return NextResponse.json(
+      { tickets },
+      {
+        headers: {
+          "Cache-Control": "private, max-age=20, stale-while-revalidate=60",
+          "Vary": "Cookie",
+        },
+      }
+    );
   } catch (error) {
     console.error("Support tickets lookup failed:", error);
     return NextResponse.json({ error: "Failed to load support tickets" }, { status: 500 });
@@ -118,12 +124,9 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
+    const user = await getFastAuthUser(supabase);
 
-    if (error || !user?.email) {
+    if (!user?.email) {
       return NextResponse.json({ error: "Sign in to raise a support ticket" }, { status: 401 });
     }
 

@@ -174,14 +174,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Fetch user data
   useEffect(() => {
+    let cancelled = false;
+
     const fetchUser = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!cancelled) setUser(session?.user || null);
       } catch (error) {
         console.error('Error fetching user:', error);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -189,11 +191,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user || null);
-      setLoading(false);
+      if (!cancelled) {
+        setUser(session?.user || null);
+        setLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [supabase]);
 
   return (

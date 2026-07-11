@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
     // Get user profile to determine role
     const { data: profile, error: profileError } = await supabase
       .from('eloo_profiles')
-      .select('role, first_name, last_name, avatar_url, is_verified')
+      .select('role, first_name, last_name, avatar_url, is_verified, has_business_profile, business_registration_status, provider_work_mode, can_work_freelance, can_work_shifts')
       .eq('id', authData.user.id)
       .single();
 
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
       // Try checking sellers table as fallback
       const { data: sellerProfile, error: sellerError } = await supabase
         .from('sellers')
-        .select('status, first_name, last_name, profile_image_url')
+        .select('status, first_name, last_name, profile_image_url, provider_work_mode, can_work_freelance, can_work_shifts')
         .eq('id', authData.user.id)
         .single();
       
@@ -116,9 +116,14 @@ export async function POST(request: NextRequest) {
           id: authData.user.id,
           email: authData.user.email,
           role: 'seller',
+          displayName: `${sellerProfile.first_name} ${sellerProfile.last_name}`.trim() || authData.user.email?.split("@")[0] || "Account",
           fullName: `${sellerProfile.first_name} ${sellerProfile.last_name}`,
           avatarUrl: sellerProfile.profile_image_url,
-          status: sellerProfile.status
+          status: sellerProfile.status,
+          hasBusinessProfile: false,
+          providerWorkMode: sellerProfile.provider_work_mode || null,
+          canWorkFreelance: Boolean(sellerProfile.can_work_freelance || sellerProfile.provider_work_mode === "freelance" || sellerProfile.provider_work_mode === "both"),
+          canWorkShifts: Boolean(sellerProfile.can_work_shifts || sellerProfile.provider_work_mode === "shift" || sellerProfile.provider_work_mode === "both"),
         },
         session: authData.session
       }, { status: 200 });
@@ -142,6 +147,13 @@ export async function POST(request: NextRequest) {
       userData = sellerData;
     }
 
+    const providerWorkMode = userData?.provider_work_mode || profile.provider_work_mode || null;
+    const providerModeAllowsFreelance = providerWorkMode === "freelance" || providerWorkMode === "both";
+    const providerModeAllowsShifts = providerWorkMode === "shift" || providerWorkMode === "both";
+    const canWorkFreelance = Boolean(userData?.can_work_freelance ?? profile.can_work_freelance ?? providerModeAllowsFreelance);
+    const canWorkShifts = Boolean(userData?.can_work_shifts ?? profile.can_work_shifts ?? providerModeAllowsShifts);
+    const displayName = `${profile.first_name || ""} ${profile.last_name || ""}`.trim() || authData.user.email?.split("@")[0] || "Account";
+
     return NextResponse.json({
       success: true,
       message: "Login successful",
@@ -149,9 +161,15 @@ export async function POST(request: NextRequest) {
         id: authData.user.id,
         email: authData.user.email,
         role: profile.role,
-        fullName: `${profile.first_name} ${profile.last_name}`,
+        displayName,
+        fullName: displayName,
         avatarUrl: profile.avatar_url,
         isVerified: profile.is_verified,
+        hasBusinessProfile: Boolean(profile.has_business_profile || authData.user.user_metadata?.account_kind === "business"),
+        businessRegistrationStatus: profile.business_registration_status || null,
+        providerWorkMode,
+        canWorkFreelance,
+        canWorkShifts,
         ...userData
       },
       session: authData.session

@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
 
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function GET() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
+  const user = await getFastAuthUser(supabase);
 
-  if (error || !user) {
+  if (!user) {
     return NextResponse.json({ user: null });
   }
 
@@ -26,11 +24,12 @@ export async function GET() {
       .maybeSingle(),
   ]);
 
-  const role = String(profile?.role || (seller ? "seller" : user.user_metadata?.role) || "client").toLowerCase();
-  const firstName = profile?.first_name || seller?.first_name || user.user_metadata?.first_name || "";
-  const lastName = profile?.last_name || seller?.last_name || user.user_metadata?.last_name || "";
-  const displayName = [firstName, lastName].filter(Boolean).join(" ") || user.user_metadata?.full_name || user.email?.split("@")[0] || "Account";
-  const providerWorkMode = seller?.provider_work_mode || profile?.provider_work_mode || user.user_metadata?.provider_work_mode || null;
+  const metadata = user.user?.user_metadata || {};
+  const role = String(profile?.role || (seller ? "seller" : metadata.role) || "client").toLowerCase();
+  const firstName = profile?.first_name || seller?.first_name || metadata.first_name || "";
+  const lastName = profile?.last_name || seller?.last_name || metadata.last_name || "";
+  const displayName = [firstName, lastName].filter(Boolean).join(" ") || metadata.full_name || user.email?.split("@")[0] || "Account";
+  const providerWorkMode = seller?.provider_work_mode || profile?.provider_work_mode || metadata.provider_work_mode || null;
   const providerModeAllowsFreelance = providerWorkMode === "freelance" || providerWorkMode === "both";
   const providerModeAllowsShifts = providerWorkMode === "shift" || providerWorkMode === "both";
   const canWorkFreelance = Boolean(seller?.can_work_freelance ?? profile?.can_work_freelance ?? providerModeAllowsFreelance);
@@ -42,7 +41,7 @@ export async function GET() {
       email: user.email,
       role,
       displayName,
-      hasBusinessProfile: Boolean(profile?.has_business_profile || user.user_metadata?.account_kind === "business"),
+      hasBusinessProfile: Boolean(profile?.has_business_profile || metadata.account_kind === "business"),
       businessRegistrationStatus: profile?.business_registration_status || null,
       providerWorkMode,
       canWorkFreelance,

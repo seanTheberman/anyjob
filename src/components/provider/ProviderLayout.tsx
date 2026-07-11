@@ -222,7 +222,8 @@ export function ProviderLayout({ children }: ProviderLayoutProps) {
           return;
         }
 
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { session } } = await supabase.auth.getSession();
+        const user = session?.user || null;
         if (cancelled) return;
         setUser(user);
         if (user) {

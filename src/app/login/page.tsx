@@ -15,6 +15,38 @@ function safeRedirect(value: string | null) {
     return value;
 }
 
+const HEADER_ACCOUNT_CACHE_KEY = "anyjob.headerAccount";
+
+type LoginHeaderAccount = {
+    id: string;
+    email?: string | null;
+    role?: string | null;
+    displayName?: string | null;
+    fullName?: string | null;
+    hasBusinessProfile?: boolean | null;
+    providerWorkMode?: string | null;
+    canWorkFreelance?: boolean | null;
+    canWorkShifts?: boolean | null;
+};
+
+function cacheHeaderAccount(user: LoginHeaderAccount | null | undefined) {
+    if (!user?.id) return;
+    try {
+        window.localStorage.setItem(HEADER_ACCOUNT_CACHE_KEY, JSON.stringify({
+            id: user.id,
+            email: user.email || null,
+            role: user.role || "client",
+            displayName: user.displayName || user.fullName || user.email?.split("@")[0] || "Account",
+            hasBusinessProfile: Boolean(user.hasBusinessProfile),
+            providerWorkMode: user.providerWorkMode || null,
+            canWorkFreelance: Boolean(user.canWorkFreelance),
+            canWorkShifts: Boolean(user.canWorkShifts),
+        }));
+    } catch {
+        // The header still resolves from the server if local storage is unavailable.
+    }
+}
+
 export default function LoginPage() {
     const router = useRouter();
     const redirectTarget = typeof window === "undefined"
@@ -63,9 +95,7 @@ export default function LoginPage() {
 
         let payload: {
             error?: string;
-            user?: {
-                role?: string | null;
-            };
+            user?: LoginHeaderAccount;
         } = {};
 
         try {
@@ -88,9 +118,11 @@ export default function LoginPage() {
             return;
         }
 
+        cacheHeaderAccount(payload.user);
+
         // Land on the public home page after login; the logged-in header menu
         // contains the role-aware dashboard entry.
-        router.push(redirectTarget);
+        router.replace(redirectTarget);
         router.refresh();
     }
 

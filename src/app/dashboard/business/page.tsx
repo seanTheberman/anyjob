@@ -94,24 +94,45 @@ export default function BusinessDashboardPage() {
   }, []);
 
   async function load() {
-      const [businessResponse, postsResponse] = await Promise.all([
-        fetch("/api/business/register"),
-        fetch("/api/business/posts"),
-      ]);
+    setLoading(true);
+    setActionError(null);
+    try {
+      const businessResponse = await fetch("/api/business/register");
       if (businessResponse.ok) {
         const payload = await businessResponse.json();
-        setBusiness(payload.business || null);
+        const nextBusiness = payload.business || null;
+        setBusiness(nextBusiness);
+
+        if (!nextBusiness) {
+          setPosts([]);
+          setApplications([]);
+          return;
+        }
+      } else {
+        setBusiness(null);
+        setPosts([]);
+        setApplications([]);
+        return;
       }
+
+      const [postsResponse, applicationsResponse] = await Promise.all([
+        fetch("/api/business/posts"),
+        fetch("/api/business/shift-applications"),
+      ]);
+
       if (postsResponse.ok) {
         const payload = await postsResponse.json();
         setPosts(payload.posts || []);
       }
-      const applicationsResponse = await fetch("/api/business/shift-applications");
       if (applicationsResponse.ok) {
         const payload = await applicationsResponse.json();
         setApplications(payload.applications || []);
       }
+    } catch {
+      setActionError("Unable to load business workspace");
+    } finally {
       setLoading(false);
+    }
   }
 
   async function runShiftAction(applicationId: string, action: string) {

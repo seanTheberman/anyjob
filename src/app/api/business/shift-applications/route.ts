@@ -1,4 +1,5 @@
 import { calculateShiftAgreedAmount } from "@/lib/shift-payments";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -20,12 +21,7 @@ type LooseRow = Record<string, any>;
 
 async function getUser() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error || !user) return null;
-  return user;
+  return getFastAuthUser(supabase);
 }
 
 export async function GET() {

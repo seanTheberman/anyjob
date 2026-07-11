@@ -63,7 +63,7 @@ export function SupportTicketCenter({
     async function loadTickets() {
       setLoading(true);
       setError(null);
-      const response = await fetch("/api/support/tickets", { cache: "no-store" }).catch(() => null);
+      const response = await fetch("/api/support/tickets").catch(() => null);
       if (!alive) return;
       if (!response?.ok) {
         const body = await response?.json().catch(() => ({}));
