@@ -292,6 +292,12 @@ function providerLevelFromBadges(badges: string[]) {
   return "";
 }
 
+function withoutDuplicateProviderLevelBadges(badges: string[]) {
+  const hasLevelOne = badges.some((badge) => normalize(badge) === "level 1");
+  if (!hasLevelOne) return badges;
+  return badges.filter((badge) => normalize(badge) !== "5 jobs completed");
+}
+
 function serviceList(provider: SellerRow) {
   return serviceTags(provider).filter((value, index, array) => value && array.indexOf(value) === index);
 }
@@ -667,8 +673,12 @@ async function getProviderBadgeMap(providerIds: string[]) {
 
   for (const [providerId, providerBadges] of badges.entries()) {
     const level = providerLevelFromBadges(providerBadges);
-    if (!level) continue;
-    badges.set(providerId, providerBadges.filter((badge) => !providerLevelFromBadges([badge]) || badge === level));
+    const dedupedBadges = withoutDuplicateProviderLevelBadges(providerBadges);
+    if (!level) {
+      badges.set(providerId, dedupedBadges);
+      continue;
+    }
+    badges.set(providerId, dedupedBadges.filter((badge) => !providerLevelFromBadges([badge]) || badge === level));
   }
 
   return badges;
