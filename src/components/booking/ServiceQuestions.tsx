@@ -18,75 +18,75 @@ export type QuestionField = {
 
 const CATEGORY_QUESTIONS: Record<string, QuestionField[]> = {
     enfants: [
-        { key: "num_children", label: "Nombre d'enfants", type: "number", placeholder: "2", required: true },
-        { key: "children_ages", label: "Âges des enfants", type: "text", placeholder: "3 ans, 6 ans", required: true },
-        { key: "sitter_gender", label: "Genre du/de la baby-sitter préféré", type: "select", options: ["Pas de préférence", "Femme", "Homme"] },
-        { key: "sitter_age_range", label: "Tranche d'âge du/de la baby-sitter", type: "select", options: ["Pas de préférence", "18-25 ans", "25-35 ans", "35-50 ans", "50+ ans"] },
-        { key: "special_needs", label: "Besoins spéciaux", type: "textarea", placeholder: "Allergies, handicaps, routines particulières..." },
-        { key: "duration", label: "Durée estimée (heures)", type: "number", placeholder: "4", required: true },
+        { key: "num_children", label: "Number of children", type: "number", placeholder: "2", required: true },
+        { key: "children_ages", label: "Children's ages", type: "text", placeholder: "3 years, 6 years", required: true },
+        { key: "sitter_gender", label: "Preferred babysitter gender", type: "select", options: ["No preference", "Female", "Male"] },
+        { key: "sitter_age_range", label: "Preferred babysitter age range", type: "select", options: ["No preference", "18-25", "25-35", "35-50", "50+"] },
+        { key: "special_needs", label: "Special needs", type: "textarea", placeholder: "Allergies, disabilities, routines..." },
+        { key: "duration", label: "Estimated duration (hours)", type: "number", placeholder: "4", required: true },
     ],
     menage: [
-        { key: "home_size", label: "Surface du logement (m²)", type: "number", placeholder: "60", required: true },
-        { key: "num_rooms", label: "Nombre de pièces", type: "number", placeholder: "3", required: true },
-        { key: "cleaning_type", label: "Type de ménage", type: "select", options: ["Ménage régulier", "Grand ménage", "Ménage de sortie", "Après chantier"], required: true },
-        { key: "supplies_provided", label: "Produits fournis ?", type: "toggle" },
-        { key: "pets", label: "Animaux dans le logement ?", type: "toggle" },
-        { key: "frequency", label: "Fréquence", type: "select", options: ["Ponctuel", "Hebdomadaire", "Bi-mensuel", "Mensuel"] },
+        { key: "home_size", label: "Home size (sqm)", type: "number", placeholder: "60", required: true },
+        { key: "num_rooms", label: "Number of rooms", type: "number", placeholder: "3", required: true },
+        { key: "cleaning_type", label: "Cleaning type", type: "select", options: ["Regular cleaning", "Deep cleaning", "Move-out cleaning", "Post-construction cleaning"], required: true },
+        { key: "supplies_provided", label: "Are cleaning supplies provided?", type: "toggle" },
+        { key: "pets", label: "Are there pets in the home?", type: "toggle" },
+        { key: "frequency", label: "Frequency", type: "select", options: ["One-time", "Weekly", "Every two weeks", "Monthly"] },
     ],
     demenagement: [
-        { key: "pickup_address", label: "Adresse de départ", type: "text", placeholder: "12 Grafton Street, Dublin", required: true },
-        { key: "dropoff_address", label: "Adresse d'arrivée", type: "text", placeholder: "45 Patrick Street, Cork", required: true },
-        { key: "pickup_floor", label: "Étage de départ", type: "number", placeholder: "3" },
-        { key: "dropoff_floor", label: "Étage d'arrivée", type: "number", placeholder: "2" },
-        { key: "elevator", label: "Ascenseur disponible ?", type: "toggle" },
-        { key: "volume", label: "Volume estimé (m³)", type: "number", placeholder: "20" },
-        { key: "heavy_items", label: "Objets lourds (piano, coffre-fort...)", type: "textarea", placeholder: "Décrivez les objets lourds" },
-        { key: "vehicle_needed", label: "Véhicule nécessaire ?", type: "select", options: ["Non, j'ai un véhicule", "Oui, camionnette", "Oui, camion"] },
+        { key: "pickup_address", label: "Pickup address", type: "text", placeholder: "12 Grafton Street, Dublin", required: true },
+        { key: "dropoff_address", label: "Drop-off address", type: "text", placeholder: "45 Patrick Street, Cork", required: true },
+        { key: "pickup_floor", label: "Pickup floor", type: "number", placeholder: "3" },
+        { key: "dropoff_floor", label: "Drop-off floor", type: "number", placeholder: "2" },
+        { key: "elevator", label: "Is an elevator available?", type: "toggle" },
+        { key: "volume", label: "Estimated volume (m³)", type: "number", placeholder: "20" },
+        { key: "heavy_items", label: "Heavy items (piano, safe...)", type: "textarea", placeholder: "Describe any heavy items" },
+        { key: "vehicle_needed", label: "Vehicle needed?", type: "select", options: ["No, I have a vehicle", "Yes, van", "Yes, truck"] },
     ],
     bricolage: [
-        { key: "task_description", label: "Description de la tâche", type: "textarea", placeholder: "Montage meuble IKEA, réparation robinet...", required: true },
-        { key: "tools_provided", label: "Outils fournis ?", type: "toggle" },
-        { key: "item_links", label: "Liens vers les articles (si montage)", type: "textarea", placeholder: "Collez les liens des meubles à monter" },
-        { key: "num_items", label: "Nombre d'articles à monter", type: "number", placeholder: "2" },
-        { key: "duration", label: "Durée estimée (heures)", type: "number", placeholder: "3", required: true },
+        { key: "task_description", label: "Task description", type: "textarea", placeholder: "IKEA furniture assembly, tap repair...", required: true },
+        { key: "tools_provided", label: "Are tools provided?", type: "toggle" },
+        { key: "item_links", label: "Item links (if assembly)", type: "textarea", placeholder: "Paste links for items to assemble" },
+        { key: "num_items", label: "Number of items to assemble", type: "number", placeholder: "2" },
+        { key: "duration", label: "Estimated duration (hours)", type: "number", placeholder: "3", required: true },
     ],
     jardinage: [
-        { key: "garden_size", label: "Taille du jardin (m²)", type: "number", placeholder: "100" },
-        { key: "tasks", label: "Tâches souhaitées", type: "select", options: ["Tonte", "Taille de haie", "Désherbage", "Plantation", "Élagage", "Autre"], required: true },
-        { key: "tools_provided", label: "Outils fournis ?", type: "toggle" },
-        { key: "green_waste", label: "Évacuation des déchets verts ?", type: "toggle" },
-        { key: "duration", label: "Durée estimée (heures)", type: "number", placeholder: "3", required: true },
+        { key: "garden_size", label: "Garden size (sqm)", type: "number", placeholder: "100" },
+        { key: "tasks", label: "Requested tasks", type: "select", options: ["Mowing", "Hedge trimming", "Weeding", "Planting", "Tree pruning", "Other"], required: true },
+        { key: "tools_provided", label: "Are tools provided?", type: "toggle" },
+        { key: "green_waste", label: "Green-waste removal needed?", type: "toggle" },
+        { key: "duration", label: "Estimated duration (hours)", type: "number", placeholder: "3", required: true },
     ],
     informatique: [
-        { key: "service_type", label: "Type de prestation", type: "select", options: ["Sur place", "À distance"], required: true },
-        { key: "device_type", label: "Type d'appareil", type: "select", options: ["PC Windows", "Mac", "Smartphone", "Tablette", "Réseau/WiFi", "Autre"], required: true },
-        { key: "issue_description", label: "Description du problème", type: "textarea", placeholder: "Décrivez votre problème en détail", required: true },
+        { key: "service_type", label: "Service type", type: "select", options: ["On-site", "Remote"], required: true },
+        { key: "device_type", label: "Device type", type: "select", options: ["Windows PC", "Mac", "Smartphone", "Tablet", "Network/Wi-Fi", "Other"], required: true },
+        { key: "issue_description", label: "Issue description", type: "textarea", placeholder: "Describe the issue in detail", required: true },
     ],
     "cours-particuliers": [
-        { key: "subject", label: "Matière", type: "text", placeholder: "Mathématiques, Français...", required: true },
-        { key: "student_level", label: "Niveau de l'élève", type: "select", options: ["Primaire", "Collège", "Lycée", "Supérieur", "Adulte"], required: true },
-        { key: "student_age", label: "Âge de l'élève", type: "number", placeholder: "14" },
-        { key: "session_format", label: "Format", type: "select", options: ["En personne", "En ligne", "Les deux"], required: true },
-        { key: "frequency", label: "Fréquence souhaitée", type: "select", options: ["Ponctuel", "Hebdomadaire", "Bi-mensuel"] },
-        { key: "session_duration", label: "Durée par session (heures)", type: "number", placeholder: "1.5", required: true },
+        { key: "subject", label: "Subject", type: "text", placeholder: "Maths, English...", required: true },
+        { key: "student_level", label: "Student level", type: "select", options: ["Primary school", "Secondary school", "Leaving Certificate", "Higher education", "Adult"], required: true },
+        { key: "student_age", label: "Student age", type: "number", placeholder: "14" },
+        { key: "session_format", label: "Format", type: "select", options: ["In person", "Online", "Both"], required: true },
+        { key: "frequency", label: "Preferred frequency", type: "select", options: ["One-time", "Weekly", "Every two weeks"] },
+        { key: "session_duration", label: "Session duration (hours)", type: "number", placeholder: "1.5", required: true },
     ],
     animaux: [
-        { key: "pet_type", label: "Type d'animal", type: "select", options: ["Chien", "Chat", "Rongeur", "Oiseau", "Autre"], required: true },
-        { key: "num_pets", label: "Nombre d'animaux", type: "number", placeholder: "1", required: true },
-        { key: "service_type", label: "Type de service", type: "select", options: ["Promenade", "Garde", "Toilettage", "Visite à domicile"], required: true },
-        { key: "special_needs", label: "Besoins spéciaux", type: "textarea", placeholder: "Médicaments, régime alimentaire, comportement..." },
+        { key: "pet_type", label: "Pet type", type: "select", options: ["Dog", "Cat", "Small pet", "Bird", "Other"], required: true },
+        { key: "num_pets", label: "Number of pets", type: "number", placeholder: "1", required: true },
+        { key: "service_type", label: "Service type", type: "select", options: ["Walking", "Pet sitting", "Grooming", "Home visit"], required: true },
+        { key: "special_needs", label: "Special needs", type: "textarea", placeholder: "Medication, diet, behaviour..." },
     ],
     "aide-domicile": [
-        { key: "beneficiary_age", label: "Âge du bénéficiaire", type: "number", placeholder: "75" },
-        { key: "mobility", label: "Niveau de mobilité", type: "select", options: ["Autonome", "Aide légère", "Aide importante", "Lit / fauteuil roulant"], required: true },
-        { key: "tasks", label: "Types de soins", type: "select", options: ["Compagnie", "Courses", "Repas", "Toilette", "Ménage léger", "Accompagnement sorties"], required: true },
-        { key: "frequency", label: "Fréquence", type: "select", options: ["Ponctuel", "Quotidien", "Hebdomadaire"], required: true },
-        { key: "duration", label: "Durée par visite (heures)", type: "number", placeholder: "3", required: true },
+        { key: "beneficiary_age", label: "Beneficiary age", type: "number", placeholder: "75" },
+        { key: "mobility", label: "Mobility level", type: "select", options: ["Independent", "Light assistance", "Significant assistance", "Bed or wheelchair"], required: true },
+        { key: "tasks", label: "Care types", type: "select", options: ["Companionship", "Shopping", "Meals", "Personal care", "Light cleaning", "Outing support"], required: true },
+        { key: "frequency", label: "Frequency", type: "select", options: ["One-time", "Daily", "Weekly"], required: true },
+        { key: "duration", label: "Visit duration (hours)", type: "number", placeholder: "3", required: true },
     ],
     hiver: [
-        { key: "task_description", label: "Description de la tâche", type: "textarea", placeholder: "Déneigement, ramonage, isolation fenêtres...", required: true },
-        { key: "tools_provided", label: "Outils/matériel fourni ?", type: "toggle" },
-        { key: "duration", label: "Durée estimée (heures)", type: "number", placeholder: "2", required: true },
+        { key: "task_description", label: "Task description", type: "textarea", placeholder: "Snow clearing, chimney cleaning, window insulation...", required: true },
+        { key: "tools_provided", label: "Are tools/materials provided?", type: "toggle" },
+        { key: "duration", label: "Estimated duration (hours)", type: "number", placeholder: "2", required: true },
     ],
 };
 
@@ -106,8 +106,8 @@ export function ServiceQuestions({ categorySlug, answers, onChange }: ServiceQue
     if (!questions) {
         return (
             <div className="text-center py-8 text-gray-500">
-                <p>Aucune question spécifique pour cette catégorie.</p>
-                <p className="text-sm mt-1">Vous pouvez ajouter des détails dans la description.</p>
+                <p>No specific questions are configured for this category.</p>
+                <p className="text-sm mt-1">You can add extra details in the description.</p>
             </div>
         );
     }
@@ -115,10 +115,10 @@ export function ServiceQuestions({ categorySlug, answers, onChange }: ServiceQue
     return (
         <div className="space-y-5">
             <h3 className="text-lg font-bold text-gray-900 dark:text-white">
-                Détails de votre demande
+                Request details
             </h3>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-                Ces informations aideront les prestataires à mieux comprendre vos besoins.
+                These details help providers understand what you need.
             </p>
 
             <div className="space-y-4">
@@ -161,7 +161,7 @@ export function ServiceQuestions({ categorySlug, answers, onChange }: ServiceQue
                                 className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4 py-3 text-sm text-gray-800 dark:text-gray-200 outline-none focus:border-red-500"
                                 required={q.required}
                             >
-                                <option value="">Sélectionner...</option>
+                                <option value="">Select...</option>
                                 {q.options?.map((opt) => (
                                     <option key={opt} value={opt}>{opt}</option>
                                 ))}
@@ -179,19 +179,19 @@ export function ServiceQuestions({ categorySlug, answers, onChange }: ServiceQue
                             <div className="flex items-center gap-3">
                                 <button
                                     type="button"
-                                    onClick={() => onChange(q.key, answers[q.key] === "oui" ? "non" : "oui")}
-                                    className={`relative w-12 h-7 rounded-full ${answers[q.key] === "oui"
+                                    onClick={() => onChange(q.key, answers[q.key] === "yes" ? "no" : "yes")}
+                                    className={`relative w-12 h-7 rounded-full ${answers[q.key] === "yes"
                                         ? "bg-red-600"
                                         : "bg-gray-200 dark:bg-gray-700"
                                         }`}
                                 >
                                     <span
-                                        className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow ${answers[q.key] === "oui" ? "translate-x-5" : ""
+                                        className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow ${answers[q.key] === "yes" ? "translate-x-5" : ""
                                             }`}
                                     />
                                 </button>
                                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                                    {answers[q.key] === "oui" ? "Oui" : "Non"}
+                                    {answers[q.key] === "yes" ? "Yes" : "No"}
                                 </span>
                             </div>
                         ) : null}
