@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" role="img" aria-labelledby="title desc">
+  <title id="title">AnyJob</title>
+  <desc id="desc">AnyJob red wordmark with the J drawn as a hammer.</desc>
+  <g fill="#e92b2b">
+    <text x="18" y="139" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="112" font-weight="900" letter-spacing="-4">Any</text>
+    <text x="328" y="139" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="112" font-weight="900" letter-spacing="-4">ob</text>
+    <text x="487" y="78" font-family="Arial Black, Arial, Helvetica, sans-serif" font-size="31" font-weight="900">TM</text>
+    <path d="M263 50h54c26 0 53 15 67 39 3 5 0 9-6 7l-45-15h-12v72c0 29-20 48-53 48-28 0-48-15-55-39-2-7 2-11 9-11h23c5 0 8 2 11 7 4 7 10 11 19 11 14 0 22-8 22-22V81h-34c-8 0-14-6-14-14v-3c0-8 6-14 14-14z"/>
+    <path d="M267 50h42c8 0 13 5 13 13v5c0 8-5 13-13 13h-42z"/>
+    <path d="M322 48h18c9 0 17 3 25 8 8 5 16 12 24 22l-50-10h-17z"/>
+  </g>
+</svg>
