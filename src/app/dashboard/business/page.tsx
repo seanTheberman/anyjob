@@ -149,6 +149,10 @@ export default function BusinessDashboardPage() {
         setActionError(payload.error || "Unable to update shift application");
         return;
       }
+      if (payload.checkoutUrl) {
+        window.location.href = payload.checkoutUrl;
+        return;
+      }
       await load();
     } catch {
       setActionError("Unable to update shift application");

@@ -852,7 +852,7 @@ export async function getAdminPayments() {
           String(bid.id).slice(0, 8),
           "Booking token",
           money(Number(breakdown.bookingToken || 0)),
-          "Paid test flow",
+          "Accepted / paid",
           "Open",
         ];
       }),

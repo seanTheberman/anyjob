@@ -1,5 +1,6 @@
 import { calculateShiftAgreedAmount } from "@/lib/shift-payments";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
@@ -198,8 +199,92 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "pay") {
-      if (payment.status !== "requires_payment" && payment.status !== "held") {
+      if (payment.status !== "requires_payment") {
         return NextResponse.json({ error: "Payment is not waiting for business payment" }, { status: 409 });
+      }
+
+      if (Number(payment.total_charged || 0) <= 0) {
+        return NextResponse.json({ error: "Payment amount is invalid" }, { status: 400 });
+      }
+
+      if (!getStripeSecretKey()) {
+        if (process.env.NODE_ENV === "production") {
+          return NextResponse.json(
+            { error: "Stripe is not configured on the server. Add stripe_secret_key in Vercel." },
+            { status: 500 }
+          );
+        }
+
+        const reference = `ANYJOB-SHIFT-LOCAL-${String(payment.id).slice(0, 8).toUpperCase()}`;
+        const [paymentResult, walletResult] = await Promise.all([
+          admin
+            .from("shift_escrow_payments")
+            .update({ status: "held", paid_at: new Date().toISOString(), payment_reference: reference })
+            .eq("id", payment.id)
+            .select("*")
+            .single(),
+          admin
+            .from("provider_wallet_entries")
+            .upsert(
+              {
+                provider_user_id: payment.provider_user_id,
+                source_type: "shift_payment",
+                source_id: payment.id,
+                amount: payment.agreed_amount,
+                currency: payment.currency || "EUR",
+                status: "pending",
+                description: `${post.role_title || "Shift work"} payment held by AnyJob`,
+              },
+              { onConflict: "source_type,source_id" }
+            )
+            .select("*")
+            .single(),
+        ]);
+
+        if (paymentResult.error || walletResult.error) {
+          return NextResponse.json({ error: paymentResult.error?.message || walletResult.error?.message }, { status: 500 });
+        }
+        return NextResponse.json({ payment: paymentResult.data, walletEntry: walletResult.data, localPayment: true });
+      }
+
+      const stripe = getStripe();
+      const origin = request.nextUrl.origin;
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["card"],
+        customer_email: user.email || undefined,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: String(payment.currency || "EUR").toLowerCase(),
+              unit_amount: Math.round(Number(payment.total_charged || 0) * 100),
+              product_data: {
+                name: `AnyJob shift payment: ${post.role_title || "Shift work"}`,
+                description: "AnyJob holds this payment and credits the provider after completed work is confirmed.",
+              },
+            },
+          },
+        ],
+        metadata: {
+          type: "shift_escrow_payment",
+          payment_id: payment.id,
+          shift_application_id: application.id,
+          business_work_post_id: application.business_work_post_id,
+          business_id: application.business_id,
+          owner_user_id: application.owner_user_id,
+          provider_user_id: application.provider_user_id,
+        },
+        success_url: `${origin}/api/payments/shift-escrow-checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/dashboard/business?payment=cancelled`,
+      });
+
+      return NextResponse.json({ checkoutUrl: session.url, sessionId: session.id });
+    }
+
+    if (action === "mark-paid") {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json({ error: "Manual payment marking is disabled in production." }, { status: 403 });
       }
 
       const reference = `ANYJOB-SHIFT-${String(payment.id).slice(0, 8).toUpperCase()}`;
