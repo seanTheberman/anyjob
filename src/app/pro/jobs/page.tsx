@@ -24,6 +24,8 @@ interface Job {
   number_of_people_needed: number;
   status: string;
   submitted_at: string;
+  anyjob_select?: boolean;
+  admin_posted?: boolean;
   bid_count: number;
   my_bid: { id: string; amount: number; status: string } | null;
   work_image_count: number;
@@ -445,6 +447,11 @@ export default function BrowseJobsPage() {
                       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${categoryColors[job.category_slug] || "bg-slate-100 text-slate-700"}`}>
                         {categoryNames[job.category_slug] || job.category_slug}
                       </span>
+                      {job.anyjob_select ? (
+                        <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-black uppercase text-white">
+                          AnyJob Select
+                        </span>
+                      ) : null}
                       <span className="inline-flex items-center gap-1 font-bold text-blue-600">
                         <Gavel className="h-4 w-4" />
                         {job.bid_count} offer{job.bid_count === 1 ? "" : "s"}
@@ -475,6 +482,9 @@ export default function BrowseJobsPage() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-3">
                       <span className="rounded-full bg-green-100 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-green-800">Open</span>
+                      {selectedJob.anyjob_select ? (
+                        <span className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-white">AnyJob Select</span>
+                      ) : null}
                       <span className={`rounded-full px-3 py-1 text-xs font-bold ${categoryColors[selectedJob.category_slug] || "bg-slate-100 text-slate-700"}`}>
                         {categoryNames[selectedJob.category_slug] || selectedJob.category_slug}
                       </span>
@@ -591,6 +601,7 @@ export default function BrowseJobsPage() {
                     <div className="rounded-lg border border-slate-200 p-4">
                       <p className="text-sm font-black text-blue-950">What you can see now</p>
                       <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+                        {selectedJob.anyjob_select ? <p>Posted by AnyJob admin for an AnyJob Select email recipient.</p> : null}
                         <p>Approximate area only until acceptance.</p>
                         <p>Buyer contact unlocks after paid acceptance.</p>
                         <p>{selectedJob.work_image_count} photo{selectedJob.work_image_count === 1 ? "" : "s"} attached.</p>

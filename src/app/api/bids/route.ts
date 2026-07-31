@@ -3,6 +3,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 import { PROVIDER_QUOTE_TERMS_PATH, PROVIDER_QUOTE_TERMS_VERSION } from "@/lib/legal/provider-terms";
 import { notifyJobEvent } from "@/lib/notifications/email-functions";
+import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
 import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
 import { getProviderApplicationEntitlement } from "@/lib/plans/provider-plan-server";
 import { getProviderStatsMap } from "@/lib/provider-stats";
@@ -35,6 +36,15 @@ function requestIp(request: NextRequest) {
   const realIp = request.headers.get("x-real-ip")?.trim();
   const candidate = forwardedFor || realIp || "";
   return candidate && /^[0-9a-fA-F:.]+$/.test(candidate) ? candidate : null;
+}
+
+function selectJobTitle(inquiry: Record<string, any>) {
+  const description = String(inquiry.job_description || "").trim();
+  if (description) {
+    const [firstBlock] = description.split(/\n\s*\n/);
+    return firstBlock.split(/[.!?]/).find((part) => part.trim())?.trim().slice(0, 96) || firstBlock.slice(0, 96);
+  }
+  return String(inquiry.subcategory_slug || inquiry.category_slug || "AnyJob Select job").replaceAll("-", " ");
 }
 
 async function queueProviderTermsFallback(
@@ -165,7 +175,8 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminSupabaseClient() as never as { from(table: string): any };
-    const buyerKyc = await getBuyerKycStatus(admin, inquiry.user_id);
+    const isAnyJobSelect = inquiry.anyjob_select === true || inquiry.admin_posted === true;
+    const buyerKyc = isAnyJobSelect ? { isComplete: true, missing: [] as string[] } : await getBuyerKycStatus(admin, inquiry.user_id);
     if (!buyerKyc.isComplete) {
       return NextResponse.json(
         {
@@ -308,6 +319,53 @@ export async function POST(request: NextRequest) {
         termsVersion: termsAcceptance?.terms_version || PROVIDER_QUOTE_TERMS_VERSION,
         termsUrl: termsAcceptance?.terms_url || PROVIDER_QUOTE_TERMS_PATH,
       });
+    }
+
+    if (isAnyJobSelect && inquiry.select_quote_recipient_email) {
+      const token = crypto.randomUUID();
+      const recipientEmail = String(inquiry.select_quote_recipient_email || "").trim().toLowerCase();
+      const providerName = [provider.first_name, provider.last_name].filter(Boolean).join(" ") || "Provider";
+      const breakdown = calculateBookingTokenBreakdown(Number(bid.amount || 0));
+
+      const { error: selectInsertError } = await admin.from("admin_select_quote_acceptances").insert({
+        inquiry_id,
+        bid_id: bid.id,
+        recipient_email: recipientEmail,
+        token,
+        status: "emailed",
+        metadata: {
+          provider_id: user.id,
+          provider_name: providerName,
+          provider_email: providerEmail,
+          seller_quote: breakdown.sellerQuote,
+          anyjob_fee: breakdown.bookingToken,
+          buyer_total: breakdown.buyerTotal,
+        },
+      });
+
+      if (selectInsertError) {
+        console.error("AnyJob Select quote token creation failed:", selectInsertError);
+      } else {
+        const selectEmailResult = await notifyJobEvent({
+          action: "anyjob_select_quote_received",
+          tenantSlug: "default",
+          jobId: inquiry_id,
+          inquiryId: inquiry_id,
+          bidId: bid.id,
+          token,
+          recipientEmail,
+          providerName,
+          providerEmail,
+          jobTitle: selectJobTitle(inquiry),
+          sellerQuote: formatMoney(breakdown.sellerQuote, "€"),
+          anyJobFee: formatMoney(breakdown.bookingToken, "€"),
+          buyerTotal: formatMoney(breakdown.buyerTotal, "€"),
+          message: String(message || ""),
+        });
+        if (!selectEmailResult.ok) {
+          console.error("AnyJob Select quote email failed:", selectEmailResult);
+        }
+      }
     }
 
     return NextResponse.json({ bid, termsAcceptance }, { status: 201 });

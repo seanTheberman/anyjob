@@ -54,6 +54,7 @@ const notificationFunctionByAction: Record<string, string> = {
   provider_plan_subscription_success: "billing-notifications",
   process_job_expirations: "job-expiry-notifications",
   process_unread_alerts: "unread-alert-notifications",
+  anyjob_select_quote_received: "select-quote-notifications",
 };
 
 export async function notifyJobEvent(payload: Record<string, unknown>) {

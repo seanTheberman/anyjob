@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { BriefcaseBusiness, ChevronDown, CheckCircle2, Clock3, Download, Eye, FileQuestion, FileText, MapPin, MessageCircle, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
+import { Award, BriefcaseBusiness, ChevronDown, CheckCircle2, Clock3, Download, Eye, FileQuestion, FileText, MapPin, MessageCircle, RefreshCw, Search, SlidersHorizontal, TimerReset, Trash2, XCircle } from "lucide-react";
 
 import type { AdminLiveJob } from "./admin-data";
 import { getJobStatusLabel } from "@/lib/job-status";
@@ -378,6 +378,33 @@ export function AdminJobsWorklist({
         {message ? <div className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">{message}</div> : null}
       </section>
 
+      <section className="rounded-lg border border-red-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-sm font-black uppercase tracking-wide text-red-600">AnyJob Select</p>
+            <h2 className="mt-1 text-xl font-black text-slate-950">Post a manual job for an email recipient</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              Admin-posted service jobs go live immediately, show an AnyJob Select badge, and send every provider quote to the selected email.
+            </p>
+          </div>
+        </div>
+        <form method="post" action="/api/admin/manual-jobs" className="mt-4 grid gap-3 lg:grid-cols-4">
+          <input name="job_title" placeholder="Job title" required className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="select_quote_recipient_email" type="email" placeholder="Recipient email for quotes" required className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="select_quote_recipient_name" placeholder="Recipient name" className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="city" placeholder="City / area" required className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="category_slug" defaultValue="custom" placeholder="Category slug" className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="subcategory_slug" defaultValue="custom-job" placeholder="Subcategory slug" className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="budget_range_min" type="number" min="0" step="1" placeholder="Budget min" className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <input name="budget_range_max" type="number" min="0" step="1" placeholder="Budget max" className="h-11 rounded-lg border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100" />
+          <textarea name="job_description" required placeholder="Job description" rows={3} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100 lg:col-span-3" />
+          <button type="submit" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-red-600 px-4 text-sm font-black text-white hover:bg-red-700">
+            <Award className="h-4 w-4" />
+            Post Select job
+          </button>
+        </form>
+      </section>
+
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="grid gap-3 border-b border-slate-200 bg-white p-4 lg:grid-cols-[minmax(0,1fr)_240px_220px_auto]">
           <label className="relative block">
@@ -607,6 +634,9 @@ export function AdminJobsWorklist({
                   <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600" title={job.description}>{job.description || "No job description recorded."}</p>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase text-slate-600">{job.sourceLabel}</span>
+                    {job.anyJobSelect ? (
+                      <span className="rounded-full bg-red-600 px-2 py-1 text-[10px] font-black uppercase text-white">AnyJob Select</span>
+                    ) : null}
                     <span className="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black uppercase text-blue-700">{job.shortId}</span>
                   </div>
                 </td>
@@ -755,11 +785,28 @@ export function AdminJobsWorklist({
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black uppercase text-slate-700">{job.sourceLabel}</span>
+                            {job.anyJobSelect ? (
+                              <span className="rounded-full bg-red-600 px-3 py-1 text-xs font-black uppercase text-white">AnyJob Select</span>
+                            ) : null}
                             <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${statusClass(job)}`}>{getJobStatusLabel(job.status)}</span>
                             <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black uppercase text-blue-700">{tabLabel(job)}</span>
                           </div>
                           <h3 className="mt-3 text-lg font-black text-slate-950">{job.type}</h3>
                           <p className="mt-2 max-w-5xl whitespace-pre-wrap text-sm leading-6 text-slate-700">{job.description || "No job description recorded."}</p>
+                          {job.anyJobSelect ? (
+                            <div className="mt-3 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-semibold text-red-900">
+                              <p>Quotes are emailed to {job.selectQuoteRecipientEmail || job.email}.</p>
+                              {job.selectQuoteSelectedBidId ? (
+                                <p className="mt-1">
+                                  Recipient selected quote {job.selectQuoteSelectedBidId.slice(0, 8)}
+                                  {job.selectQuoteSelectedAt ? ` on ${new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short" }).format(new Date(job.selectQuoteSelectedAt))}` : ""}.
+                                  Payment status: {job.selectQuotePaymentStatus || "unpaid"}.
+                                </p>
+                              ) : (
+                                <p className="mt-1">No external quote selection yet.</p>
+                              )}
+                            </div>
+                          ) : null}
                         </div>
                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
                           <p className="font-black text-slate-950">{job.quotes}</p>

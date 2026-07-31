@@ -150,6 +150,13 @@ export type AdminLiveJob = {
   lastActivity: string;
   lastActivityAt: string | null;
   tabStatus: "pending_review" | "live" | "expired" | "awaiting_buyer" | "no_quotes" | "completed" | "cancelled" | "all";
+  anyJobSelect?: boolean;
+  adminPosted?: boolean;
+  selectQuoteRecipientEmail?: string;
+  selectQuoteRecipientName?: string;
+  selectQuoteSelectedBidId?: string;
+  selectQuoteSelectedAt?: string;
+  selectQuotePaymentStatus?: string;
 };
 
 export type AdminSettingField = {

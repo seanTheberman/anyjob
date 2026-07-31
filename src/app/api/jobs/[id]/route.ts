@@ -262,6 +262,7 @@ export async function GET(
 
     const showContact = myBid?.status === 'accepted';
     const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(', ');
+    const isAnyJobSelect = job.anyjob_select === true || job.admin_posted === true;
 
     // Transform the data to match the expected format
     const transformedJob = {
@@ -269,7 +270,7 @@ export async function GET(
       title: jobTitleFromInquiry(job),
       description: jobDescriptionFromInquiry(job),
       client: {
-        name: `${job.first_name} ${job.last_name}`,
+        name: isAnyJobSelect ? "AnyJob Select" : `${job.first_name} ${job.last_name}`,
         email: user && showContact ? job.email : undefined, // Only after bid accepted
         phone: user && showContact ? job.phone : undefined, // Only after bid accepted
         photo: undefined,
@@ -303,13 +304,28 @@ export async function GET(
       equipment: job.equipment_needed || 'No specific equipment needed',
       postedAt: new Date(job.submitted_at).toLocaleDateString(),
       status: job.status || 'submitted',
+      anyjobSelect: isAnyJobSelect,
+      adminPosted: job.admin_posted === true,
       bid_count: bidCount || 0,
       my_bid: myBid,
       work_image_count: imageCount,
       work_images: images || [],
       offers: offerDetails,
       buyerStats,
-      buyerTrust,
+      buyerTrust: isAnyJobSelect
+        ? {
+            jobsPosted: 0,
+            hires: 0,
+            hireRate: 0,
+            paidJobs: 0,
+            totalSpent: 0,
+            totalSpentLabel: "AnyJob Select",
+            paymentStatus: "verified",
+            isNewClient: false,
+            kycVerified: true,
+            badges: [{ label: "AnyJob Select", tone: "red", source: "system" }],
+          }
+        : buyerTrust,
     };
 
     return NextResponse.json({ job: transformedJob });

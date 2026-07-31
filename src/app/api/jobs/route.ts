@@ -78,7 +78,10 @@ export async function GET(request: NextRequest) {
         })
       )
     );
-    const visibleJobs = (jobs || []).filter((job) => buyerKycByUser.get(String(job.user_id || ""))?.isComplete);
+    const visibleJobs = (jobs || []).filter((job) => {
+      if (job.anyjob_select === true || job.admin_posted === true) return true;
+      return buyerKycByUser.get(String(job.user_id || ""))?.isComplete;
+    });
     const buyerTrustByUser = await getBuyerTrustForUsers(admin, buyerIds);
     const buyerRatingsResult = buyerIds.length
       ? await admin
@@ -130,10 +133,17 @@ export async function GET(request: NextRequest) {
         delete safeJob.longitude;
         delete safeJob.postal_code;
         delete safeJob.user_id;
+        delete safeJob.select_quote_recipient_email;
+        delete safeJob.select_quote_recipient_name;
+        delete safeJob.select_quote_note;
+        delete safeJob.admin_posted_by;
         const buyerRating = buyerRatingsByUser.get(String(job.user_id || ""));
+        const isAnyJobSelect = job.anyjob_select === true || job.admin_posted === true;
 
         return {
           ...safeJob,
+          anyjob_select: isAnyJobSelect,
+          admin_posted: job.admin_posted === true,
           address: coarseLabel || "Approximate location shared after quote",
           postal_code: coarsePostalCode(job.postal_code),
           coarse_location_label: coarseLabel,
@@ -154,7 +164,20 @@ export async function GET(request: NextRequest) {
           })),
           buyer_rating: buyerRating?.reviewCount ? buyerRating.rating : undefined,
           buyer_review_count: buyerRating?.reviewCount || undefined,
-          buyerTrust: buyerTrustByUser.get(String(job.user_id || "")) || null,
+          buyerTrust: isAnyJobSelect
+            ? {
+                jobsPosted: 0,
+                hires: 0,
+                hireRate: 0,
+                paidJobs: 0,
+                totalSpent: 0,
+                totalSpentLabel: "AnyJob Select",
+                paymentStatus: "verified",
+                isNewClient: false,
+                kycVerified: true,
+                badges: [{ label: "AnyJob Select", tone: "red", source: "system" }],
+              }
+            : buyerTrustByUser.get(String(job.user_id || "")) || null,
         };
       })
     );
