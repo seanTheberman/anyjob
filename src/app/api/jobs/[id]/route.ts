@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { isAnyJobSelectInquiry } from "@/lib/anyjob-select";
 import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
 import { getProviderStatsMap } from "@/lib/provider-stats";
@@ -262,7 +263,7 @@ export async function GET(
 
     const showContact = myBid?.status === 'accepted';
     const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(', ');
-    const isAnyJobSelect = job.anyjob_select === true || job.admin_posted === true;
+    const isAnyJobSelect = isAnyJobSelectInquiry(job);
 
     // Transform the data to match the expected format
     const transformedJob = {

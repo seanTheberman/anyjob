@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { verifyAnyJobSelectToken } from "@/lib/anyjob-select";
 import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
@@ -87,6 +88,47 @@ export async function GET(request: NextRequest) {
       job: String(inquiry.id).slice(0, 8),
     }));
   } catch (error) {
+    const payload = verifyAnyJobSelectToken(token);
+    if (payload && payload.bidId === bidId) {
+      try {
+        const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
+        const { data: bid } = await supabase
+          .from("bids")
+          .select("*, inquiry:service_inquiries!bids_inquiry_id_fkey(*)")
+          .eq("id", payload.bidId)
+          .eq("inquiry_id", payload.inquiryId)
+          .maybeSingle();
+        const inquiry = Array.isArray(bid?.inquiry) ? bid?.inquiry[0] : bid?.inquiry;
+        if (!bid || !inquiry || String(bid.status || "") !== "pending") {
+          return NextResponse.redirect(thankYouUrl(request, { status: "unavailable", token }));
+        }
+        const now = new Date().toISOString();
+        const breakdown = calculateBookingTokenBreakdown(Number(bid.amount || 0));
+        await supabase.from("eloo_notifications").insert({
+          user_id: payload.adminUserId || inquiry.user_id,
+          title: "AnyJob Select quote chosen",
+          message: `${payload.recipientEmail} wants to continue with this provider for ${String(inquiry.job_description || "the job").slice(0, 90)}.`,
+          type: "anyjob_select_quote_selected",
+          action_url: `/admin/jobs?tab=awaiting_buyer&q=${String(inquiry.id).slice(0, 8)}`,
+          is_read: false,
+          data: {
+            inquiry_id: inquiry.id,
+            bid_id: bid.id,
+            recipient_email: payload.recipientEmail,
+            buyer_total: breakdown.buyerTotal,
+            selected_at: now,
+            signed_token_fallback: true,
+          },
+        });
+        return NextResponse.redirect(thankYouUrl(request, {
+          status: "selected",
+          token,
+          job: String(inquiry.id).slice(0, 8),
+        }));
+      } catch (fallbackError) {
+        console.error("AnyJob Select signed token acceptance failed:", fallbackError);
+      }
+    }
     console.error("AnyJob Select quote acceptance failed:", error);
     return NextResponse.redirect(thankYouUrl(request, { status: "failed", token }));
   }

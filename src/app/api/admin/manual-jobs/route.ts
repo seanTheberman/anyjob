@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { anyJobSelectRequirements } from "@/lib/anyjob-select";
 import { adminForbidden, getAdminApiUser, logAdminAction } from "@/lib/auth/admin-api";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
@@ -60,9 +61,7 @@ export async function POST(request: Request) {
     const now = new Date().toISOString();
     const storedDescription = title ? `${title}\n\n${description}` : description;
     const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
-    const { data: inquiry, error } = await supabase
-      .from("service_inquiries")
-      .insert({
+    const baseInsert = {
         user_id: admin.id,
         email: recipientEmail,
         phone: clean(body.phone) || null,
@@ -85,11 +84,14 @@ export async function POST(request: Request) {
         number_of_people_needed: numberOrNull(body.number_of_people_needed) || 1,
         budget_range_min: numberOrNull(body.budget_range_min) || 0,
         budget_range_max: numberOrNull(body.budget_range_max) || 999999,
-        specific_requirements: clean(body.specific_requirements) || null,
+        specific_requirements: anyJobSelectRequirements(clean(body.specific_requirements || body.select_quote_note)),
         equipment_needed: clean(body.equipment_needed) || null,
         materials_provided: body.materials_provided === "on" || body.materials_provided === true,
         status: "submitted",
         submitted_at: now,
+      };
+    const selectInsert = {
+        ...baseInsert,
         admin_posted: true,
         admin_posted_by: admin.id,
         anyjob_select: true,
@@ -97,9 +99,25 @@ export async function POST(request: Request) {
         select_quote_recipient_name: clean(body.select_quote_recipient_name || body.recipient_name) || null,
         select_quote_note: clean(body.select_quote_note) || null,
         select_quote_payment_status: "unpaid",
-      })
+      };
+    let insertResult = await supabase
+      .from("service_inquiries")
+      .insert(selectInsert)
       .select("id")
       .single();
+
+    if (
+      insertResult.error &&
+      (insertResult.error.code === "PGRST204" || /admin_posted|anyjob_select|select_quote/i.test(insertResult.error.message || ""))
+    ) {
+      insertResult = await supabase
+        .from("service_inquiries")
+        .insert(baseInsert)
+        .select("id")
+        .single();
+    }
+
+    const { data: inquiry, error } = insertResult;
 
     if (error) {
       if (isFormPost) return redirectAfter(request, { manualJobError: error.message });

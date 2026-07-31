@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { createAnyJobSelectToken, isAnyJobSelectInquiry } from "@/lib/anyjob-select";
 import { NextRequest, NextResponse } from "next/server";
 import { PROVIDER_QUOTE_TERMS_PATH, PROVIDER_QUOTE_TERMS_VERSION } from "@/lib/legal/provider-terms";
 import { notifyJobEvent } from "@/lib/notifications/email-functions";
@@ -175,7 +176,7 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminSupabaseClient() as never as { from(table: string): any };
-    const isAnyJobSelect = inquiry.anyjob_select === true || inquiry.admin_posted === true;
+    const isAnyJobSelect = isAnyJobSelectInquiry(inquiry);
     const buyerKyc = isAnyJobSelect ? { isComplete: true, missing: [] as string[] } : await getBuyerKycStatus(admin, inquiry.user_id);
     if (!buyerKyc.isComplete) {
       return NextResponse.json(
@@ -321,31 +322,40 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    if (isAnyJobSelect && inquiry.select_quote_recipient_email) {
-      const token = crypto.randomUUID();
-      const recipientEmail = String(inquiry.select_quote_recipient_email || "").trim().toLowerCase();
+    if (isAnyJobSelect) {
+      let token = "";
+      const recipientEmail = String(inquiry.select_quote_recipient_email || inquiry.email || "").trim().toLowerCase();
       const providerName = [provider.first_name, provider.last_name].filter(Boolean).join(" ") || "Provider";
       const breakdown = calculateBookingTokenBreakdown(Number(bid.amount || 0));
 
-      const { error: selectInsertError } = await admin.from("admin_select_quote_acceptances").insert({
-        inquiry_id,
-        bid_id: bid.id,
-        recipient_email: recipientEmail,
-        token,
-        status: "emailed",
-        metadata: {
-          provider_id: user.id,
-          provider_name: providerName,
-          provider_email: providerEmail,
-          seller_quote: breakdown.sellerQuote,
-          anyjob_fee: breakdown.bookingToken,
-          buyer_total: breakdown.buyerTotal,
-        },
-      });
+      if (recipientEmail) {
+        token = crypto.randomUUID();
+        const { error: selectInsertError } = await admin.from("admin_select_quote_acceptances").insert({
+          inquiry_id,
+          bid_id: bid.id,
+          recipient_email: recipientEmail,
+          token,
+          status: "emailed",
+          metadata: {
+            provider_id: user.id,
+            provider_name: providerName,
+            provider_email: providerEmail,
+            seller_quote: breakdown.sellerQuote,
+            anyjob_fee: breakdown.bookingToken,
+            buyer_total: breakdown.buyerTotal,
+          },
+        });
 
-      if (selectInsertError) {
-        console.error("AnyJob Select quote token creation failed:", selectInsertError);
-      } else {
+        if (selectInsertError) {
+          console.error("AnyJob Select quote token creation failed:", selectInsertError);
+          token = createAnyJobSelectToken({
+            inquiryId: inquiry_id,
+            bidId: bid.id,
+            recipientEmail,
+            adminUserId: inquiry.admin_posted_by || inquiry.user_id,
+          });
+        }
+
         const selectEmailResult = await notifyJobEvent({
           action: "anyjob_select_quote_received",
           tenantSlug: "default",

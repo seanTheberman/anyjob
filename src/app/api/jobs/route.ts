@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import { isAnyJobSelectInquiry } from "@/lib/anyjob-select";
 import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
 import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
 import { NextRequest, NextResponse } from "next/server";
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
       )
     );
     const visibleJobs = (jobs || []).filter((job) => {
-      if (job.anyjob_select === true || job.admin_posted === true) return true;
+      if (isAnyJobSelectInquiry(job)) return true;
       return buyerKycByUser.get(String(job.user_id || ""))?.isComplete;
     });
     const buyerTrustByUser = await getBuyerTrustForUsers(admin, buyerIds);
@@ -138,7 +139,7 @@ export async function GET(request: NextRequest) {
         delete safeJob.select_quote_note;
         delete safeJob.admin_posted_by;
         const buyerRating = buyerRatingsByUser.get(String(job.user_id || ""));
-        const isAnyJobSelect = job.anyjob_select === true || job.admin_posted === true;
+        const isAnyJobSelect = isAnyJobSelectInquiry(job);
 
         return {
           ...safeJob,

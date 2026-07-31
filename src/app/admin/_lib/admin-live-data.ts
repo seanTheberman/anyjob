@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isAnyJobSelectInquiry } from "@/lib/anyjob-select";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { mapSupportTicketRow, type SupportTicket } from "@/lib/support/tickets";
@@ -414,10 +415,15 @@ export async function getKycReviews(): Promise<KycReview[]> {
 }
 
 export async function getAdminJobs() {
+  const baseInquirySelect =
+    "id,user_id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,preferred_time_start,preferred_time_end,flexible_timing,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,specific_requirements,equipment_needed,materials_provided,status,created_at,updated_at,submitted_at";
+  const selectInquirySelect =
+    `${baseInquirySelect},admin_posted,admin_posted_by,anyjob_select,select_quote_recipient_email,select_quote_recipient_name,select_quote_note,select_quote_selected_bid_id,select_quote_selected_at,select_quote_payment_status`;
   const [inquiries, bids, businessPosts, shiftApplications, businesses, profiles, conversations, messages] = await Promise.all([
-    maybeRows<AnyRecord>(
+    maybeRowsWithFallback<AnyRecord>(
       "service_inquiries",
-      "id,user_id,first_name,last_name,email,phone,address,city,postal_code,coarse_location_label,category_slug,subcategory_slug,service_type,job_description,job_urgency,preferred_date,preferred_time_start,preferred_time_end,flexible_timing,estimated_duration_hours,number_of_people_needed,budget_range_min,budget_range_max,specific_requirements,equipment_needed,materials_provided,status,created_at,updated_at,submitted_at,admin_posted,admin_posted_by,anyjob_select,select_quote_recipient_email,select_quote_recipient_name,select_quote_note,select_quote_selected_bid_id,select_quote_selected_at,select_quote_payment_status",
+      selectInquirySelect,
+      baseInquirySelect,
       500
     ),
     maybeRows<AnyRecord>("bids", "*", 1000),
@@ -535,7 +541,7 @@ export async function getAdminJobs() {
     const ageDays = createdAt ? Math.max(Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000), 0) : 0;
     const quoteCount = jobBids.length;
     const acceptedQuote = jobBids.some((bid) => String(bid.status || "").toLowerCase() === "accepted");
-    const isAnyJobSelect = job.anyjob_select === true || job.admin_posted === true;
+    const isAnyJobSelect = isAnyJobSelectInquiry(job);
     const normalizedStatus = status.toLowerCase();
     const budgetLabel = job.budget_range_min || job.budget_range_max
       ? `${money(Number(job.budget_range_min || 0))} - ${money(Number(job.budget_range_max || 0))}`
@@ -586,7 +592,7 @@ export async function getAdminJobs() {
       status,
       sourceLabel: isAnyJobSelect ? "AnyJob Select · posted by admin" : "Buyer service request",
       customer: isAnyJobSelect
-        ? String(job.select_quote_recipient_name || job.email || "AnyJob Select recipient")
+        ? String(job.select_quote_recipient_name || [job.first_name, job.last_name].filter(Boolean).join(" ") || job.email || "AnyJob Select recipient")
         : String([job.first_name, job.last_name].filter(Boolean).join(" ") || job.email || "Client"),
       email: String(job.email || ""),
       phone: String(job.phone || ""),
@@ -609,7 +615,7 @@ export async function getAdminJobs() {
       tabStatus,
       anyJobSelect: isAnyJobSelect,
       adminPosted: job.admin_posted === true,
-      selectQuoteRecipientEmail: String(job.select_quote_recipient_email || ""),
+      selectQuoteRecipientEmail: String(job.select_quote_recipient_email || (isAnyJobSelect ? job.email : "") || ""),
       selectQuoteRecipientName: String(job.select_quote_recipient_name || ""),
       selectQuoteSelectedBidId: String(job.select_quote_selected_bid_id || ""),
       selectQuoteSelectedAt: String(job.select_quote_selected_at || ""),
