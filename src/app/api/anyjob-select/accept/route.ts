@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     const bid = selection?.bid;
     const inquiry = Array.isArray(bid?.inquiry) ? bid?.inquiry[0] : bid?.inquiry;
     if (selectionError || !selection || !bid || !inquiry) {
-      return NextResponse.redirect(thankYouUrl(request, { status: "invalid" }));
+      throw selectionError || new Error("AnyJob Select quote selection not found");
     }
 
     if (String(bid.status || "") !== "pending" && String(selection.status || "") !== "paid") {
