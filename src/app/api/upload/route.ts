@@ -53,19 +53,31 @@ async function syncKycUpload(
   const timestamp = new Date().toISOString();
   const column = imageType === "id_document" ? "id_document_url" : "selfie_video_url";
 
+  const [{ data: buyer }, { data: seller }, { data: profile }] = await Promise.all([
+    supabase.from("buyers").select("kyc_status").eq("id", userId).maybeSingle(),
+    supabase.from("sellers").select("status").eq("id", userId).maybeSingle(),
+    supabase.from("eloo_profiles").select("is_verified,kyc_status").eq("id", userId).maybeSingle(),
+  ]);
+
+  const buyerApproved = ["approved", "confirmed", "verified", "manual_override", "manually_verified"]
+    .includes(String(buyer?.kyc_status || "").toLowerCase());
+  const sellerApproved = String(seller?.status || "").toLowerCase() === "approved";
+  const profileApproved = profile?.is_verified === true || ["approved", "confirmed", "verified", "manual_override", "manually_verified"]
+    .includes(String(profile?.kyc_status || "").toLowerCase());
+
   await supabase
     .from("buyers")
-    .update({ [column]: url, kyc_status: "submitted", kyc_submitted_at: timestamp })
+    .update({ [column]: url, ...(!buyerApproved ? { kyc_status: "submitted" } : {}), kyc_submitted_at: timestamp })
     .eq("id", userId);
 
   await supabase
     .from("sellers")
-    .update({ [column]: url, verification_status: "pending", kyc_submitted_at: timestamp })
+    .update({ [column]: url, kyc_submitted_at: timestamp })
     .eq("id", userId);
 
   await supabase
     .from("eloo_profiles")
-    .update({ kyc_status: "submitted", kyc_submitted_at: timestamp })
+    .update({ ...(!buyerApproved && !sellerApproved && !profileApproved ? { kyc_status: "submitted" } : {}), kyc_submitted_at: timestamp })
     .eq("id", userId);
 }
 

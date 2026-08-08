@@ -56,8 +56,8 @@ export async function getProviderStatsMap(supabase: SupabaseLike, providerIds: s
   if (!ids.length) return stats;
 
   const [reviews, bids, bookings, shiftApplications] = await Promise.all([
-    safeRows(supabase, "eloo_reviews", "reviewee_id,rating,is_public,booking_id", (query) =>
-      query.in("reviewee_id", ids).eq("is_public", true).not("booking_id", "is", null)
+    safeRows(supabase, "eloo_reviews", "reviewee_id,rating,is_public", (query) =>
+      query.in("reviewee_id", ids).eq("is_public", true)
     ),
     safeRows(supabase, "bids", "id,provider_id,status,inquiry:service_inquiries!bids_inquiry_id_fkey(status)", (query) =>
       query.in("provider_id", ids)

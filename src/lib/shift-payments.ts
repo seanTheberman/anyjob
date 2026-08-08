@@ -21,7 +21,7 @@ export function calculateShiftHours(post: ShiftPostForAmount) {
   const start = new Date(post.starts_at).getTime();
   const end = new Date(post.ends_at).getTime();
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 1;
-  return Math.max(1, Math.round(((end - start) / 36_000) / 10));
+  return Math.max(1, Math.round(((end - start) / 3_600_000) * 10) / 10);
 }
 
 export function calculateShiftAgreedAmount(post: ShiftPostForAmount, application: ShiftApplicationForAmount) {

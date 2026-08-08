@@ -2,18 +2,15 @@ import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 
 type LooseRow = Record<string, any>;
 
 export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const user = await getFastAuthUser(supabase);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -23,6 +23,10 @@ export type ProviderMarketplaceData = ProviderCardData & {
   level: string;
   badges: string[];
   availability: string;
+  contactWindows: string[];
+  unavailable: boolean;
+  unavailableUntil: string | null;
+  unavailableNote: string;
   responseTime: string;
   description: string;
   services: string[];
@@ -57,6 +61,10 @@ export type ProviderProfileData = {
   responseTime: string;
   hourlyRate: string;
   availability: string;
+  contactWindows: string[];
+  unavailable: boolean;
+  unavailableUntil: string | null;
+  unavailableNote: string;
   photos: string[];
   highlights: string[];
   reviewDistribution: Record<number, number>;
@@ -208,6 +216,10 @@ function providerMetadata(provider: SellerRow) {
     companyName?: string | null;
     marketplaceAvailability?: string;
     note?: string;
+    contactWindows?: unknown;
+    unavailable?: boolean;
+    unavailableUntil?: string | null;
+    unavailableNote?: string | null;
     responseTime?: string;
     response_time?: string;
   };
@@ -268,9 +280,27 @@ function initialsForName(name: string) {
 
 function providerAvailabilityLabel(provider: SellerRow) {
   const availability = providerMetadata(provider);
+  if (availability?.unavailable) {
+    const until = availability.unavailableUntil ? new Date(availability.unavailableUntil) : null;
+    const hasValidUntil = until && Number.isFinite(until.getTime());
+    const untilLabel = hasValidUntil
+      ? new Intl.DateTimeFormat("en-IE", { dateStyle: "medium", timeStyle: "short" }).format(until)
+      : "";
+    return availability.unavailableNote?.trim()
+      || (untilLabel ? `Unavailable until ${untilLabel}` : "Currently unavailable");
+  }
   if (availability?.note && availability.note.trim()) return availability.note.trim();
   if (availability?.marketplaceAvailability && availability.marketplaceAvailability.trim()) return availability.marketplaceAvailability.trim();
   return "";
+}
+
+function providerContactWindows(provider: SellerRow) {
+  const windows = providerMetadata(provider).contactWindows;
+  if (!Array.isArray(windows)) return [];
+  return windows
+    .map((window) => typeof window === "string" ? window.trim() : "")
+    .filter(Boolean)
+    .slice(0, 14);
 }
 
 function providerResponseTime(provider: SellerRow) {
@@ -334,6 +364,7 @@ function mapSellerToMarketplace(
   const accountBadges = providerAccountBadges(provider);
   const displayBadges = [...accountBadges, ...badges].filter((value, index, array) => value && array.indexOf(value) === index);
   const availability = providerAvailabilityLabel(provider);
+  const metadata = providerMetadata(provider);
   const tags = [
     level,
     availability,
@@ -368,6 +399,10 @@ function mapSellerToMarketplace(
     level,
     badges: displayBadges,
     availability,
+    contactWindows: providerContactWindows(provider),
+    unavailable: Boolean(metadata.unavailable),
+    unavailableUntil: metadata.unavailableUntil || null,
+    unavailableNote: metadata.unavailableNote?.trim() || "",
     responseTime: providerResponseTime(provider),
     description,
     services,
@@ -437,6 +472,7 @@ function mapSellerToProfile(
   const rating = providerStats.rating;
   const completedJobs = providerStats.completedJobs;
   const displayBadges = [...providerAccountBadges(provider), ...badges].filter((value, index, array) => value && array.indexOf(value) === index);
+  const metadata = providerMetadata(provider);
 
   return {
     id: provider.id,
@@ -461,6 +497,10 @@ function mapSellerToProfile(
     responseTime: providerResponseTime(provider),
     hourlyRate: rate ? `From $${rate} / hour` : "Rate not set",
     availability: providerAvailabilityLabel(provider),
+    contactWindows: providerContactWindows(provider),
+    unavailable: Boolean(metadata.unavailable),
+    unavailableUntil: metadata.unavailableUntil || null,
+    unavailableNote: metadata.unavailableNote?.trim() || "",
     photos: [heroImage, ...media.portfolioPhotos].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index),
     highlights: displayBadges,
     reviewDistribution: ratingStats.distribution,

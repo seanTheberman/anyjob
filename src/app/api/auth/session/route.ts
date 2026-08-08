@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export async function GET() {
   const supabase = await createServerSupabaseClient();
@@ -11,15 +12,17 @@ export async function GET() {
     return NextResponse.json({ user: null });
   }
 
+  const admin = createAdminSupabaseClient() as never as { from(table: string): any };
+
   const [{ data: profile }, { data: seller }] = await Promise.all([
-    supabase
+    admin
       .from("eloo_profiles")
-      .select("role, first_name, last_name, has_business_profile, business_registration_status, provider_work_mode, can_work_freelance, can_work_shifts")
+      .select("role, first_name, last_name, has_business_profile, business_registration_status, provider_work_mode, can_work_freelance, can_work_shifts, rating, review_count")
       .eq("id", user.id)
       .maybeSingle(),
-    supabase
+    admin
       .from("sellers")
-      .select("id, first_name, last_name, status, provider_work_mode, can_work_freelance, can_work_shifts")
+      .select("id, first_name, last_name, status, provider_work_mode, can_work_freelance, can_work_shifts, rating, review_count")
       .eq("id", user.id)
       .maybeSingle(),
   ]);
@@ -46,6 +49,13 @@ export async function GET() {
       providerWorkMode,
       canWorkFreelance,
       canWorkShifts,
+      rating: Number(seller?.rating ?? profile?.rating ?? 0),
+      reviewCount: Number(seller?.review_count ?? profile?.review_count ?? 0),
+    },
+  }, {
+    headers: {
+      "Cache-Control": "private, no-store, max-age=0",
+      "Vary": "Cookie, Authorization",
     },
   });
 }

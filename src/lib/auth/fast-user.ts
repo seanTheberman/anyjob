@@ -16,18 +16,18 @@ export async function getFastAuthUser(supabase: Pick<SupabaseClient, "auth">): P
   const sessionResult = await supabase.auth.getSession().catch(() => null);
   const session = sessionResult?.data?.session;
 
-  if (!session?.access_token) return null;
+  if (session?.access_token) {
+    const claimsResult = await supabase.auth.getClaims().catch(() => null);
+    const claims = claimsResult?.data?.claims as Record<string, unknown> | undefined;
+    const id = stringClaim(claims?.sub);
 
-  const claimsResult = await supabase.auth.getClaims().catch(() => null);
-  const claims = claimsResult?.data?.claims as Record<string, unknown> | undefined;
-  const id = stringClaim(claims?.sub);
-
-  if (id) {
-    return {
-      id,
-      email: stringClaim(claims?.email) || session.user.email || null,
-      user: session.user,
-    };
+    if (id) {
+      return {
+        id,
+        email: stringClaim(claims?.email) || session.user.email || null,
+        user: session.user,
+      };
+    }
   }
 
   const {

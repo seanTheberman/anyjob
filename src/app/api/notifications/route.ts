@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 
 type NotificationRow = {
   id: string;
@@ -27,11 +28,7 @@ function normalize(row: NotificationRow) {
 
 async function currentUserId() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  return user?.id || null;
+  return (await getFastAuthUser(supabase))?.id || null;
 }
 
 async function notificationsClient() {

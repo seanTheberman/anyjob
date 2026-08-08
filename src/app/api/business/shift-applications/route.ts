@@ -207,14 +207,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Payment amount is invalid" }, { status: 400 });
       }
 
-      if (!getStripeSecretKey()) {
-        if (process.env.NODE_ENV === "production") {
-          return NextResponse.json(
-            { error: "Stripe is not configured on the server. Add stripe_secret_key in Vercel." },
-            { status: 500 }
-          );
-        }
-
+      if (process.env.STRIPE_ENABLED !== "true" || !getStripeSecretKey()) {
         const reference = `ANYJOB-SHIFT-LOCAL-${String(payment.id).slice(0, 8).toUpperCase()}`;
         const [paymentResult, walletResult] = await Promise.all([
           admin
@@ -283,10 +276,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "mark-paid") {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json({ error: "Manual payment marking is disabled in production." }, { status: 403 });
-      }
-
       const reference = `ANYJOB-SHIFT-${String(payment.id).slice(0, 8).toUpperCase()}`;
       const [paymentResult, walletResult] = await Promise.all([
         admin

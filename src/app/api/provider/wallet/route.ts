@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { NextResponse } from "next/server";
 
 function total(entries: Array<{ amount?: number | string | null; status?: string | null }>, status: string) {
@@ -11,12 +12,8 @@ function total(entries: Array<{ amount?: number | string | null; status?: string
 export async function GET() {
   try {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error || !user) {
+    const user = await getFastAuthUser(supabase);
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

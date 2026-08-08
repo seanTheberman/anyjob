@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 
 type BadgeRole = "provider" | "buyer";
 type BadgeOperator = "gte" | "lte" | "eq";
@@ -91,7 +92,50 @@ function levelPriority(row: LooseRow) {
   return match ? Number(match[1]) : 0;
 }
 
+function isProviderVerificationBadge(row: LooseRow) {
+  const label = `${String(row.name || "")} ${String(row.slug || "")}`.toLowerCase();
+  return label.includes("verified id") || label.includes("verified-id") || label.includes("verified provider");
+}
+
 async function loadMetricValue(admin: BadgeMetricClient, userId: string, role: BadgeRole, metric: string) {
+  if (role === "provider" && (metric === "average_rating" || metric === "review_count")) {
+    const { data, error } = await (admin as unknown as { from(table: string): any })
+      .from("eloo_reviews")
+      .select("rating")
+      .eq("reviewee_id", userId)
+      .eq("is_public", true);
+    if (!error) {
+      const ratings = (data || []).map((row: { rating?: number | null }) => Number(row.rating || 0)).filter((value: number) => value > 0);
+      if (metric === "review_count") return ratings.length;
+      return ratings.length ? ratings.reduce((sum: number, value: number) => sum + value, 0) / ratings.length : 0;
+    }
+  }
+  if (role === "provider" && (metric === "verified_provider" || metric === "kyc_verified")) {
+    const client = admin as unknown as { from(table: string): any };
+    const [sellerResult, profileResult] = await Promise.all([
+      client.from("sellers").select("status").eq("id", userId).maybeSingle(),
+      client.from("eloo_profiles").select("is_verified,kyc_status").eq("id", userId).maybeSingle(),
+    ]);
+    const status = String(sellerResult.data?.status || "").toLowerCase();
+    const kycStatus = String(profileResult.data?.kyc_status || "").toLowerCase();
+    return status === "approved" || profileResult.data?.is_verified === true || ["approved", "confirmed", "verified", "manual_override", "manually_verified"].includes(kycStatus) ? 1 : 0;
+  }
+  if (role === "buyer" && metric === "total_spent") {
+    const client = admin as unknown as { from(table: string): any };
+    const [inquiriesResult, bookingsResult, shiftsResult] = await Promise.all([
+      client.from("service_inquiries").select("id").eq("user_id", userId).in("status", ["bid_accepted", "in_progress", "completed", "converted"]),
+      client.from("eloo_bookings").select("total_price,is_paid,status").eq("client_id", userId),
+      client.from("shift_escrow_payments").select("total_charged,status").eq("owner_user_id", userId).in("status", ["held", "released"]),
+    ]);
+    const inquiryIds = (inquiriesResult.data || []).map((row: { id: string }) => row.id);
+    const bidsResult = inquiryIds.length
+      ? await client.from("bids").select("amount").in("inquiry_id", inquiryIds).eq("status", "accepted")
+      : { data: [], error: null };
+    const serviceTotal = (bidsResult.data || []).reduce((sum: number, row: { amount?: number | null }) => sum + Number(row.amount || 0), 0);
+    const bookingTotal = (bookingsResult.data || []).filter((row: { is_paid?: boolean; status?: string }) => row.is_paid === true || ["confirmed", "in_progress", "completed"].includes(String(row.status || ""))).reduce((sum: number, row: { total_price?: number | null }) => sum + Number(row.total_price || 0), 0);
+    const shiftTotal = (shiftsResult.data || []).reduce((sum: number, row: { total_charged?: number | null }) => sum + Number(row.total_charged || 0), 0);
+    return serviceTotal + bookingTotal + shiftTotal;
+  }
   const { data, error } = await admin.rpc("badge_metric_value", {
     target_user_id: userId,
     target_role: role,
@@ -109,8 +153,8 @@ async function loadMetricValue(admin: BadgeMetricClient, userId: string, role: B
 
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await getFastAuthUser(supabase);
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const role = roleFromRequest(request);
   const admin = createAdminSupabaseClient() as unknown as LooseAdminClient;
@@ -151,7 +195,9 @@ export async function GET(request: NextRequest) {
   }
 
   const rules = rulesResult.data || [];
-  const metrics = Array.from(new Set(rules.map((rule) => String(rule.metric || "")).filter(Boolean)));
+  const metricSet = new Set(rules.map((rule) => String(rule.metric || "")).filter(Boolean));
+  if (role === "provider" && (definitions || []).some(isProviderVerificationBadge)) metricSet.add("verified_provider");
+  const metrics = Array.from(metricSet);
   const metricPairs = await Promise.all(metrics.map(async (metric) => [metric, await loadMetricValue(admin, user.id, role, metric)] as const));
   const metricValues = Object.fromEntries(metricPairs);
 
@@ -168,7 +214,10 @@ export async function GET(request: NextRequest) {
   }
 
   const badges = (definitions || []).map((badge) => {
-    const badgeRules = rulesByBadge.get(String(badge.id || "")) || [];
+    const configuredRules = rulesByBadge.get(String(badge.id || "")) || [];
+    const badgeRules = role === "provider" && !configuredRules.length && isProviderVerificationBadge(badge)
+      ? [{ id: `${badge.id}-verified-provider`, badge_id: badge.id, metric: "verified_provider", operator: "gte", threshold: 1 }]
+      : configuredRules;
     const evaluatedRules = badgeRules.map((rule) => {
       const metric = String(rule.metric || "");
       const operator = String(rule.operator || "gte") as BadgeOperator;
@@ -233,6 +282,7 @@ export async function GET(request: NextRequest) {
     value: metricValues[metric] || 0,
     valueLabel: formatMetricValue(metric, metricValues[metric] || 0),
     qualifiesNext: nextBadge ? nextBadge.rules.some((rule: LooseRow) => rule.metric === metric && rule.complete) : false,
+    complete: badges.some((badge) => badge.rules.some((rule: LooseRow) => rule.metric === metric && rule.complete)),
   }));
 
   return NextResponse.json({
@@ -240,8 +290,8 @@ export async function GET(request: NextRequest) {
     user: {
       id: user.id,
       email: user.email,
-      name: user.user_metadata?.first_name || user.email?.split("@")[0] || (role === "provider" ? "Provider" : "Buyer"),
-      initial: (user.user_metadata?.first_name?.[0] || user.email?.[0] || "A").toUpperCase(),
+      name: user.user?.user_metadata?.first_name || user.email?.split("@")[0] || (role === "provider" ? "Provider" : "Buyer"),
+      initial: (user.user?.user_metadata?.first_name?.[0] || user.email?.[0] || "A").toUpperCase(),
     },
     summary: {
       earnedCount: earnedBadges.length,

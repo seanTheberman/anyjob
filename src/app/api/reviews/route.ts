@@ -161,7 +161,7 @@ async function loadReviewProfiles(admin: LooseAdminClient, userIds: string[]) {
   }]));
 }
 
-function enrichReview(review: LooseRow, reviewer: LooseRow | undefined) {
+function enrichReview(review: LooseRow, reviewer: LooseRow | undefined, reviewee?: LooseRow) {
   const enrichedReviewer = reviewer
     ? {
         ...reviewer,
@@ -179,6 +179,10 @@ function enrichReview(review: LooseRow, reviewer: LooseRow | undefined) {
     title: String(review.title || reviewTitle(String(review.comment || ""), "Review")),
     review_type: review.review_type || "buyer_to_seller",
     reviewer: enrichedReviewer,
+    reviewee: reviewee ? {
+      ...reviewee,
+      profile_image_url: reviewee.profile_image_url || reviewee.avatar_url || null,
+    } : undefined,
   };
 }
 
@@ -214,7 +218,7 @@ function reviewsJson(reviews: LooseRow[], status = 200) {
       status,
       headers: {
         "Cache-Control": "private, max-age=20, stale-while-revalidate=60",
-        "Vary": "Cookie",
+        "Vary": "Cookie, Authorization",
       },
     }
   );
@@ -568,16 +572,31 @@ export async function GET(request: NextRequest) {
     }
 
     const reviewRows = (reviews || []) as LooseRow[];
-    const missingReviewerIds = Array.from(
-      new Set(reviewRows
-        .filter((review: LooseRow) => !embeddedReviewer(review))
-        .map((review: LooseRow) => String(review.reviewer_id || ""))
-        .filter((id: string) => Boolean(id)))
-    );
-    const profilesById = await loadReviewProfiles(admin, missingReviewerIds);
-    const enrichedReviews = reviewRows.map((review: LooseRow) =>
-      enrichReview(review, embeddedReviewer(review) || profilesById.get(String(review.reviewer_id || "")))
-    );
+    const participantIds = Array.from(new Set(reviewRows.flatMap((review: LooseRow) => [
+      String(review.reviewer_id || ""),
+      String(review.reviewee_id || ""),
+    ]).filter(Boolean)));
+    const workPostIds = Array.from(new Set(reviewRows.map((review) => String(review.business_work_post_id || "")).filter(Boolean)));
+    const [profilesById, workPostsResult] = await Promise.all([
+      loadReviewProfiles(admin, participantIds),
+      workPostIds.length
+        ? admin.from("business_work_posts").select("id,business:business_profiles(business_name)").in("id", workPostIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+    const businessNameByPost = new Map((workPostsResult.data || []).map((post: LooseRow) => {
+      const business = Array.isArray(post.business) ? post.business[0] : post.business;
+      const name = business && typeof business === "object" ? String((business as LooseRow).business_name || "") : "";
+      return [String(post.id || ""), name];
+    }));
+    const enrichedReviews = reviewRows.map((review: LooseRow) => {
+      const businessName = businessNameByPost.get(String(review.business_work_post_id || ""));
+      const businessProfile = businessName ? { first_name: businessName, last_name: "", avatar_url: null, profile_image_url: null } : undefined;
+      return enrichReview(
+        review,
+        review.review_type === "buyer_to_seller" && businessProfile ? businessProfile : embeddedReviewer(review) || profilesById.get(String(review.reviewer_id || "")),
+        review.review_type === "seller_to_buyer" && businessProfile ? businessProfile : profilesById.get(String(review.reviewee_id || "")),
+      );
+    });
     reviewListCache.set(cacheKey, {
       expiresAt: Date.now() + REVIEW_LIST_CACHE_TTL_MS,
       reviews: enrichedReviews,

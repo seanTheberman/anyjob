@@ -59,14 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = request.nextUrl.origin;
-    if (!getStripeSecretKey()) {
-      if (process.env.NODE_ENV === "production") {
-        return NextResponse.json(
-          { error: "Stripe is not configured on the server. Add stripe_secret_key in Vercel." },
-          { status: 500 }
-        );
-      }
-
+    if (process.env.STRIPE_ENABLED !== "true" || !getStripeSecretKey()) {
       const inquiry = Array.isArray(bid.inquiry) ? bid.inquiry[0] : bid.inquiry;
       await acceptBidAndUnlockChat(supabase, { ...bid, inquiry });
       return NextResponse.json({

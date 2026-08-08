@@ -3,15 +3,46 @@ import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+function mobileCorsOrigin(request: NextRequest) {
+    const origin = request.headers.get('origin') || ''
+    const configured = (process.env.MOBILE_APP_ORIGINS || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    const isLocalExpo = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+    return isLocalExpo || configured.includes(origin) ? origin : null
+}
+
+function withMobileCors(response: NextResponse, origin: string | null) {
+    if (!origin) return response
+    response.headers.set('Access-Control-Allow-Origin', origin)
+    response.headers.set('Access-Control-Allow-Credentials', 'true')
+    response.headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept')
+    response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
+    response.headers.set('Access-Control-Max-Age', '86400')
+    response.headers.append('Vary', 'Origin')
+    return response
+}
+
 export async function proxy(request: NextRequest) {
     const pathname = request.nextUrl.pathname
     const isAdminRoute = pathname.startsWith('/admin')
+    const isApiRoute = pathname.startsWith('/api/')
+    const corsOrigin = isApiRoute ? mobileCorsOrigin(request) : null
+
+    if (isApiRoute && request.method === 'OPTIONS') {
+        return withMobileCors(new NextResponse(null, { status: 204 }), corsOrigin)
+    }
 
     let response = NextResponse.next({
         request: {
             headers: request.headers,
         },
     })
+
+    if (isApiRoute) {
+        return withMobileCors(response, corsOrigin)
+    }
 
     if (!isAdminRoute && process.env.ROUTE_GUARDS_ENABLED !== 'true') {
         return response
@@ -157,5 +188,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/dashboard/:path*', '/pro/:path*', '/admin/:path*'],
+    matcher: ['/api/:path*', '/dashboard/:path*', '/pro/:path*', '/admin/:path*'],
 }

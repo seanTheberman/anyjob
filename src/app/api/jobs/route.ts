@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
     // For each job, get the bid count and whether current provider already bid
     const jobsWithBidInfo = await Promise.all(
       visibleJobs.map(async (job) => {
-        const { count: bidCount } = await supabase
+        const { count: bidCount } = await admin
           .from("bids")
           .select("*", { count: "exact", head: true })
           .eq("inquiry_id", job.id);

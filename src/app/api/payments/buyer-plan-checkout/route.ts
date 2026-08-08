@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { discountedMonthlyPrice, hasPlanDiscount } from "@/lib/plans/provider-plan-config";
 import { getBuyerPlanById, getProviderPlanRules } from "@/lib/plans/provider-plan-server";
-import { getStripe } from "@/lib/stripe/server";
+import { getStripe, getStripeSecretKey } from "@/lib/stripe/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
@@ -25,6 +25,25 @@ export async function POST(request: NextRequest) {
 
     if (!plan || plan.id === "buyer-free" || plan.priceMonthly <= 0) {
       return NextResponse.json({ checkoutUrl: "/dashboard/requests", free: true });
+    }
+
+    if (!getStripeSecretKey()) {
+      const now = new Date();
+      const periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const { error } = await (admin as never as { from(table: string): any }).from("buyer_plan_subscriptions").upsert({
+        user_id: user.id,
+        plan_id: plan.id,
+        status: "active",
+        stripe_customer_id: null,
+        stripe_checkout_session_id: `dummy_buyer_${Date.now()}`,
+        stripe_subscription_id: null,
+        current_period_start: now.toISOString(),
+        current_period_end: periodEnd.toISOString(),
+        started_at: now.toISOString(),
+        updated_at: now.toISOString(),
+      }, { onConflict: "user_id" });
+      if (error) throw error;
+      return NextResponse.json({ dummyPayment: true, activePlanId: plan.id });
     }
 
     const origin = request.nextUrl.origin;

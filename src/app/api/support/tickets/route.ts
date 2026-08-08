@@ -111,7 +111,7 @@ export async function GET() {
       {
         headers: {
           "Cache-Control": "private, max-age=20, stale-while-revalidate=60",
-          "Vary": "Cookie",
+          "Vary": "Cookie, Authorization",
         },
       }
     );
@@ -184,5 +184,31 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Support ticket creation failed:", error);
     return NextResponse.json({ error: "Failed to create support ticket" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const supabase = await createServerSupabaseClient();
+    const user = await getFastAuthUser(supabase);
+    if (!user) return NextResponse.json({ error: "Sign in to reply" }, { status: 401 });
+
+    const body = await request.json().catch(() => ({}));
+    const ticketId = cleanString(body.ticketId, 120);
+    const message = cleanString(body.message, 5000);
+    if (!ticketId || !message) return NextResponse.json({ error: "Ticket and message are required" }, { status: 400 });
+
+    const admin = createAdminSupabaseClient() as never as AdminClient;
+    const { data: ticket } = await admin.from("support_tickets").select("id,user_id,status").eq("id", ticketId).eq("user_id", user.id).maybeSingle();
+    if (!ticket) return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+
+    const now = new Date().toISOString();
+    const { data: reply, error } = await admin.from("support_ticket_messages").insert({ ticket_id: ticketId, sender_user_id: user.id, sender_role: "user", body: message, internal_note: false }).select("*").single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await admin.from("support_tickets").update({ status: ticket.status === "resolved" ? "open" : ticket.status, last_user_response_at: now, updated_at: now }).eq("id", ticketId);
+    return NextResponse.json({ reply });
+  } catch (error) {
+    console.error("Support ticket reply failed:", error);
+    return NextResponse.json({ error: "Failed to send reply" }, { status: 500 });
   }
 }

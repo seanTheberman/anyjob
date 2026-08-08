@@ -14,6 +14,10 @@ type ProviderProfilePayload = {
   experienceLevel?: string;
   availabilityMode?: string;
   availabilityNote?: string;
+  contactWindows?: string[] | string;
+  unavailable?: boolean;
+  unavailableUntil?: string;
+  unavailableNote?: string;
   address?: string;
   city?: string;
   postalCode?: string;
@@ -41,6 +45,21 @@ async function currentUser() {
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function textLines(value: unknown) {
+  const rows = Array.isArray(value) ? value : text(value).split(/\r?\n/);
+  return rows
+    .map((row) => text(row))
+    .filter(Boolean)
+    .slice(0, 14);
+}
+
+function dateValue(value: unknown) {
+  const raw = text(value);
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isFinite(date.getTime()) ? raw : null;
 }
 
 export async function GET() {
@@ -112,6 +131,10 @@ export async function PATCH(request: NextRequest) {
       ...existingAvailability,
       marketplaceAvailability: availabilityMode,
       note: text(body.availabilityNote) || null,
+      contactWindows: textLines(body.contactWindows),
+      unavailable: Boolean(body.unavailable),
+      unavailableUntil: dateValue(body.unavailableUntil),
+      unavailableNote: text(body.unavailableNote) || null,
     },
     address: text(body.address),
     city: text(body.city),

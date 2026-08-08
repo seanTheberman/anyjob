@@ -50,7 +50,8 @@ function jobTitleFromInquiry(job: LooseRow) {
   const description = String(job.job_description || "").trim();
   if (hasMeaningfulText(description)) {
     const [firstBlock] = description.split(/\n\s*\n/);
-    return firstBlock.split(/[.!?]/).find((part) => hasMeaningfulText(part))?.trim().slice(0, 90) || firstBlock.trim().slice(0, 90);
+    const titleBlock = firstBlock.replace(/^Title:\s*/i, "").trim();
+    return titleBlock.split(/[.!?]/).find((part) => hasMeaningfulText(part))?.trim().slice(0, 90) || titleBlock.slice(0, 90);
   }
 
   return (
@@ -196,12 +197,22 @@ export async function GET(
         : Promise.resolve({ data: [] }),
     ]);
 
+    if (!myBid && user) {
+      const ownBid = ((bids || []) as LooseRow[]).find((bid) => String(bid.provider_id || "") === user.id);
+      myBid = ownBid ? {
+        id: ownBid.id,
+        amount: ownBid.amount,
+        status: ownBid.status,
+        created_at: ownBid.created_at,
+      } : null;
+    }
+
     const providerIds = Array.from(new Set(((bids || []) as LooseRow[]).map((bid) => String(bid.provider_id || "")).filter(Boolean)));
     const [{ data: providerProfiles }, { data: providerSellers }, providerStatsById] = providerIds.length
       ? await Promise.all([
           adminSupabase
             .from("eloo_profiles")
-            .select("id,first_name,last_name,profile_image_url")
+            .select("id,first_name,last_name,avatar_url")
             .in("id", providerIds),
           adminSupabase
             .from("sellers")
@@ -232,7 +243,7 @@ export async function GET(
         createdAt: bid.created_at,
         provider: {
           name: [seller.first_name || profile.first_name, seller.last_name || profile.last_name].filter(Boolean).join(" ") || "Provider",
-          avatar: seller.profile_image_url || profile.profile_image_url || null,
+          avatar: seller.profile_image_url || profile.avatar_url || null,
           rating: providerStats.rating,
           reviewCount: providerStats.reviewCount,
           totalJobs: providerStats.completedJobs,
@@ -327,6 +338,7 @@ export async function GET(
             badges: [{ label: "AnyJob Select", tone: "red", source: "system" }],
           }
         : buyerTrust,
+      quoteTermsVersion: "provider_quote_terms_v1",
     };
 
     return NextResponse.json({ job: transformedJob });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
 
 type ProviderServiceInput = {
   id?: string;
@@ -164,13 +165,7 @@ function servicePayload(input: ProviderServiceInput, providerId: string) {
 
 async function getUser() {
   const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-
-  if (error || !user) return null;
-  return user;
+  return getFastAuthUser(supabase);
 }
 
 export async function GET() {

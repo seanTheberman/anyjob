@@ -277,6 +277,18 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
                   <p className="mt-1 font-bold text-slate-950">{provider.availability}</p>
                 </div>
                 ) : null}
+                {provider.contactWindows?.length ? (
+                <div className="sm:col-span-2">
+                  <p className="font-semibold text-slate-500">Best times to contact</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {provider.contactWindows.map((window) => (
+                      <span key={window} className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                        {window}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                ) : null}
                 <div>
                   <p className="font-semibold text-slate-500">Starting rate</p>
                   <p className="mt-1 font-bold text-slate-950">{provider.hourlyRate}</p>
@@ -370,6 +382,22 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-slate-400" />
               {provider.responseTime}
+            </div>
+            ) : null}
+            {provider.availability ? (
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-slate-400" />
+              {provider.availability}
+            </div>
+            ) : null}
+            {provider.contactWindows?.length ? (
+            <div className="rounded-md bg-slate-50 p-3">
+              <p className="font-semibold text-slate-950">Best times to contact</p>
+              <ul className="mt-2 space-y-1">
+                {provider.contactWindows.slice(0, 4).map((window) => (
+                  <li key={window}>{window}</li>
+                ))}
+              </ul>
             </div>
             ) : null}
             <div className="flex items-center gap-2">

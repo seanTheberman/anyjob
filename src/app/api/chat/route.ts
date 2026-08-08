@@ -138,9 +138,9 @@ export async function GET(request: NextRequest) {
           .eq("is_read", false)
         : Promise.resolve({ data: [], error: null }),
       participantIds.length
-        ? supabase
+        ? createAdminSupabaseClient()
           .from("eloo_profiles")
-          .select("id, first_name, last_name, profile_image_url")
+          .select("id, first_name, last_name, avatar_url")
           .in("id", participantIds)
         : Promise.resolve({ data: [], error: null }),
     ]);

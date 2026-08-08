@@ -27,6 +27,10 @@ type ProfileState = {
   experienceLevel: string;
   availabilityMode: string;
   availabilityNote: string;
+  contactWindows: string;
+  unavailable: boolean;
+  unavailableUntil: string;
+  unavailableNote: string;
   address: string;
   city: string;
   postalCode: string;
@@ -55,6 +59,10 @@ const emptyProfile: ProfileState = {
   experienceLevel: "",
   availabilityMode: "This week",
   availabilityNote: "",
+  contactWindows: "",
+  unavailable: false,
+  unavailableUntil: "",
+  unavailableNote: "",
   address: "",
   city: "",
   postalCode: "",
@@ -82,14 +90,30 @@ function documentSideFiles(files: UploadedFile[], side: "front" | "back"): Uploa
 }
 
 function availabilityFields(value: unknown) {
-  const data = value && typeof value === "object" ? value as { marketplaceAvailability?: unknown; note?: unknown } : {};
+  const data = value && typeof value === "object" ? value as {
+    marketplaceAvailability?: unknown;
+    note?: unknown;
+    contactWindows?: unknown;
+    unavailable?: unknown;
+    unavailableUntil?: unknown;
+    unavailableNote?: unknown;
+  } : {};
   const marketplaceAvailability = typeof data.marketplaceAvailability === "string" && availabilityOptions.includes(data.marketplaceAvailability)
     ? data.marketplaceAvailability
     : "This week";
+  const contactWindows = Array.isArray(data.contactWindows)
+    ? data.contactWindows.filter((item): item is string => typeof item === "string" && item.trim().length > 0).join("\n")
+    : typeof data.contactWindows === "string"
+      ? data.contactWindows
+      : "";
 
   return {
     availabilityMode: marketplaceAvailability,
     availabilityNote: typeof data.note === "string" ? data.note : "",
+    contactWindows,
+    unavailable: Boolean(data.unavailable),
+    unavailableUntil: typeof data.unavailableUntil === "string" ? data.unavailableUntil : "",
+    unavailableNote: typeof data.unavailableNote === "string" ? data.unavailableNote : "",
   };
 }
 
@@ -143,6 +167,10 @@ export default function ProfilePage() {
             experienceLevel: seller.experience_level || "",
             availabilityMode: availability.availabilityMode,
             availabilityNote: availability.availabilityNote,
+            contactWindows: availability.contactWindows,
+            unavailable: availability.unavailable,
+            unavailableUntil: availability.unavailableUntil,
+            unavailableNote: availability.unavailableNote,
             address: seller.address || "",
             city: seller.city || "",
             postalCode: seller.postal_code || "",
@@ -183,7 +211,7 @@ export default function ProfilePage() {
     setSaveError(null);
     setSaveMessage(null);
 
-    const normalizedProfile = {
+    const normalizedProfile: ProfileState = {
       ...profile,
       firstName: profile.firstName.trim(),
       lastName: profile.lastName.trim(),
@@ -194,6 +222,10 @@ export default function ProfilePage() {
       experienceLevel: profile.experienceLevel.trim(),
       availabilityMode: availabilityOptions.includes(profile.availabilityMode) ? profile.availabilityMode : "This week",
       availabilityNote: profile.availabilityNote.trim(),
+      contactWindows: profile.contactWindows.trim(),
+      unavailable: profile.unavailable,
+      unavailableUntil: profile.unavailableUntil.trim(),
+      unavailableNote: profile.unavailableNote.trim(),
       address: profile.address.trim(),
       city: profile.city.trim(),
       postalCode: profile.postalCode.trim(),
@@ -213,10 +245,18 @@ export default function ProfilePage() {
       return;
     }
 
+    const profilePayload = {
+      ...normalizedProfile,
+      contactWindows: normalizedProfile.contactWindows
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
+    };
+
     const response = await fetch("/api/provider/profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(normalizedProfile),
+      body: JSON.stringify(profilePayload),
     });
     const payload = await response.json().catch(() => null);
 
@@ -469,6 +509,63 @@ export default function ProfilePage() {
                 placeholder="Example: Usually available within 24 hours, evenings preferred"
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
               />
+            </div>
+
+            <div className="md:col-span-2 rounded-xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h4 className="text-sm font-bold text-gray-900">Contact availability</h4>
+                  <p className="mt-1 text-sm text-gray-500">Set when buyers should contact you. These windows show on your public profile.</p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={profile.unavailable}
+                    onChange={(event) => setProfile({ ...profile, unavailable: event.target.checked })}
+                    disabled={!isEditing}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Mark unavailable
+                </label>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div className="md:col-span-2">
+                  <label htmlFor="contact-windows" className="block text-sm font-medium text-gray-700 mb-1">Contact windows</label>
+                  <textarea
+                    id="contact-windows"
+                    value={profile.contactWindows}
+                    onChange={(event) => setProfile({ ...profile, contactWindows: event.target.value })}
+                    disabled={!isEditing}
+                    rows={4}
+                    placeholder={"Mon-Fri 09:00-17:00\nSat 10:00-14:00\nEmergency jobs by message only"}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-white"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="unavailable-until" className="block text-sm font-medium text-gray-700 mb-1">Unavailable until</label>
+                  <input
+                    id="unavailable-until"
+                    type="datetime-local"
+                    value={profile.unavailableUntil}
+                    onChange={(event) => setProfile({ ...profile, unavailableUntil: event.target.value })}
+                    disabled={!isEditing || !profile.unavailable}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-white"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="unavailable-note" className="block text-sm font-medium text-gray-700 mb-1">Unavailable message</label>
+                  <input
+                    id="unavailable-note"
+                    type="text"
+                    value={profile.unavailableNote}
+                    onChange={(event) => setProfile({ ...profile, unavailableNote: event.target.value })}
+                    disabled={!isEditing || !profile.unavailable}
+                    placeholder="Example: Away on booked work this week"
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-white"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="md:col-span-2">
