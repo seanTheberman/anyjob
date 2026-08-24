@@ -46,6 +46,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { api } from "@/lib/api";
+import { useAppContent } from "@/lib/content";
 import { serviceCover } from "@/lib/service-assets";
 import { isProviderRole, useAuth } from "@/providers/auth-provider";
 import { useAppTheme } from "@/providers/theme-provider";
@@ -331,6 +332,7 @@ export function Dashboard() {
   const router = useRouter();
   const { user } = useAuth();
   const { colors, isDark } = useAppTheme();
+  const { copy, content } = useAppContent();
   const provider = isProviderRole(user?.role);
   const name = user?.displayName?.split(" ")[0] || "there";
   const providers = useQuery({
@@ -683,7 +685,7 @@ export function Dashboard() {
       >
         <View style={styles.heroImageWrap}>
           <Image
-            source={serviceCover("handyman")}
+            source={content["home.hero.image_url"] ? { uri: content["home.hero.image_url"] } : serviceCover("handyman")}
             alt="Professional helping with a home task"
             contentFit="cover"
             style={StyleSheet.absoluteFill}
@@ -691,7 +693,7 @@ export function Dashboard() {
         </View>
         <View style={styles.heroCopy}>
           <Text style={[styles.heroKicker, { color: colors.brand }]}>
-            ANYJOB
+            {copy("home.hero.kicker", "ANYJOB")}
           </Text>
           <Text
             numberOfLines={3}
@@ -699,10 +701,10 @@ export function Dashboard() {
             minimumFontScale={0.76}
             style={[styles.heroTitle, { color: colors.ink }]}
           >
-            Get things done, your way.
+            {copy("home.hero.title", "Get things done, your way.")}
           </Text>
           <Text style={[styles.heroBody, { color: colors.muted }]}>
-            Trusted help for everyday tasks.
+            {copy("home.hero.body", "Trusted help for everyday tasks.")}
           </Text>
         </View>
         <Pressable
@@ -718,12 +720,12 @@ export function Dashboard() {
             numberOfLines={1}
             style={[styles.heroSearchText, { color: colors.muted }]}
           >
-            What do you need help with?
+            {copy("home.hero.search", "What do you need help with?")}
           </Text>
         </Pressable>
       </View>
       <HomeSectionHeader
-        title="Popular services"
+        title={copy("home.services.title", "Popular services")}
         action="View all"
         onPress={() => router.push("/(app)/explore")}
       />
@@ -742,7 +744,7 @@ export function Dashboard() {
         ))}
       </View>
       <HomeSectionHeader
-        title="Popular near you"
+        title={copy("home.nearby.title", "Popular near you")}
         action="Explore"
         onPress={() => router.push("/(app)/explore")}
       />
@@ -829,7 +831,7 @@ export function Dashboard() {
         </View>
       </View>
       <HomeSectionHeader
-        title="Your activity"
+        title={copy("home.activity.title", "Your activity")}
         action="See tasks"
         onPress={() => router.push("/(app)/work")}
       />
@@ -902,7 +904,7 @@ export function Dashboard() {
         </Pressable>
       )}
       <HomeSectionHeader
-        title="Recommended taskers"
+        title={copy("home.providers.title", "Recommended taskers")}
         action="See all"
         onPress={() => router.push("/(app)/explore")}
       />
@@ -927,7 +929,7 @@ export function Dashboard() {
         </Text>
       )}
       <HomeSectionHeader
-        title="Book with confidence"
+        title={copy("home.trust.title", "Book with confidence")}
         action="Support"
         onPress={() => router.push("/support")}
       />
@@ -967,9 +969,9 @@ export function Dashboard() {
         ]}
       >
         <View style={styles.startCopy}>
-          <Text style={styles.startTitle}>Ready to get it sorted?</Text>
+          <Text style={styles.startTitle}>{copy("home.cta.title", "Ready to get it sorted?")}</Text>
           <Text style={styles.startBody}>
-            Post once and compare local quotes.
+            {copy("home.cta.body", "Post once and compare local quotes.")}
           </Text>
         </View>
         <Pressable

@@ -65,7 +65,8 @@
           "locationWhenInUsePermission": "Allow AnyJob to use your approximate area when posting or finding nearby work."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

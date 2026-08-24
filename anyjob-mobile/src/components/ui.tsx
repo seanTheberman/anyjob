@@ -1,7 +1,16 @@
 import { Image } from "expo-image";
-import React, { useMemo } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+} from "react";
 import {
   ActivityIndicator,
+  findNodeHandle,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +25,10 @@ import { ChevronLeft, ChevronRight, Inbox, Star } from "lucide-react-native";
 import { useRouter } from "expo-router";
 import { shadow, type AppColors } from "@/theme/tokens";
 import { useAppTheme } from "@/providers/theme-provider";
+
+const KeyboardScrollContext = createContext<(input: TextInput | null) => void>(
+  () => undefined,
+);
 
 function useStyles() {
   const { colors } = useAppTheme();
@@ -34,6 +47,19 @@ export function Screen({
   edgeToEdge?: boolean;
 }) {
   const { colors, styles } = useStyles();
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollToInput = useCallback((input: TextInput | null) => {
+    const handle = input ? findNodeHandle(input) : null;
+    if (!handle) return;
+
+    setTimeout(() => {
+      scrollRef.current?.scrollResponderScrollNativeHandleToKeyboard(
+        handle,
+        132,
+        true,
+      );
+    }, 120);
+  }, []);
   const content = (
     <View style={[styles.screenInner, edgeToEdge && styles.edgeToEdge, style]}>
       {children}
@@ -44,17 +70,26 @@ export function Screen({
       edges={["top"]}
       style={[styles.safe, { backgroundColor: colors.canvas }]}
     >
-      {scroll ? (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={styles.scroll}
-        >
-          {content}
-        </ScrollView>
-      ) : (
-        content
-      )}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.keyboardAvoider}
+      >
+        <KeyboardScrollContext.Provider value={scrollToInput}>
+          {scroll ? (
+            <ScrollView
+              ref={scrollRef}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              contentContainerStyle={styles.scroll}
+            >
+              {content}
+            </ScrollView>
+          ) : (
+            content
+          )}
+        </KeyboardScrollContext.Provider>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -195,10 +230,14 @@ export function Field({
   ...props
 }: TextInputProps & { label: string; error?: string }) {
   const { styles } = useStyles();
+  const inputRef = useRef<TextInput>(null);
+  const scrollToInput = useContext(KeyboardScrollContext);
+  const onFocus = props.onFocus;
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
       <TextInput
+        ref={inputRef}
         placeholderTextColor={styles.placeholder.color}
         multiline={multiline}
         style={[
@@ -207,6 +246,10 @@ export function Field({
           error && styles.inputError,
         ]}
         {...props}
+        onFocus={(event) => {
+          onFocus?.(event);
+          scrollToInput(inputRef.current);
+        }}
       />
       {error ? <Text style={styles.error}>{error}</Text> : null}
     </View>
@@ -366,6 +409,7 @@ export function ErrorState({
 function createStyles(colors: AppColors) {
   return StyleSheet.create({
     safe: { flex: 1 },
+    keyboardAvoider: { flex: 1 },
     scroll: { flexGrow: 1, paddingBottom: 34 },
     screenInner: {
       width: "100%",

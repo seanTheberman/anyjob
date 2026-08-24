@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -8,7 +9,9 @@ import {
   BadgeCheck,
   Baby,
   Camera,
+  CalendarDays,
   Check,
+  Clock3,
   GraduationCap,
   Hammer,
   HouseHeart,
@@ -27,9 +30,19 @@ import {
   X,
 } from "lucide-react-native";
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import {
+  Alert,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 import { Button, Card, Field, Header, Screen } from "@/components/ui";
 import { api, jsonBody } from "@/lib/api";
+import { useAppContent } from "@/lib/content";
 import {
   BUDGET_OPTIONS,
   CATEGORIES,
@@ -124,6 +137,30 @@ function isValidDate(value: string) {
   return selected >= today && selected <= latest;
 }
 
+function formatPickerValue(date: Date, mode: "date" | "time") {
+  if (mode === "time") {
+    return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  }
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function pickerDate(value: string, mode: "date" | "time") {
+  const now = new Date();
+  if (mode === "date" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const parsed = new Date(`${value}T12:00:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  if (mode === "time" && /^\d{2}:\d{2}$/.test(value)) {
+    const [hours, minutes] = value.split(":").map(Number);
+    now.setHours(hours, minutes, 0, 0);
+  }
+  return now;
+}
+
 function categoryIcon(slug: string, color: string) {
   const props = { color, size: 24, strokeWidth: 2.2 };
   switch (slug) {
@@ -180,6 +217,7 @@ export default function NewRequestScreen() {
   const client = useQueryClient();
   const { user } = useAuth();
   const { colors } = useAppTheme();
+  const { copy } = useAppContent();
   const params = useLocalSearchParams<{
     category?: string;
     subcategory?: string;
@@ -616,12 +654,12 @@ export default function NewRequestScreen() {
       case 3:
         return (
           <View style={styles.sectionStack}>
-            <OptionSection title="Service type">
+            <OptionSection title={copy("request.service_type.title", "Service type")}>
               {SERVICE_TYPES.map((option) => (
                 <Choice
                   key={option.value}
-                  title={option.label}
-                  description={option.description}
+                  title={copy(`request.service_type.${option.value}.label`, option.label)}
+                  description={copy(`request.service_type.${option.value}.description`, option.description)}
                   selected={form.service_type === option.value}
                   onPress={() =>
                     setForm((current) => ({
@@ -632,13 +670,13 @@ export default function NewRequestScreen() {
                 />
               ))}
             </OptionSection>
-            <OptionSection title="How soon do you need it?">
+            <OptionSection title={copy("request.urgency.title", "How soon do you need it?")}>
               <View style={styles.grid}>
                 {URGENCY_OPTIONS.map((option) => (
                   <Choice
                     key={option.value}
                     compact
-                    title={option.label}
+                    title={copy(`request.urgency.${option.value}.label`, option.label)}
                     selected={form.job_urgency === option.value}
                     onPress={() =>
                       setForm((current) => ({
@@ -678,34 +716,36 @@ export default function NewRequestScreen() {
       case 5:
         return (
           <Card>
-            <Field
-              label="Preferred date"
-              placeholder="YYYY-MM-DD"
+            <SchedulePickerField
+              label={copy("request.schedule.date_label", "Preferred date")}
+              placeholder="Choose a date"
               value={form.preferred_date}
-              onChangeText={setText("preferred_date")}
-              keyboardType="numbers-and-punctuation"
+              mode="date"
+              onChange={setText("preferred_date")}
             />
             <View style={styles.twoColumns}>
               <View style={styles.column}>
-                <Field
-                  label="Start time"
-                  placeholder="09:00"
+                <SchedulePickerField
+                  label={copy("request.schedule.start_label", "Start time")}
+                  placeholder="Choose time"
                   value={form.preferred_time_start}
-                  onChangeText={setText("preferred_time_start")}
+                  mode="time"
+                  onChange={setText("preferred_time_start")}
                 />
               </View>
               <View style={styles.column}>
-                <Field
-                  label="End time"
-                  placeholder="12:00"
+                <SchedulePickerField
+                  label={copy("request.schedule.end_label", "End time")}
+                  placeholder="Choose time"
                   value={form.preferred_time_end}
-                  onChangeText={setText("preferred_time_end")}
+                  mode="time"
+                  onChange={setText("preferred_time_end")}
                 />
               </View>
             </View>
             <ToggleRow
-              title="My timing is flexible"
-              subtitle="Providers can suggest a nearby time."
+              title={copy("request.schedule.flexible_title", "My timing is flexible")}
+              subtitle={copy("request.schedule.flexible_body", "Providers can suggest a nearby time.")}
               value={form.flexible_timing}
               onValueChange={(value) =>
                 setForm((current) => ({ ...current, flexible_timing: value }))
@@ -1029,10 +1069,10 @@ export default function NewRequestScreen() {
       </View>
       <View style={styles.stepIntro}>
         <Text style={[styles.stepTitle, { color: colors.ink }]}>
-          {STEP_COPY[step - 1][0]}
+          {copy(`request.step.${step}.title`, STEP_COPY[step - 1][0])}
         </Text>
         <Text style={[styles.stepSubtitle, { color: colors.muted }]}>
-          {STEP_COPY[step - 1][1]}
+          {copy(`request.step.${step}.subtitle`, STEP_COPY[step - 1][1])}
         </Text>
       </View>
       {params.providerName && step !== 9 ? (
@@ -1058,7 +1098,7 @@ export default function NewRequestScreen() {
         {step > 1 ? (
           <View style={styles.actionColumn}>
             <Button
-              title="Back"
+              title={copy("request.action.back", "Back")}
               variant="secondary"
               onPress={() => setStep((current) => Math.max(1, current - 1))}
             />
@@ -1070,8 +1110,8 @@ export default function NewRequestScreen() {
               step === TOTAL_STEPS && !user
                 ? "Create account to submit"
                 : step === TOTAL_STEPS
-                  ? "Submit for approval"
-                  : "Continue"
+                  ? copy("request.action.submit", "Submit for approval")
+                  : copy("request.action.continue", "Continue")
             }
             loading={mutation.isPending}
             icon={
@@ -1084,6 +1124,127 @@ export default function NewRequestScreen() {
         </View>
       </View>
     </Screen>
+  );
+}
+
+function SchedulePickerField({
+  label,
+  placeholder,
+  value,
+  mode,
+  onChange,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  mode: "date" | "time";
+  onChange: (value: string) => void;
+}) {
+  const { colors, isDark } = useAppTheme();
+  const [visible, setVisible] = useState(false);
+  const [draft, setDraft] = useState(() => pickerDate(value, mode));
+  const Icon = mode === "date" ? CalendarDays : Clock3;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const latest = new Date(today);
+  latest.setDate(latest.getDate() + 90);
+
+  const open = () => {
+    setDraft(pickerDate(value, mode));
+    setVisible(true);
+  };
+
+  const picker = (
+    <DateTimePicker
+      value={draft}
+      mode={mode}
+      display={Platform.OS === "ios" ? (mode === "date" ? "inline" : "spinner") : "default"}
+      minimumDate={mode === "date" ? today : undefined}
+      maximumDate={mode === "date" ? latest : undefined}
+      minuteInterval={5}
+      is24Hour
+      themeVariant={isDark ? "dark" : "light"}
+      accentColor={colors.brand}
+      onChange={(event, selected) => {
+        if (Platform.OS === "android") {
+          setVisible(false);
+          if (event.type === "set" && selected) {
+            onChange(formatPickerValue(selected, mode));
+          }
+          return;
+        }
+        if (selected) setDraft(selected);
+      }}
+    />
+  );
+
+  return (
+    <View style={styles.scheduleField}>
+      <Text style={[styles.scheduleLabel, { color: colors.ink }]}>{label}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${value || placeholder}`}
+        onPress={open}
+        style={({ pressed }) => [
+          styles.scheduleControl,
+          { backgroundColor: colors.soft, borderColor: colors.line },
+          pressed && styles.pressed,
+        ]}
+      >
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.78}
+          style={[
+            styles.scheduleValue,
+            { color: value ? colors.ink : colors.subtle },
+          ]}
+        >
+          {value || placeholder}
+        </Text>
+        <Icon color={colors.brand} size={19} />
+      </Pressable>
+      {Platform.OS === "android" && visible ? picker : null}
+      {Platform.OS === "ios" ? (
+        <Modal
+          animationType="fade"
+          transparent
+          visible={visible}
+          onRequestClose={() => setVisible(false)}
+        >
+          <View style={styles.pickerModal}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close picker"
+              onPress={() => setVisible(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View
+              style={[
+                styles.pickerSheet,
+                { backgroundColor: colors.surface, borderColor: colors.line },
+              ]}
+            >
+              <View style={styles.pickerHeader}>
+                <Pressable onPress={() => setVisible(false)}>
+                  <Text style={[styles.pickerAction, { color: colors.muted }]}>Cancel</Text>
+                </Pressable>
+                <Text style={[styles.pickerTitle, { color: colors.ink }]}>{label}</Text>
+                <Pressable
+                  onPress={() => {
+                    onChange(formatPickerValue(draft, mode));
+                    setVisible(false);
+                  }}
+                >
+                  <Text style={[styles.pickerAction, { color: colors.brand }]}>Done</Text>
+                </Pressable>
+              </View>
+              {picker}
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+    </View>
   );
 }
 
@@ -1116,8 +1277,15 @@ function Choice({
           {icon}
         </View>
       ) : null}
-      <View style={styles.choiceCopy}>
-        <Text style={[styles.choiceTitle, { color: colors.ink }]}>{title}</Text>
+      <View style={[styles.choiceCopy, compact && styles.choiceCopyCompact]}>
+        <Text
+          numberOfLines={compact ? 3 : undefined}
+          adjustsFontSizeToFit={compact}
+          minimumFontScale={0.72}
+          style={[styles.choiceTitle, { color: colors.ink }]}
+        >
+          {title}
+        </Text>
         {description ? (
           <Text style={[styles.choiceDescription, { color: colors.muted }]}>
             {description}
@@ -1224,9 +1392,10 @@ const styles = StyleSheet.create({
   },
   choiceCompact: {
     width: "48.4%",
-    minHeight: 92,
+    minHeight: 100,
     alignItems: "flex-start",
     flexDirection: "column",
+    paddingRight: 42,
   },
   choiceIcon: {
     width: 44,
@@ -1236,6 +1405,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   choiceCopy: { flex: 1, minWidth: 0, gap: 3 },
+  choiceCopyCompact: { width: "100%", paddingTop: 1 },
   choiceTitle: { fontSize: 14, fontWeight: "900", lineHeight: 18 },
   choiceDescription: { fontSize: 12, lineHeight: 17 },
   choiceCheck: {
@@ -1260,6 +1430,40 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginTop: -8,
   },
+  scheduleField: { gap: 7 },
+  scheduleLabel: { fontSize: 14, fontWeight: "800" },
+  scheduleControl: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  scheduleValue: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "700" },
+  pickerModal: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.42)",
+  },
+  pickerSheet: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 28,
+  },
+  pickerHeader: {
+    minHeight: 40,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  pickerTitle: { flex: 1, textAlign: "center", fontSize: 15, fontWeight: "900" },
+  pickerAction: { minWidth: 52, fontSize: 14, fontWeight: "900" },
   twoColumns: { flexDirection: "row", gap: 10 },
   column: { flex: 1, minWidth: 0 },
   toggleRow: {

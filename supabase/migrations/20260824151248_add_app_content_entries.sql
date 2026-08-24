@@ -1,0 +1,90 @@
+create table if not exists public.app_content_entries (
+  id bigint generated always as identity primary key,
+  content_key text not null unique,
+  section text not null,
+  label text not null,
+  value text not null,
+  default_value text not null,
+  description text,
+  content_type text not null default 'text',
+  is_active boolean not null default true,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references auth.users(id) on delete set null,
+  constraint app_content_entries_key_format check (content_key ~ '^[a-z0-9]+([._-][a-z0-9]+)*$'),
+  constraint app_content_entries_type_check check (content_type in ('text', 'textarea', 'url')),
+  constraint app_content_entries_value_length check (char_length(value) <= 4000)
+);
+
+create index if not exists app_content_entries_section_key_idx
+  on public.app_content_entries (section, content_key);
+
+alter table public.app_content_entries enable row level security;
+revoke all on table public.app_content_entries from anon, authenticated;
+grant all on table public.app_content_entries to service_role;
+grant usage, select on sequence public.app_content_entries_id_seq to service_role;
+
+insert into public.app_content_entries
+  (content_key, section, label, value, default_value, description, content_type)
+values
+  ('home.hero.kicker', 'Home banner', 'Banner eyebrow', 'ANYJOB', 'ANYJOB', 'Short text above the main banner heading.', 'text'),
+  ('home.hero.title', 'Home banner', 'Banner title', 'Get things done, your way.', 'Get things done, your way.', 'Primary buyer home banner heading.', 'text'),
+  ('home.hero.body', 'Home banner', 'Banner subtitle', 'Trusted help for everyday tasks.', 'Trusted help for everyday tasks.', 'Supporting buyer home banner copy.', 'textarea'),
+  ('home.hero.search', 'Home banner', 'Search prompt', 'What do you need help with?', 'What do you need help with?', 'Text in the banner search control.', 'text'),
+  ('home.hero.image_url', 'Home banner', 'Banner image URL', '', '', 'Optional HTTPS image URL. Leave blank to use the bundled image.', 'url'),
+  ('home.services.title', 'Home sections', 'Services heading', 'Popular services', 'Popular services', 'Heading above service categories.', 'text'),
+  ('home.nearby.title', 'Home sections', 'Nearby heading', 'Popular near you', 'Popular near you', 'Heading above nearby service cards.', 'text'),
+  ('home.activity.title', 'Home sections', 'Activity heading', 'Your activity', 'Your activity', 'Heading above the latest request.', 'text'),
+  ('home.providers.title', 'Home sections', 'Providers heading', 'Recommended taskers', 'Recommended taskers', 'Heading above recommended providers.', 'text'),
+  ('home.trust.title', 'Home sections', 'Trust heading', 'Book with confidence', 'Book with confidence', 'Heading above trust information.', 'text'),
+  ('home.cta.title', 'Home call to action', 'Call-to-action title', 'Ready to get it sorted?', 'Ready to get it sorted?', 'Bottom home call-to-action heading.', 'text'),
+  ('home.cta.body', 'Home call to action', 'Call-to-action subtitle', 'Post once and compare local quotes.', 'Post once and compare local quotes.', 'Bottom home call-to-action description.', 'textarea'),
+  ('request.step.1.title', 'Request steps', 'Step 1 title', 'Choose a service', 'Choose a service', 'Request wizard step heading.', 'text'),
+  ('request.step.1.subtitle', 'Request steps', 'Step 1 subtitle', 'Start with the type of help you need.', 'Start with the type of help you need.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.2.title', 'Request steps', 'Step 2 title', 'Specify your need', 'Specify your need', 'Request wizard step heading.', 'text'),
+  ('request.step.2.subtitle', 'Request steps', 'Step 2 subtitle', 'Choose the closest match so providers can quote accurately.', 'Choose the closest match so providers can quote accurately.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.3.title', 'Request steps', 'Step 3 title', 'Service and urgency', 'Service and urgency', 'Request wizard step heading.', 'text'),
+  ('request.step.3.subtitle', 'Request steps', 'Step 3 subtitle', 'Tell us how often and how soon you need help.', 'Tell us how often and how soon you need help.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.4.title', 'Request steps', 'Step 4 title', 'Describe the job', 'Describe the job', 'Request wizard step heading.', 'text'),
+  ('request.step.4.subtitle', 'Request steps', 'Step 4 subtitle', 'Give providers enough detail to prepare a useful quote.', 'Give providers enough detail to prepare a useful quote.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.5.title', 'Request steps', 'Step 5 title', 'Choose a schedule', 'Choose a schedule', 'Request wizard step heading.', 'text'),
+  ('request.step.5.subtitle', 'Request steps', 'Step 5 subtitle', 'Set your preferred date and time.', 'Set your preferred date and time.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.6.title', 'Request steps', 'Step 6 title', 'Add the location', 'Add the location', 'Request wizard step heading.', 'text'),
+  ('request.step.6.subtitle', 'Request steps', 'Step 6 subtitle', 'Your exact address stays private until booking.', 'Your exact address stays private until booking.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.7.title', 'Request steps', 'Step 7 title', 'Define the scope', 'Define the scope', 'Request wizard step heading.', 'text'),
+  ('request.step.7.subtitle', 'Request steps', 'Step 7 subtitle', 'Set the expected effort, budget, and supplies.', 'Set the expected effort, budget, and supplies.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.8.title', 'Request steps', 'Step 8 title', 'Add work photos', 'Add work photos', 'Request wizard step heading.', 'text'),
+  ('request.step.8.subtitle', 'Request steps', 'Step 8 subtitle', 'Photos are optional, but they help providers quote.', 'Photos are optional, but they help providers quote.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.step.9.title', 'Request steps', 'Step 9 title', 'Review and submit', 'Review and submit', 'Request wizard step heading.', 'text'),
+  ('request.step.9.subtitle', 'Request steps', 'Step 9 subtitle', 'Check the request before sending it for approval.', 'Check the request before sending it for approval.', 'Request wizard step supporting copy.', 'textarea'),
+  ('request.service_type.title', 'Request options', 'Service type heading', 'Service type', 'Service type', 'Heading above service frequency choices.', 'text'),
+  ('request.service_type.one_time.label', 'Request options', 'One time label', 'One time', 'One time', 'Service type choice label.', 'text'),
+  ('request.service_type.one_time.description', 'Request options', 'One time description', 'One-off service', 'One-off service', 'Service type choice supporting copy.', 'text'),
+  ('request.service_type.recurring.label', 'Request options', 'Regular label', 'Regular', 'Regular', 'Service type choice label.', 'text'),
+  ('request.service_type.recurring.description', 'Request options', 'Regular description', 'Recurring service (weekly, monthly...)', 'Recurring service (weekly, monthly...)', 'Service type choice supporting copy.', 'text'),
+  ('request.service_type.emergency.label', 'Request options', 'Emergency label', 'Emergency', 'Emergency', 'Service type choice label.', 'text'),
+  ('request.service_type.emergency.description', 'Request options', 'Emergency description', 'Immediate need', 'Immediate need', 'Service type choice supporting copy.', 'text'),
+  ('request.service_type.project.label', 'Request options', 'Project label', 'Project', 'Project', 'Service type choice label.', 'text'),
+  ('request.service_type.project.description', 'Request options', 'Project description', 'Multi-day project', 'Multi-day project', 'Service type choice supporting copy.', 'text'),
+  ('request.urgency.title', 'Request options', 'Urgency heading', 'How soon do you need it?', 'How soon do you need it?', 'Heading above urgency choices.', 'text'),
+  ('request.urgency.asap.label', 'Request options', 'ASAP label', 'As soon as possible', 'As soon as possible', 'Urgency choice label.', 'text'),
+  ('request.urgency.this_week.label', 'Request options', 'This week label', 'This week', 'This week', 'Urgency choice label.', 'text'),
+  ('request.urgency.this_month.label', 'Request options', 'This month label', 'This month', 'This month', 'Urgency choice label.', 'text'),
+  ('request.urgency.flexible.label', 'Request options', 'Flexible label', 'Flexible', 'Flexible', 'Urgency choice label.', 'text'),
+  ('request.schedule.date_label', 'Request schedule', 'Date field label', 'Preferred date', 'Preferred date', 'Date picker label.', 'text'),
+  ('request.schedule.start_label', 'Request schedule', 'Start field label', 'Start time', 'Start time', 'Start time picker label.', 'text'),
+  ('request.schedule.end_label', 'Request schedule', 'End field label', 'End time', 'End time', 'End time picker label.', 'text'),
+  ('request.schedule.flexible_title', 'Request schedule', 'Flexible timing title', 'My timing is flexible', 'My timing is flexible', 'Flexible timing toggle title.', 'text'),
+  ('request.schedule.flexible_body', 'Request schedule', 'Flexible timing description', 'Providers can suggest a nearby time.', 'Providers can suggest a nearby time.', 'Flexible timing toggle supporting copy.', 'textarea'),
+  ('request.action.back', 'Request actions', 'Back button', 'Back', 'Back', 'Request wizard secondary action.', 'text'),
+  ('request.action.continue', 'Request actions', 'Continue button', 'Continue', 'Continue', 'Request wizard primary action.', 'text'),
+  ('request.action.submit', 'Request actions', 'Submit button', 'Submit for approval', 'Submit for approval', 'Signed-in request submit action.', 'text'),
+  ('explore.buyer.title', 'Explore', 'Buyer title', 'Discover local pros', 'Discover local pros', 'Buyer explore screen title.', 'text'),
+  ('explore.buyer.subtitle', 'Explore', 'Buyer subtitle', 'Portfolio work, verified reviews and clear pricing.', 'Portfolio work, verified reviews and clear pricing.', 'Buyer explore screen supporting copy.', 'textarea'),
+  ('explore.provider.title', 'Explore', 'Provider title', 'Find work', 'Find work', 'Provider explore screen title.', 'text'),
+  ('explore.provider.subtitle', 'Explore', 'Provider subtitle', 'Approved jobs with approximate buyer areas.', 'Approved jobs with approximate buyer areas.', 'Provider explore screen supporting copy.', 'textarea'),
+  ('account.title', 'Account', 'Account title', 'Account', 'Account', 'Account screen title.', 'text'),
+  ('account.subtitle', 'Account', 'Account subtitle', 'Your identity, preferences and marketplace settings.', 'Your identity, preferences and marketplace settings.', 'Signed-in account screen supporting copy.', 'textarea'),
+  ('auth.sign_in.title', 'Authentication', 'Sign-in title', 'Welcome back', 'Welcome back', 'Sign-in screen heading.', 'text'),
+  ('auth.forgot.title', 'Authentication', 'Forgot password title', 'Reset password', 'Reset password', 'Forgot password screen heading.', 'text'),
+  ('auth.forgot.subtitle', 'Authentication', 'Forgot password subtitle', 'We will email a secure reset link to your account.', 'We will email a secure reset link to your account.', 'Forgot password screen supporting copy.', 'textarea')
+on conflict (content_key) do nothing;

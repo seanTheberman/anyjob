@@ -30,6 +30,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { api, jsonBody } from "@/lib/api";
+import { useAppContent } from "@/lib/content";
 import { isProviderRole, useAuth } from "@/providers/auth-provider";
 import { useAppTheme } from "@/providers/theme-provider";
 import { radius } from "@/theme/tokens";
@@ -110,6 +111,7 @@ export default function ExploreScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { colors } = useAppTheme();
+  const { copy } = useAppContent();
   const provider = isProviderRole(user?.role);
   const [search, setSearch] = useState("");
   const [boardMode, setBoardMode] = useState<"day" | "shift">("day");
@@ -192,12 +194,12 @@ export default function ExploreScreen() {
       <AppHeader compact />
       <View style={styles.heading}>
         <Text style={[styles.title, { color: colors.ink }]}>
-          {provider ? "Find work" : "Discover local pros"}
+          {provider ? copy("explore.provider.title", "Find work") : copy("explore.buyer.title", "Discover local pros")}
         </Text>
         <Text style={[styles.subtitle, { color: colors.muted }]}>
           {provider
-            ? "Approved jobs with approximate buyer areas."
-            : "Portfolio work, verified reviews and clear pricing."}
+            ? copy("explore.provider.subtitle", "Approved jobs with approximate buyer areas.")
+            : copy("explore.buyer.subtitle", "Portfolio work, verified reviews and clear pricing.")}
         </Text>
       </View>
       {provider ? (

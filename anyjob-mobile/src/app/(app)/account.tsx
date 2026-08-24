@@ -28,6 +28,7 @@ import {
   Screen,
 } from "@/components/ui";
 import { isProviderRole, useAuth } from "@/providers/auth-provider";
+import { useAppContent } from "@/lib/content";
 import { useAppTheme, type ThemePreference } from "@/providers/theme-provider";
 import { radius } from "@/theme/tokens";
 
@@ -79,6 +80,7 @@ export default function AccountScreen() {
   const provider = isProviderRole(user?.role);
   const [confirming, setConfirming] = useState(false);
   const { colors } = useAppTheme();
+  const { copy } = useAppContent();
   const role = provider
     ? "Provider"
     : user?.hasBusinessProfile
@@ -120,9 +122,9 @@ export default function AccountScreen() {
     <Screen>
       <AppHeader compact />
       <View style={styles.pageHead}>
-        <Text style={[styles.pageTitle, { color: colors.ink }]}>Account</Text>
+        <Text style={[styles.pageTitle, { color: colors.ink }]}>{copy("account.title", "Account")}</Text>
         <Text style={[styles.pageSubtitle, { color: colors.muted }]}>
-          Your identity, preferences and marketplace settings.
+          {copy("account.subtitle", "Your identity, preferences and marketplace settings.")}
         </Text>
       </View>
 

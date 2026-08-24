@@ -4,11 +4,13 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button, Field, Screen } from "@/components/ui";
+import { useAppContent } from "@/lib/content";
 import { useAuth } from "@/providers/auth-provider";
 import { colors } from "@/theme/tokens";
 
 export default function SignInScreen() {
   const { signIn } = useAuth();
+  const { copy } = useAppContent();
   const router = useRouter();
   const { registered, redirectTo } = useLocalSearchParams<{
     registered?: string;
@@ -52,7 +54,7 @@ export default function SignInScreen() {
       </Pressable>
       <View style={styles.header}>
         <Text style={styles.logo}>AnyJob</Text>
-        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.title}>{copy("auth.sign_in.title", "Welcome back")}</Text>
         <Text style={styles.body}>Sign in with your AnyJob account.</Text>
       </View>
       {registered === "1" ? (
