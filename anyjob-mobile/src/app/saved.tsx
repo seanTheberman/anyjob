@@ -1,0 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useQueries } from "@tanstack/react-query";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useState } from "react";
+import { api } from "@/lib/api";
+import { Card, EmptyState, Header, LoadingState, RowLink, Screen } from "@/components/ui";
+export default function SavedScreen() { const router = useRouter(); const [ids, setIds] = useState<string[]>([]); useFocusEffect(useCallback(() => { AsyncStorage.getItem("anyjob-saved-providers").then((value) => setIds(JSON.parse(value || "[]"))); }, [])); const queries = useQueries({ queries: ids.map((id) => ({ queryKey: ["public-profile", id], queryFn: () => api<any>(`/api/profile/${id}`) })) }); if (queries.some((q) => q.isLoading)) return <Screen><LoadingState /></Screen>; return <Screen><Header title="Saved providers" subtitle="Profiles saved on this device for quick comparison." />{ids.length === 0 ? <EmptyState title="No saved providers" body="Use the heart button on a provider profile to save it here." /> : queries.map((query, index) => { const row = query.data?.provider || query.data?.profile || query.data || {}; return <Card key={ids[index]}><RowLink title={[row.first_name, row.last_name].filter(Boolean).join(" ") || "AnyJob provider"} subtitle={`${row.service_category || "Service provider"} · ${row.city || "Ireland"}`} onPress={() => router.push(`/provider/${ids[index]}`)} /></Card>; })}</Screen>; }

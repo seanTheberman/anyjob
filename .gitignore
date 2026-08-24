@@ -22,6 +22,5 @@ supabase/.temp/
 playwright-report/
 test-results/
 
-# Ignored native app workspace
+# Ignored legacy native app workspace
 mobile-app/
-anyjob-mobile/
