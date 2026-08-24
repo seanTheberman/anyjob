@@ -1,5 +1,6 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { notifyJobEvent } from "@/lib/notifications/email-functions";
+import { randomInt } from "crypto";
 
 type SupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
 
@@ -16,6 +17,10 @@ type BidWithInquiry = {
 const PROVIDER_BOOKING_CONFIRMED_MESSAGE =
   "Thank you for confirming the booking. Your AnyJob payment is complete, and I'm ready to coordinate the job with you here. Please send any final access details, preferred timing, photos, or special instructions, and I'll confirm the plan before arrival.";
 
+function createVisitVerificationCode() {
+  return String(randomInt(0, 10000)).padStart(4, "0");
+}
+
 export async function acceptBidAndUnlockChat(
   supabase: SupabaseClient,
   bid: BidWithInquiry,
@@ -30,6 +35,8 @@ export async function acceptBidAndUnlockChat(
     .update({
       status: "accepted",
       accepted_at: timestamp,
+      visit_verification_code: createVisitVerificationCode(),
+      visit_verification_code_created_at: timestamp,
       updated_at: timestamp,
     })
     .eq("id", bid.id)

@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
       const token = createToken();
       const tokenHash = await sha256Hex(token);
       const resetPath = `/reset-password?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
-      const appUrl = cleanText(context.tenant.app_url) || cleanText(body.appUrl);
+      const appUrl = cleanText(body.appUrl) || cleanText(context.tenant.app_url);
       const resetUrl = appUrl ? `${appUrl.replace(/\/$/, "")}${resetPath}` : toPublicUrl(req, resetPath);
       const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "there";
 

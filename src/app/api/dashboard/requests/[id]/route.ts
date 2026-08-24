@@ -91,7 +91,7 @@ export async function GET(
 
     const { data: acceptedBid, error: acceptedBidError } = await admin
       .from("bids")
-      .select("id,provider_id,status")
+      .select("id,provider_id,status,visit_verification_code,visit_verification_code_created_at")
       .eq("inquiry_id", id)
       .eq("status", "accepted")
       .maybeSingle();
@@ -116,6 +116,8 @@ export async function GET(
         ...inquiry,
         provider_id: acceptedBid?.provider_id || null,
         accepted_bid_id: acceptedBid?.id || null,
+        visit_verification_code: acceptedBid?.visit_verification_code || null,
+        visit_verification_code_created_at: acceptedBid?.visit_verification_code_created_at || null,
       },
       workImages: workImages || [],
     });
@@ -172,7 +174,7 @@ export async function PATCH(
 
     const { data: acceptedBid, error: acceptedBidError } = await admin
       .from("bids")
-      .select("id,provider_id,status")
+      .select("id,provider_id,status,visit_verification_code,visit_verification_code_created_at")
       .eq("inquiry_id", id)
       .eq("status", "accepted")
       .maybeSingle();
@@ -213,6 +215,8 @@ export async function PATCH(
         ...updatedInquiry,
         provider_id: acceptedBid?.provider_id || null,
         accepted_bid_id: acceptedBid?.id || null,
+        visit_verification_code: acceptedBid?.visit_verification_code || null,
+        visit_verification_code_created_at: acceptedBid?.visit_verification_code_created_at || null,
       },
     });
   } catch (error) {

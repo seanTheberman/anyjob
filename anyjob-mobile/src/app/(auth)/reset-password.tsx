@@ -1,9 +1,10 @@
 import * as Linking from "expo-linking";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
 import { Button, Field, Screen } from "@/components/ui";
+import { api, jsonBody } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import { colors } from "@/theme/tokens";
 
@@ -13,15 +14,23 @@ function recoveryParams(url: string) {
     accessToken: parsed.searchParams.get("access_token"),
     refreshToken: parsed.searchParams.get("refresh_token"),
     code: parsed.searchParams.get("code"),
+    email: parsed.searchParams.get("email"),
+    token: parsed.searchParams.get("token"),
   };
+}
+
+function paramValue(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 export default function ResetPasswordScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ email?: string; token?: string }>();
   const incomingUrl = Linking.useURL();
   const [password, setPassword] = useState("");
   const [confirmation, setConfirmation] = useState("");
   const [ready, setReady] = useState(false);
+  const [webReset, setWebReset] = useState<{ email: string; token: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
@@ -29,15 +38,26 @@ export default function ResetPasswordScreen() {
     let active = true;
     const prepare = async () => {
       try {
+        const urlParams = incomingUrl ? recoveryParams(incomingUrl) : null;
+        const email = paramValue(params.email) || urlParams?.email || "";
+        const token = paramValue(params.token) || urlParams?.token || "";
+        if (email && token) {
+          if (active) {
+            setWebReset({ email, token });
+            setReady(true);
+          }
+          return;
+        }
+
         const existing = await supabase.auth.getSession();
         if (existing.data.session) { if (active) setReady(true); return; }
         if (!incomingUrl) throw new Error("Open the password reset link from your email.");
-        const params = recoveryParams(incomingUrl);
-        if (params.accessToken && params.refreshToken) {
-          const { error } = await supabase.auth.setSession({ access_token: params.accessToken, refresh_token: params.refreshToken });
+        const recovery = recoveryParams(incomingUrl);
+        if (recovery.accessToken && recovery.refreshToken) {
+          const { error } = await supabase.auth.setSession({ access_token: recovery.accessToken, refresh_token: recovery.refreshToken });
           if (error) throw error;
-        } else if (params.code) {
-          const { error } = await supabase.auth.exchangeCodeForSession(params.code);
+        } else if (recovery.code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(recovery.code);
           if (error) throw error;
         } else {
           throw new Error("This reset link is missing its recovery credentials.");
@@ -49,15 +69,26 @@ export default function ResetPasswordScreen() {
     };
     void prepare();
     return () => { active = false; };
-  }, [incomingUrl]);
+  }, [incomingUrl, params.email, params.token]);
 
   const valid = password.length >= 8 && password === confirmation;
   const submit = async () => {
     try {
       setBusy(true); setMessage("");
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
-      await supabase.auth.signOut();
+      if (webReset) {
+        await api("/api/auth/reset-password", {
+          method: "POST",
+          ...jsonBody({
+            email: webReset.email,
+            token: webReset.token,
+            password,
+          }),
+        });
+      } else {
+        const { error } = await supabase.auth.updateUser({ password });
+        if (error) throw error;
+        await supabase.auth.signOut();
+      }
       router.replace("/(auth)/sign-in");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not update your password.");

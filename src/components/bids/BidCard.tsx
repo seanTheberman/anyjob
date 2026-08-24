@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star, Clock, Calendar, CheckCircle, XCircle, MessageSquare, Loader2, User } from "lucide-react";
+import { Star, Clock, Calendar, CheckCircle, XCircle, MessageSquare, Loader2, User, ShieldCheck } from "lucide-react";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
 
 export interface BidProvider {
@@ -25,6 +25,7 @@ export interface Bid {
   available_date?: string;
   status: string;
   created_at: string;
+  visit_verification_code?: string | null;
   provider?: BidProvider;
 }
 
@@ -235,13 +236,29 @@ export function BidCard({ bid, isClient, onAccept, onReject, onWithdraw, onChat 
       )}
 
       {bid.status === "accepted" && (
-        <button
-          onClick={() => onChat?.(bid.id)}
-          className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          <MessageSquare className="w-4 h-4" />
-          Open Chat
-        </button>
+        <div className="space-y-3">
+          {bid.visit_verification_code ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-center gap-2 text-sm font-black uppercase tracking-wide text-blue-800">
+                <ShieldCheck className="h-4 w-4" />
+                Visit verification code
+              </div>
+              <div className="mt-2 font-mono text-3xl font-black tracking-[0.35em] text-blue-950">
+                {bid.visit_verification_code}
+              </div>
+              <p className="mt-2 text-xs font-medium leading-5 text-blue-800">
+                Ask the provider to show this code at the door before work starts.
+              </p>
+            </div>
+          ) : null}
+          <button
+            onClick={() => onChat?.(bid.id)}
+            className="w-full flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            <MessageSquare className="w-4 h-4" />
+            Open Chat
+          </button>
+        </div>
       )}
 
       {/* Timestamp */}

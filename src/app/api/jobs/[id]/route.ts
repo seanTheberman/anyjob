@@ -104,7 +104,7 @@ export async function GET(
       try {
         const { data: bidData } = await supabase
           .from('bids')
-          .select('id, amount, status, created_at')
+          .select('id, amount, status, created_at, visit_verification_code, visit_verification_code_created_at')
           .eq('inquiry_id', jobId)
           .eq('provider_id', user.id)
           .single();
@@ -169,7 +169,7 @@ export async function GET(
     const [{ data: bids }, { data: buyerJobs }, { data: buyerReviewsGiven }, { data: buyerReviewsReceived }] = await Promise.all([
       adminSupabase
         .from("bids")
-        .select("id,inquiry_id,provider_id,amount,message,estimated_duration_hours,available_date,status,created_at")
+        .select("id,inquiry_id,provider_id,amount,message,estimated_duration_hours,available_date,status,created_at,visit_verification_code,visit_verification_code_created_at")
         .eq("inquiry_id", jobId)
         .order("created_at", { ascending: false }),
       job.user_id
@@ -204,6 +204,8 @@ export async function GET(
         amount: ownBid.amount,
         status: ownBid.status,
         created_at: ownBid.created_at,
+        visit_verification_code: ownBid.visit_verification_code || null,
+        visit_verification_code_created_at: ownBid.visit_verification_code_created_at || null,
       } : null;
     }
 
@@ -241,6 +243,8 @@ export async function GET(
         availableDate: bid.available_date || null,
         status: String(bid.status || "pending"),
         createdAt: bid.created_at,
+        visitVerificationCode: bid.visit_verification_code || null,
+        visitVerificationCodeCreatedAt: bid.visit_verification_code_created_at || null,
         provider: {
           name: [seller.first_name || profile.first_name, seller.last_name || profile.last_name].filter(Boolean).join(" ") || "Provider",
           avatar: seller.profile_image_url || profile.avatar_url || null,

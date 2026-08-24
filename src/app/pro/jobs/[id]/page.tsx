@@ -88,6 +88,7 @@ interface JobDetails {
   my_bid?: {
     amount: number;
     status: string;
+    visit_verification_code?: string | null;
   } | null;
   work_image_count: number;
   work_images?: Array<{
@@ -645,6 +646,20 @@ export default function JobDetailsPage() {
                     <p className="text-sm text-green-800">
                       Status: <Badge variant="outline">{existingBid.status}</Badge>
                     </p>
+                    {existingBid.status === "accepted" && existingBid.visit_verification_code ? (
+                      <div className="mx-auto mt-5 max-w-sm rounded-xl border border-blue-200 bg-white p-4 text-left">
+                        <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wide text-blue-800">
+                          <ShieldCheck className="h-4 w-4" />
+                          Visit verification code
+                        </div>
+                        <div className="mt-2 font-mono text-3xl font-black tracking-[0.35em] text-blue-950">
+                          {existingBid.visit_verification_code}
+                        </div>
+                        <p className="mt-2 text-xs font-semibold leading-5 text-blue-800">
+                          Show this to the buyer when you arrive so they can verify the correct provider.
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
               </section>
             )}

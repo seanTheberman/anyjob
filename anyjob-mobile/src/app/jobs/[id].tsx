@@ -100,7 +100,11 @@ type JobDetails = {
   anyjobSelect?: boolean;
   adminPosted?: boolean;
   bid_count?: number;
-  my_bid?: { amount: number; status: string } | null;
+  my_bid?: {
+    amount: number;
+    status: string;
+    visit_verification_code?: string | null;
+  } | null;
   work_image_count?: number;
   work_images?: Array<{ id: string; image_url: string }>;
   offers?: Offer[];
@@ -460,6 +464,24 @@ export default function JobDetailScreen() {
               You quoted {money(Number(existingBid.amount), currency)}. Status:{" "}
               {existingBid.status}
             </Text>
+            {existingBid.status === "accepted" && existingBid.visit_verification_code ? (
+              <View
+                style={[
+                  styles.providerCode,
+                  { backgroundColor: colors.surface, borderColor: colors.info },
+                ]}
+              >
+                <Text style={[styles.codeLabel, { color: colors.info }]}>
+                  Visit verification code
+                </Text>
+                <Text style={[styles.codeValue, { color: colors.ink }]}>
+                  {existingBid.visit_verification_code}
+                </Text>
+                <Text style={[styles.codeHelp, { color: colors.muted }]}>
+                  Show this code to the buyer when you arrive.
+                </Text>
+              </View>
+            ) : null}
           </View>
         </Card>
       ) : showOffer ? (
@@ -966,6 +988,25 @@ const styles = StyleSheet.create({
   emptyOffer: { borderRadius: radius.lg, padding: 18, alignItems: "center", gap: 8 },
   center: { alignItems: "center", gap: 8 },
   mutedCentered: { textAlign: "center", fontSize: 14, lineHeight: 20 },
+  providerCode: {
+    alignSelf: "stretch",
+    borderWidth: 1,
+    borderRadius: radius.lg,
+    padding: 14,
+    marginTop: 8,
+  },
+  codeLabel: {
+    fontSize: 12,
+    fontWeight: "900",
+    textTransform: "uppercase",
+  },
+  codeValue: {
+    fontSize: 34,
+    fontWeight: "900",
+    letterSpacing: 10,
+    fontVariant: ["tabular-nums"],
+  },
+  codeHelp: { fontSize: 13, lineHeight: 19, fontWeight: "700" },
   breakdown: { borderWidth: 1, borderRadius: radius.lg, padding: 13, gap: 9 },
   statLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   statLabel: { fontSize: 13, fontWeight: "700" },

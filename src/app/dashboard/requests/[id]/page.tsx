@@ -35,6 +35,7 @@ interface ServiceInquiry {
   notes?: string;
   provider_name?: string;
   buyer_name?: string;
+  visit_verification_code?: string | null;
 }
 
 interface Review {

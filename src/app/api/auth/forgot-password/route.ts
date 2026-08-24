@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const appUrl = typeof body.appUrl === "string" ? body.appUrl.trim() : "";
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
       payload: {
         tenantSlug: "default",
         email,
+        ...(appUrl ? { appUrl } : {}),
       },
       useServiceRole: true,
     });

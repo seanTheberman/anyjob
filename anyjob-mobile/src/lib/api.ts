@@ -1,6 +1,7 @@
 import { supabase } from "./supabase";
+import { API_URL } from "./config";
 
-export const API_URL = (process.env.EXPO_PUBLIC_WEB_API_URL || "https://anyjob-mu.vercel.app").replace(/\/$/, "");
+export { API_URL } from "./config";
 
 export class ApiError extends Error {
   constructor(message: string, public status: number, public details?: unknown) {
