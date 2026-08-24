@@ -9,6 +9,18 @@ export class ApiError extends Error {
   }
 }
 
+export async function fetchApiResponse(path: string, init: RequestInit = {}) {
+  try {
+    return await fetch(`${API_URL}${path}`, { ...init, cache: "no-store" });
+  } catch (error) {
+    throw new ApiError(
+      "AnyJob could not reach the server. Check your connection and try again.",
+      0,
+      error instanceof Error ? error.message : error,
+    );
+  }
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const { data: { session } } = await supabase.auth.getSession();
   const headers = new Headers(init.headers);
@@ -16,7 +28,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   if (!headers.has("Authorization") && session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
 
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers, cache: "no-store" });
+  const response = await fetchApiResponse(path, { ...init, headers });
   const contentType = response.headers.get("content-type") || "";
   const payload = contentType.includes("application/json") ? await response.json() : await response.text();
   if (!response.ok) {

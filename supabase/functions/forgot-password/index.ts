@@ -5,6 +5,14 @@ import { createAdminClient } from "../_shared/supabase-admin.ts";
 import { addHours, cleanText, createToken, isValidEmail, normalizeEmail, sha256Hex, toPublicUrl } from "../_shared/tokens.ts";
 import { brandedEmail, getTenantContext, queueAndSendEmail } from "../_shared/tenant-email.ts";
 
+function resetDestination(requestedAppUrl: string, tenantAppUrl: string, resetPath: string) {
+  if (requestedAppUrl === "anyjob://") {
+    return `anyjob://${resetPath.replace(/^\//, "")}`;
+  }
+  const appUrl = tenantAppUrl || "https://anyjob.eu";
+  return `${appUrl.replace(/\/$/, "")}${resetPath}`;
+}
+
 Deno.serve(async (req) => {
   const cors = handleCors(req);
   if (cors) return cors;
@@ -46,8 +54,9 @@ Deno.serve(async (req) => {
       const token = createToken();
       const tokenHash = await sha256Hex(token);
       const resetPath = `/reset-password?email=${encodeURIComponent(email)}&token=${encodeURIComponent(token)}`;
-      const appUrl = cleanText(body.appUrl) || cleanText(context.tenant.app_url);
-      const resetUrl = appUrl ? `${appUrl.replace(/\/$/, "")}${resetPath}` : toPublicUrl(req, resetPath);
+      const requestedAppUrl = cleanText(body.appUrl);
+      const tenantAppUrl = cleanText(context.tenant.app_url) || toPublicUrl(req, "").replace(/\/$/, "");
+      const resetUrl = resetDestination(requestedAppUrl, tenantAppUrl, resetPath);
       const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") || "there";
 
       const { error: tokenError } = await supabase

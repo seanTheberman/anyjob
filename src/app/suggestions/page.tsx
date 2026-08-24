@@ -129,18 +129,6 @@ function SuggestionsContent() {
 
   const generateAndFetchSuggestions = async (inquiryData: Inquiry) => {
     try {
-      // First, try to generate suggestions via the edge function
-      const { error: generateError } = await supabase.functions.invoke(
-        "generate-suggestions",
-        {
-          body: { inquiry_id: inquiryData.id },
-        }
-      );
-
-      if (generateError) {
-        console.log("Edge function not available, using client-side matching");
-      }
-
       // Fetch providers from the database
       const { data: allProviders, error: providersError } = await supabase
         .from("eloo_profiles")

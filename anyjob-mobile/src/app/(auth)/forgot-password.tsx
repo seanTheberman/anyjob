@@ -1,4 +1,3 @@
-import * as Linking from "expo-linking";
 import { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import { Button, Field, Screen } from "@/components/ui";
@@ -21,7 +20,7 @@ export default function ForgotPasswordScreen() {
         method: "POST",
         ...jsonBody({
           email: email.trim().toLowerCase(),
-          appUrl: Linking.createURL("/reset-password"),
+          client: "mobile",
         }),
       });
       setMessage(payload.message || "If an AnyJob account exists for this email, a reset link has been sent.");

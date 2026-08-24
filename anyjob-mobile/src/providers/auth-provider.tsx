@@ -4,7 +4,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { SplashScreen, useRouter, useSegments } from "expo-router";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
-import { api, API_URL } from "@/lib/api";
+import { api, fetchApiResponse } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
 import type { AppUser } from "@/types/domain";
 
@@ -141,7 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser,
     signIn: async (email, password) => {
       setUser(null);
-      const response = await fetch(`${API_URL}/api/auth/login`, {
+      const response = await fetchApiResponse("/api/auth/login", {
         method: "POST",
         headers: {
           Accept: "application/json",

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button, Field, Screen } from "@/components/ui";
-import { API_URL } from "@/lib/api";
+import { fetchApiResponse } from "@/lib/api";
 import { colors } from "@/theme/tokens";
 
 type Kind = "buyer" | "seller";
@@ -86,7 +86,7 @@ export default function RegisterScreen() {
               openToUrgentShifts: true,
               openToRecurringShifts: true,
             };
-      const response = await fetch(`${API_URL}${endpoint}`, {
+      const response = await fetchApiResponse(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
