@@ -76,6 +76,14 @@ function textFromHtml(html: string) {
     .trim();
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 export async function sendTenantEmail(context: TenantContext, input: OutboxInput) {
   const config = context.emailConfig;
   const transporter = nodemailer.createTransport({
@@ -156,8 +164,10 @@ export async function queueAndSendEmail(context: TenantContext, input: OutboxInp
 }
 
 export function brandedEmail(title: string, body: string, action?: { label: string; url: string }) {
+  const actionUrl = action ? escapeHtml(action.url) : "";
+  const actionLabel = action ? escapeHtml(action.label) : "";
   const actionHtml = action
-    ? `<p style="margin:28px 0 6px"><a href="${action.url}" style="display:inline-block;background:#e11d2e;color:#fff;text-decoration:none;border-radius:12px;padding:13px 20px;font-weight:700">${action.label}</a></p>`
+    ? `<p style="margin:28px 0 10px"><a href="${actionUrl}" style="display:inline-block;background:#e11d2e;color:#fff;text-decoration:none;border-radius:12px;padding:13px 20px;font-weight:700">${actionLabel}</a></p><p style="margin:0;font-size:13px;line-height:1.5;color:#6b7280">If the button does not open, use this secure link:<br><a href="${actionUrl}" style="color:#2563eb;word-break:break-all">${actionUrl}</a></p>`
     : "";
 
   return `<!doctype html>

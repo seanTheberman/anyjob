@@ -11,6 +11,9 @@
       "icon": "./assets/images/icon.png",
       "bundleIdentifier": "ie.anyjob.mobile",
       "buildNumber": "1",
+      "associatedDomains": [
+        "applinks:anyjob-mu.vercel.app"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Allow AnyJob to use your approximate area when posting or finding nearby work.",

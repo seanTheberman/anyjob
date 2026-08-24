@@ -20,7 +20,6 @@ export default function ForgotPasswordScreen() {
         method: "POST",
         ...jsonBody({
           email: email.trim().toLowerCase(),
-          client: "mobile",
         }),
       });
       setMessage(payload.message || "If an AnyJob account exists for this email, a reset link has been sent.");
