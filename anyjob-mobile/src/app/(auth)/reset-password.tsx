@@ -1,8 +1,9 @@
 import * as Linking from "expo-linking";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
 
+import { AuthBackButton } from "@/components/auth-navigation";
 import { Button, Field, Screen } from "@/components/ui";
 import { api, jsonBody } from "@/lib/api";
 import { supabase } from "@/lib/supabase";
@@ -97,7 +98,7 @@ export default function ResetPasswordScreen() {
     }
   };
 
-  return <Screen style={styles.screen}><Text style={styles.title}>Choose a new password</Text><Text style={styles.body}>Use at least eight characters, then sign in with your new password.</Text><Field label="New password" value={password} secureTextEntry onChangeText={(value) => { setPassword(value); setMessage(""); }} /><Field label="Confirm password" value={confirmation} secureTextEntry onChangeText={(value) => { setConfirmation(value); setMessage(""); }} />{confirmation && password !== confirmation ? <Text accessibilityRole="alert" style={styles.error}>Passwords do not match.</Text> : null}{message ? <Text accessibilityRole="alert" style={styles.error}>{message}</Text> : null}<Button title="Update password" onPress={submit} loading={busy} disabled={!ready || !valid} /></Screen>;
+  return <Screen style={styles.screen}><AuthBackButton /><Text style={styles.title}>Choose a new password</Text><Text style={styles.body}>Use at least eight characters, then sign in with your new password.</Text><Field label="New password" value={password} secureTextEntry onChangeText={(value) => { setPassword(value); setMessage(""); }} /><Field label="Confirm password" value={confirmation} secureTextEntry onChangeText={(value) => { setConfirmation(value); setMessage(""); }} />{confirmation && password !== confirmation ? <Text accessibilityRole="alert" style={styles.error}>Passwords do not match.</Text> : null}{message ? <Text accessibilityRole="alert" style={styles.error}>{message}</Text> : null}<Button title="Update password" onPress={submit} loading={busy} disabled={!ready || !valid} /><Link href="/(auth)/sign-in" replace style={styles.link}>Back to sign in</Link></Screen>;
 }
 
-const styles = StyleSheet.create({ screen: { justifyContent: "center", minHeight: 620 }, title: { color: colors.ink, fontSize: 28, fontWeight: "800" }, body: { color: colors.muted, lineHeight: 21 }, error: { color: colors.danger, fontWeight: "700" } });
+const styles = StyleSheet.create({ screen: { justifyContent: "center", minHeight: 620 }, title: { color: colors.ink, fontSize: 28, fontWeight: "800" }, body: { color: colors.muted, lineHeight: 21 }, error: { color: colors.danger, fontWeight: "700" }, link: { color: colors.brand, fontWeight: "700", textAlign: "center", padding: 8 } });

@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -200,6 +200,9 @@ export default function RegisterScreen() {
         loading={busy}
         disabled={!complete}
       />
+      <Link href="/(auth)/sign-in" replace style={styles.link}>
+        Already have an account? Sign in
+      </Link>
     </Screen>
   );
 }
@@ -221,6 +224,7 @@ const styles = StyleSheet.create({
   label: { color: colors.ink, fontWeight: "700" },
   terms: { color: colors.muted, lineHeight: 20 },
   error: { color: colors.danger, fontWeight: "700" },
+  link: { color: colors.brand, fontWeight: "700", textAlign: "center", padding: 8 },
   segment: {
     flexDirection: "row",
     backgroundColor: colors.soft,
