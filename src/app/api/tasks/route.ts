@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         .from("service_inquiries")
         .select("id,user_id,category_slug,subcategory_slug,service_type,job_description,city,postal_code,coarse_location_label,budget_range_min,budget_range_max,preferred_date,status,submitted_at,created_at,country_code")
         .eq("status", "submitted")
+        .eq("request_visibility", "public")
         .eq("country_code", marketCountry)
         .order("submitted_at", { ascending: false })
         .limit(100),

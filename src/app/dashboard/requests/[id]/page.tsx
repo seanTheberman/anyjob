@@ -13,6 +13,7 @@ import { BidCard, type Bid } from "@/components/bids/BidCard";
 import { ImageUploader } from "@/components/upload/ImageUploader";
 import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token";
 import { getJobStatusColor, getJobStatusLabel, jobStatusIcons } from "@/lib/job-status";
+import { cn } from "@/lib/utils";
 
 interface ServiceInquiry {
   id: string;
@@ -36,6 +37,11 @@ interface ServiceInquiry {
   provider_name?: string;
   buyer_name?: string;
   visit_verification_code?: string | null;
+  request_visibility?: "public" | "private";
+  provider_decision_status?: "not_required" | "pending" | "accepted" | "rejected";
+  provider_rejection_reason?: string | null;
+  conversation_id?: string | null;
+  target_provider_name?: string | null;
 }
 
 interface Review {
@@ -322,6 +328,8 @@ export default function RequestDetailPage() {
   const acceptedBreakdown = acceptedBid ? calculateBookingTokenBreakdown(Number(acceptedBid.amount)) : null;
   const requestCopy = splitStoredJobDescription(inquiry.job_description);
   const requestTitle = requestCopy.title || getServiceName(inquiry.category_slug, inquiry.subcategory_slug);
+  const isPrivateRequest = inquiry.request_visibility === "private";
+  const targetProviderName = inquiry.target_provider_name || "the selected provider";
   const requestDescription = requestCopy.description || "No description provided.";
 
   return (
@@ -348,6 +356,36 @@ export default function RequestDetailPage() {
                 {getJobStatusLabel(inquiry.status)}
               </div>
             </div>
+            {isPrivateRequest ? (
+              <div className={cn(
+                "mt-5 rounded-lg border p-4 text-sm leading-6",
+                inquiry.provider_decision_status === "accepted"
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-950"
+                  : inquiry.provider_decision_status === "rejected"
+                    ? "border-slate-200 bg-slate-50 text-slate-800"
+                    : "border-amber-200 bg-amber-50 text-amber-950",
+              )}>
+                <p className="font-black">
+                  {inquiry.provider_decision_status === "accepted"
+                    ? `${targetProviderName} accepted your request`
+                    : inquiry.provider_decision_status === "rejected"
+                      ? `${targetProviderName} declined your request`
+                      : `Requirements sent to ${targetProviderName}`}
+                </p>
+                <p>
+                  {inquiry.provider_decision_status === "accepted"
+                    ? "Review the quote below. Payment is now available."
+                    : inquiry.provider_decision_status === "rejected"
+                      ? inquiry.provider_rejection_reason || "Choose another provider or post the job publicly."
+                      : "The provider is reviewing the job. You will receive an email when they accept or decline."}
+                </p>
+                {inquiry.conversation_id ? (
+                  <Link href="/dashboard/mail" className="mt-2 inline-flex font-black underline underline-offset-2">
+                    Open requirements messages
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </div>
 

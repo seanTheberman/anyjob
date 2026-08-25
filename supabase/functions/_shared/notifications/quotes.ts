@@ -7,10 +7,63 @@ export async function notifyQuoteActivity(context: TenantContext, body: Record<s
   const jobId = cleanText(body.jobId || body.inquiryId);
   const bidId = cleanText(body.bidId);
   const providerUserId = cleanText(body.providerUserId);
-  if (!jobId || !bidId) return { error: "jobId and bidId are required" };
+  if (!jobId) return { error: "jobId is required" };
 
   const job = await getServiceInquiry(jobId);
   if (!job) return { error: "service_inquiry_not_found" };
+
+  if (action.startsWith("direct_request_")) {
+    const buyerUserId = cleanText(body.buyerUserId || job.user_id);
+    const targetProviderId = cleanText(body.providerUserId || job.target_provider_id);
+    const provider = await profileForUser(targetProviderId);
+    const providerName = [provider?.first_name, provider?.last_name].filter(Boolean).join(" ")
+      || cleanText(body.providerName, "The provider");
+    const isReceived = action === "direct_request_received";
+    const isAccepted = action === "direct_request_accepted";
+    const recipientId = isReceived ? targetProviderId : buyerUserId;
+    const recipientEmail = isReceived ? cleanText(body.providerEmail || provider?.email) : cleanText(job.email);
+    const actionPath = isReceived ? `/pro/jobs/${job.id}` : `/dashboard/requests/${job.id}`;
+    const title = isReceived
+      ? "New private job request"
+      : isAccepted
+        ? "Provider accepted your request"
+        : "Provider declined your request";
+    const message = isReceived
+      ? "A buyer sent job requirements for you to review."
+      : isAccepted
+        ? `${providerName} accepted your requirements and sent a quote. You can now review it and pay to confirm.`
+        : `${providerName} declined your private request.${body.reason ? ` Reason: ${cleanText(body.reason)}` : ""}`;
+
+    await createInAppNotification({
+      userId: recipientId,
+      title,
+      message,
+      type: action,
+      actionUrl: actionPath,
+      data: { job_id: job.id, provider_user_id: targetProviderId, bid_id: cleanText(body.bidId) || null },
+    });
+
+    return sendNotificationEmail(context, {
+      eventKey: `private_requests.${action}`,
+      dedupeKey: `${action}:${job.id}:${recipientId || recipientEmail}`,
+      userId: recipientId,
+      email: recipientEmail,
+      subject: title,
+      title,
+      body: [
+        `<p>${escapeHtml(message)}</p>`,
+        isReceived ? `<p>Review the full requirements, then accept with your quote or reject the request.</p>` : "",
+        isAccepted && body.amount ? `<p>Your total quote: <strong>${escapeHtml(body.amount)}</strong></p>` : "",
+      ].join(""),
+      actionLabel: isReceived ? "Review requirements" : isAccepted ? "Review quote and pay" : "Open order",
+      actionUrl: fullAppUrl(context, actionPath),
+      sourceTable: "service_inquiries",
+      sourceId: job.id,
+      metadata: { provider_user_id: targetProviderId, bid_id: cleanText(body.bidId) || null },
+    });
+  }
+
+  if (!bidId) return { error: "bidId is required" };
 
   const provider = await profileForUser(providerUserId);
   const providerName = [provider?.first_name, provider?.last_name].filter(Boolean).join(" ") || cleanText(body.providerName, "A provider");

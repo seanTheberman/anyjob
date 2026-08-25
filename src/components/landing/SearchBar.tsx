@@ -118,8 +118,8 @@ export function SearchBar() {
         }
 
         return result.type === 'subcategory'
-            ? `/${result.categorySlug}?subcategory=${result.slug}`
-            : `/questionnaire?category=${result.slug}`;
+            ? `/questionnaire?category=${encodeURIComponent(result.categorySlug || "custom")}&subcategory=${encodeURIComponent(result.slug)}`
+            : `/questionnaire?category=${encodeURIComponent(result.slug)}`;
     }
 
     function handleCustomService() {
@@ -252,7 +252,7 @@ export function SearchBar() {
     const getLocalizedPlaceholder = () => {
         const placeholders: Record<string, string> = {
             fr: "Femme de ménage, bricoleur...",
-            en: "Cleaning, handyman...",
+            en: "Post a job",
             es: "Limpieza, fontanería...",
             de: "Reinigung, Handwerker...",
             it: "Pulizie, fai da te...",
@@ -429,7 +429,7 @@ export function SearchBar() {
                                 className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-red-700"
                             >
                                 <PlusCircle className="h-4 w-4" />
-                                Request custom service
+                                Create a custom job
                             </button>
                         </div>
                     )}
@@ -437,16 +437,6 @@ export function SearchBar() {
                 )}
             </div>
 
-            <div className="mt-[52px] flex justify-center">
-                <button
-                    type="button"
-                    onClick={handleCustomService}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-white/25 bg-white/15 px-4 text-sm font-semibold text-white shadow-lg backdrop-blur-md transition-colors hover:bg-white/25 focus:outline-none focus:ring-2 focus:ring-white/60"
-                >
-                    <PlusCircle className="h-4 w-4" />
-                    Request custom service
-                </button>
-            </div>
         </div>
         </>
     );

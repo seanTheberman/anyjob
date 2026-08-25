@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, Star } from "lucide-react";
 import Link from "next/link";
 
 // Define the props for the ProviderCard component
@@ -16,6 +16,7 @@ interface ProviderCardProps extends React.HTMLAttributes<HTMLDivElement> {
     image?: string | null;
     isNew?: boolean;
     tags: string[];
+    availableForShifts?: boolean;
   };
 }
 
@@ -72,6 +73,12 @@ const ProviderCard = React.forwardRef<HTMLDivElement, ProviderCardProps>(
           
           {/* Content */}
           <div className="relative flex flex-col justify-end h-full p-5 text-white">
+            {provider.availableForShifts ? (
+              <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded bg-emerald-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+                <BriefcaseBusiness className="h-3.5 w-3.5" />
+                Available for work shifts
+              </span>
+            ) : null}
             {/* Name and Rate Row */}
             <div className="flex items-baseline justify-between mb-1">
               <h3 className="text-2xl font-bold tracking-tight truncate pr-2">

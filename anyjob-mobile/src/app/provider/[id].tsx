@@ -1,7 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
-import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   BadgeCheck,
@@ -18,9 +17,6 @@ import {
 import { useEffect, useState } from "react";
 import {
   Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -32,16 +28,14 @@ import {
   Avatar,
   Button,
   ErrorState,
-  Field,
   Header,
   LoadingState,
   Pill,
   Screen,
   SectionHeader,
 } from "@/components/ui";
-import { api, ApiError, jsonBody } from "@/lib/api";
+import { api } from "@/lib/api";
 import { serviceCover } from "@/lib/service-assets";
-import { useAuth } from "@/providers/auth-provider";
 import { useAppTheme } from "@/providers/theme-provider";
 
 type GigPackage = {
@@ -260,21 +254,9 @@ export default function PublicProviderScreen() {
   const providerId = textValue(id);
   const router = useRouter();
   const { colors } = useAppTheme();
-  const { session } = useAuth();
   const [saved, setSaved] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [showDirectHire, setShowDirectHire] = useState(false);
-  const [hiring, setHiring] = useState(false);
-  const [hireError, setHireError] = useState("");
-  const [hireForm, setHireForm] = useState({
-    preferredDate: "",
-    preferredTime: "",
-    address: "",
-    city: "",
-    postalCode: "",
-    notes: "",
-  });
   const query = useQuery({
     queryKey: ["public-profile", providerId],
     queryFn: () => api<any>(`/api/profile/${providerId}?role=provider`),
@@ -416,6 +398,7 @@ export default function PublicProviderScreen() {
       rating: numberValue(row.rating),
       reviewCount: numberValue(row.reviewCount),
       rate: numberValue(row.rate),
+      availableForShifts: row.availableForShifts === true,
     };
   });
 
@@ -428,96 +411,8 @@ export default function PublicProviderScreen() {
         providerName: name,
         serviceId: textValue(gig?.id),
         packageTier: activePackage?.tier || String(selectedPackage),
-        requestKey: String(Date.now()),
       },
     });
-
-  const openDirectHire = () => {
-    if (!session) {
-      router.push({
-        pathname: "/(auth)/sign-in",
-        params: { redirectTo: `/provider/${providerId}` },
-      });
-      return;
-    }
-    setHireError("");
-    setShowDirectHire(true);
-  };
-
-  const setHireField = (key: keyof typeof hireForm) => (value: string) => {
-    setHireForm((current) => ({ ...current, [key]: value }));
-    setHireError("");
-  };
-
-  const hirePackage = async () => {
-    if (!gig?.id || !activePackage?.tier) {
-      setHireError("This package is no longer available.");
-      return;
-    }
-    if (!hireForm.preferredDate || !/^\d{4}-\d{2}-\d{2}$/.test(hireForm.preferredDate)) {
-      setHireError("Enter the booking date as YYYY-MM-DD.");
-      return;
-    }
-    if (!hireForm.preferredTime || !/^\d{2}:\d{2}$/.test(hireForm.preferredTime)) {
-      setHireError("Enter the preferred time as HH:MM.");
-      return;
-    }
-    if (!hireForm.address.trim() || !hireForm.city.trim()) {
-      setHireError("Enter the service address and city.");
-      return;
-    }
-
-    let inquiryId = "";
-    try {
-      setHiring(true);
-      setHireError("");
-      const direct = await api<any>("/api/direct-hire", {
-        method: "POST",
-        ...jsonBody({
-          providerId,
-          serviceId: gig.id,
-          packageTier: activePackage.tier,
-          ...hireForm,
-        }),
-      });
-      inquiryId = textValue(direct.inquiry?.id);
-      const checkout = await api<any>("/api/payments/bid-checkout", {
-        method: "POST",
-        ...jsonBody({ bid_id: direct.bid?.id }),
-      });
-
-      setShowDirectHire(false);
-      if (checkout.checkoutUrl && !checkout.dummyPayment) {
-        await WebBrowser.openBrowserAsync(checkout.checkoutUrl);
-      }
-      if (inquiryId) router.push(`/requests/${inquiryId}`);
-      Alert.alert(
-        checkout.dummyPayment ? "Provider hired" : "Payment started",
-        checkout.dummyPayment
-          ? "Your package booking is confirmed and messaging is unlocked."
-          : "Return to AnyJob after payment to see the confirmed booking.",
-      );
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        setShowDirectHire(false);
-        router.push({
-          pathname: "/(auth)/sign-in",
-          params: { redirectTo: `/provider/${providerId}` },
-        });
-        return;
-      }
-      const message = error instanceof Error ? error.message : "Could not hire this package.";
-      if (inquiryId) {
-        setShowDirectHire(false);
-        router.push(`/requests/${inquiryId}`);
-        Alert.alert("Booking created; payment pending", message);
-      } else {
-        setHireError(message);
-      }
-    } finally {
-      setHiring(false);
-    }
-  };
 
   if (query.isLoading)
     return (
@@ -608,6 +503,9 @@ export default function PublicProviderScreen() {
           </Text>
           {textValue(profile.level) ? (
             <Pill text={textValue(profile.level)} tone="success" />
+          ) : null}
+          {profile.availableForShifts === true ? (
+            <Pill text="Available for work shifts" tone="success" />
           ) : null}
           {reviewCount ? (
             <View style={styles.rating}>
@@ -706,7 +604,7 @@ export default function PublicProviderScreen() {
               </Text>
             </View>
           ))}
-          <Button title="Hire this package" onPress={openDirectHire} />
+          <Button title="Hire this package" onPress={continueBooking} />
           <Button
             title="Post a custom request instead"
             variant="secondary"
@@ -1062,6 +960,11 @@ export default function PublicProviderScreen() {
                       {related.rate ? `€${related.rate}/h` : "Quote"}
                     </Text>
                   </View>
+                  {related.availableForShifts ? (
+                    <View style={[styles.relatedShift, { backgroundColor: colors.successSoft }] }>
+                      <Text style={[styles.relatedShiftText, { color: colors.success }]}>Available for work shifts</Text>
+                    </View>
+                  ) : null}
                 </View>
               </Pressable>
             ))}
@@ -1082,62 +985,10 @@ export default function PublicProviderScreen() {
         </View>
       </View>
       {activePackage ? (
-        <Button title={`Hire ${activePackage.title || "this package"}`} onPress={openDirectHire} />
+        <Button title={`Hire ${activePackage.title || "this package"}`} onPress={continueBooking} />
       ) : (
         <Button title="Post a custom request" onPress={continueBooking} />
       )}
-
-      <Modal
-        visible={showDirectHire}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDirectHire(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.modalBackdrop}
-        >
-          <View style={[styles.modalSheet, { backgroundColor: colors.surface }] }>
-            <View style={styles.modalHead}>
-              <View style={styles.modalCopy}>
-                <Text style={[styles.modalEyebrow, { color: colors.brand }]}>DIRECT HIRE</Text>
-                <Text style={[styles.modalTitle, { color: colors.ink }]}>
-                  {activePackage?.title || "Service package"}
-                </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
-                  {name} · €{Number(activePackage?.price || 0).toFixed(0)}
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Close direct hire"
-                onPress={() => setShowDirectHire(false)}
-                style={[styles.modalClose, { backgroundColor: colors.soft }]}
-              >
-                <Text style={[styles.modalCloseText, { color: colors.ink }]}>×</Text>
-              </Pressable>
-            </View>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={styles.modalFields}
-            >
-              <Field label="Date" placeholder="YYYY-MM-DD" value={hireForm.preferredDate} onChangeText={setHireField("preferredDate")} />
-              <Field label="Preferred time" placeholder="HH:MM" value={hireForm.preferredTime} onChangeText={setHireField("preferredTime")} />
-              <Field label="Service address" placeholder="Street address" value={hireForm.address} onChangeText={setHireField("address")} />
-              <Field label="City" placeholder="City" value={hireForm.city} onChangeText={setHireField("city")} />
-              <Field label="Postal code" placeholder="Optional" value={hireForm.postalCode} onChangeText={setHireField("postalCode")} />
-              <Field label="Notes for provider" placeholder="Access, scope, or timing details" multiline value={hireForm.notes} onChangeText={setHireField("notes")} />
-              {hireError ? (
-                <Text accessibilityRole="alert" style={[styles.hireError, { color: colors.danger, backgroundColor: colors.soft }]}>
-                  {hireError}
-                </Text>
-              ) : null}
-              <Button title="Pay and hire package" loading={hiring} onPress={() => void hirePackage()} />
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
     </Screen>
   );
 }
@@ -1308,6 +1159,8 @@ const styles = StyleSheet.create({
   },
   relatedRating: { fontSize: 10.5, fontWeight: "800" },
   relatedPrice: { fontSize: 10.5, fontWeight: "900" },
+  relatedShift: { borderRadius: 5, paddingHorizontal: 6, paddingVertical: 4 },
+  relatedShiftText: { fontSize: 8.5, fontWeight: "900" },
   trust: {
     borderRadius: 16,
     padding: 14,

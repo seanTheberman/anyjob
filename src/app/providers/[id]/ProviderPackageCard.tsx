@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type React from "react";
-import { Check, Clock, Loader2, RefreshCw, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Check, Clock, RefreshCw } from "lucide-react";
 
 import type { ProviderPackageData } from "@/lib/real-providers";
 import { cn } from "@/lib/utils";
-import { VerifiedLocationFields } from "@/components/location/VerifiedLocationFields";
-import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
 
 type ProviderPackageCardProps = {
   bookingHref: string;
@@ -27,7 +24,6 @@ function formatPrice(value: number) {
 
 export function ProviderPackageCard({
   bookingHref,
-  providerId,
   providerName,
   listedPackages,
 }: ProviderPackageCardProps) {
@@ -36,82 +32,11 @@ export function ProviderPackageCard({
     [listedPackages],
   );
   const [selected, setSelected] = useState(0);
-  const [showHireForm, setShowHireForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [form, setForm] = useState({
-    preferredDate: "",
-    preferredTime: "",
-    address: "",
-    city: "",
-    postalCode: "",
-    notes: "",
-  });
-  const marketLocation = useVerifiedMarketLocation(false);
   const activePackage = packages[Math.min(selected, Math.max(packages.length - 1, 0))];
 
-  useEffect(() => {
-    if (selected >= packages.length) setSelected(0);
-  }, [packages.length, selected]);
-
-  useEffect(() => {
-    if (!marketLocation.location) return;
-    setForm((current) => ({
-      ...current,
-      city: marketLocation.location?.city || "",
-      postalCode: marketLocation.location?.postalCode || "",
-    }));
-  }, [marketLocation.location]);
-
-  const setField = (key: keyof typeof form) => (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
-    setForm((current) => ({ ...current, [key]: event.target.value }));
-  };
-
-  async function hirePackage() {
-    if (!activePackage) return;
-    setSubmitting(true);
-    setError("");
-
-    try {
-      const directResponse = await fetch("/api/direct-hire", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          providerId,
-          serviceId: activePackage.serviceId,
-          packageTier: activePackage.tier,
-          locationToken: marketLocation.token,
-          ...form,
-        }),
-      });
-      const directData = await directResponse.json().catch(() => ({}));
-
-      if (directResponse.status === 401) {
-        window.location.href = `/login?redirect=${encodeURIComponent(window.location.pathname)}`;
-        return;
-      }
-      if (!directResponse.ok) {
-        throw new Error(directData.error || "Could not start direct hire.");
-      }
-
-      const checkoutResponse = await fetch("/api/payments/bid-checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bid_id: directData.bid?.id }),
-      });
-      const checkoutData = await checkoutResponse.json().catch(() => ({}));
-
-      if (!checkoutResponse.ok) {
-        throw new Error(checkoutData.error || "Could not start payment.");
-      }
-      window.location.href = checkoutData.checkoutUrl || `/dashboard/requests/${directData.inquiry?.id}`;
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "Could not start direct hire.");
-      setSubmitting(false);
-    }
-  }
+  const packageRequestHref = activePackage
+    ? `${bookingHref}&serviceId=${encodeURIComponent(activePackage.serviceId)}&packageTier=${encodeURIComponent(activePackage.tier)}`
+    : bookingHref;
 
   if (!activePackage) {
     return (
@@ -182,19 +107,15 @@ export function ProviderPackageCard({
           </ul>
         ) : null}
 
-        <button
-          type="button"
-          onClick={() => {
-            setShowHireForm(true);
-            void marketLocation.requestLocation();
-          }}
+        <a
+          href={packageRequestHref}
           className="mt-6 flex h-12 w-full items-center justify-center rounded bg-slate-950 px-4 text-sm font-bold text-white transition-colors hover:bg-red-600"
         >
           Hire this package
-        </button>
+        </a>
 
         <p className="mt-3 rounded bg-slate-50 px-3 py-2 text-xs font-semibold leading-5 text-slate-600">
-          Book this fixed-price package directly, or
+          Send the full requirements to {providerName}, or
           <a href={bookingHref} className="ml-1 text-slate-950 underline underline-offset-2">
             post a custom request instead
           </a>
@@ -202,68 +123,6 @@ export function ProviderPackageCard({
         </p>
       </div>
 
-      {showHireForm ? (
-        <div className="fixed inset-0 z-50 flex items-end bg-slate-950/45 px-3 py-4 sm:items-center sm:justify-center">
-          <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-5 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-black uppercase tracking-wide text-red-600">Direct hire</p>
-                <h3 className="mt-1 text-xl font-black text-slate-950">{activePackage.title}</h3>
-                <p className="mt-1 text-sm font-semibold text-slate-600">
-                  {providerName} · {formatPrice(activePackage.price)}
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label="Close direct hire"
-                onClick={() => setShowHireForm(false)}
-                className="rounded-full border border-slate-200 p-2 text-slate-500 hover:text-slate-950"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-bold text-slate-700">
-                Date
-                <input type="date" required value={form.preferredDate} onChange={setField("preferredDate")} className="mt-1 h-11 w-full rounded border border-slate-200 px-3 text-sm font-semibold text-slate-950 outline-none focus:border-slate-950" />
-              </label>
-              <label className="text-sm font-bold text-slate-700">
-                Time
-                <input type="time" required value={form.preferredTime} onChange={setField("preferredTime")} className="mt-1 h-11 w-full rounded border border-slate-200 px-3 text-sm font-semibold text-slate-950 outline-none focus:border-slate-950" />
-              </label>
-              <label className="text-sm font-bold text-slate-700 sm:col-span-2">
-                Address
-                <input required value={form.address} onChange={setField("address")} placeholder="Street address" className="mt-1 h-11 w-full rounded border border-slate-200 px-3 text-sm font-semibold text-slate-950 outline-none focus:border-slate-950" />
-              </label>
-              <div className="sm:col-span-2">
-                <VerifiedLocationFields
-                  location={marketLocation.location}
-                  loading={marketLocation.loading}
-                  error={marketLocation.error}
-                  onRetry={() => void marketLocation.requestLocation()}
-                />
-              </div>
-              <label className="text-sm font-bold text-slate-700 sm:col-span-2">
-                Notes for provider
-                <textarea value={form.notes} onChange={setField("notes")} placeholder="Add access notes, scope, or timing details" rows={4} className="mt-1 w-full rounded border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-950 outline-none focus:border-slate-950" />
-              </label>
-            </div>
-
-            {error ? <p className="mt-4 rounded bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{error}</p> : null}
-
-            <button
-              type="button"
-              disabled={submitting || !form.preferredDate || !form.preferredTime || !form.address.trim() || !form.city.trim() || !marketLocation.token}
-              onClick={hirePackage}
-              className="mt-5 flex h-12 w-full items-center justify-center gap-2 rounded bg-red-600 px-4 text-sm font-black text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              Pay and hire package
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

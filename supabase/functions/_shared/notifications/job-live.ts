@@ -13,6 +13,9 @@ import {
 } from "./core.ts";
 
 async function notifyProvidersForServiceJob(context: TenantContext, job: AnyRow) {
+  if (job.request_visibility === "private") {
+    return { sent: 0, skipped: "private_request" };
+  }
   if (!LIVE_STATUSES.includes(String(job.status || "").toLowerCase())) {
     return { sent: 0, skipped: "not_live" };
   }
@@ -131,6 +134,9 @@ export async function notifyJobMarkedLive(context: TenantContext, source: string
 
   const job = await getServiceInquiry(jobId);
   if (!job) return { error: "service_inquiry_not_found" };
+  if (job.request_visibility === "private") {
+    return { skipped: "private_request" };
+  }
 
   await createInAppNotification({
     userId: job.user_id,

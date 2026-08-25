@@ -15,7 +15,12 @@ export async function GET(request: NextRequest) {
     const results = searchCategories(query, language);
     
     return NextResponse.json({ 
-      results: results.slice(0, 20) // Limit to 20 results
+      results: results.slice(0, 20).map((result) => ({
+        type: "category" as const,
+        slug: result.slug,
+        name: result.name,
+        color: result.color,
+      }))
     });
   } catch (error) {
     console.error('Search error:', error);

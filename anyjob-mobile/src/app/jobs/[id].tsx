@@ -97,6 +97,11 @@ type JobDetails = {
   equipment?: string;
   postedAt?: string;
   status?: string;
+  requestVisibility?: "public" | "private";
+  providerDecisionStatus?: "not_required" | "pending" | "accepted" | "rejected";
+  providerRejectionReason?: string | null;
+  targetProviderId?: string | null;
+  isTargetedProvider?: boolean;
   anyjobSelect?: boolean;
   adminPosted?: boolean;
   bid_count?: number;
@@ -200,7 +205,12 @@ export default function JobDetailScreen() {
         }),
       }),
     onSuccess: () => {
-      Alert.alert("Offer sent", "The buyer can now review your quote.");
+      Alert.alert(
+        job?.requestVisibility === "private" ? "Request accepted" : "Offer sent",
+        job?.requestVisibility === "private"
+          ? "Your quote was sent to the buyer. They can now review it and pay."
+          : "The buyer can now review your quote.",
+      );
       setShowOffer(false);
       setTermsAccepted(false);
       void Promise.all([
@@ -210,6 +220,23 @@ export default function JobDetailScreen() {
       ]);
     },
     onError: (error: Error) => Alert.alert("Could not send offer", error.message),
+  });
+
+  const reject = useMutation({
+    mutationFn: () =>
+      api(`/api/provider/private-requests/${id}`, {
+        method: "PATCH",
+        ...jsonBody({ action: "reject" }),
+      }),
+    onSuccess: () => {
+      Alert.alert("Request declined", "The buyer has been notified by email.");
+      void Promise.all([
+        client.invalidateQueries({ queryKey: ["jobs"] }),
+        client.invalidateQueries({ queryKey: ["job", id] }),
+        client.invalidateQueries({ queryKey: ["notifications"] }),
+      ]);
+    },
+    onError: (error: Error) => Alert.alert("Could not decline request", error.message),
   });
 
   if (query.isLoading)
@@ -230,6 +257,8 @@ export default function JobDetailScreen() {
     );
 
   const existingBid = job.my_bid ?? null;
+  const isPrivateRequest = job.requestVisibility === "private" && job.isTargetedProvider;
+  const privateRequestPending = isPrivateRequest && job.providerDecisionStatus === "pending";
   const offers = job.offers || [];
   const offerCount = Math.max(Number(job.bid_count || 0), offers.length);
   const buyerStats = job.buyerStats || {
@@ -275,6 +304,7 @@ export default function JobDetailScreen() {
         <View style={styles.badges}>
           <Pill text="Open" tone="success" />
           {job.anyjobSelect ? <Pill text="AnyJob Select" tone="brand" /> : null}
+          {isPrivateRequest ? <Pill text="Private request" tone="brand" /> : null}
           <Pill text={job.status || "submitted"} tone="info" />
           <Pill
             text={`${offerCount} offer${offerCount === 1 ? "" : "s"}`}
@@ -312,6 +342,19 @@ export default function JobDetailScreen() {
           />
         </View>
       </Card>
+
+      {isPrivateRequest ? (
+        <Card style={{ backgroundColor: colors.infoSoft }}>
+          <SectionTitle title="Buyer requested you directly" />
+          <Text style={[styles.description, { color: colors.muted }]}>
+            Review the full requirements. Accept by sending your quote, or decline the request. The buyer cannot pay until you accept.
+          </Text>
+          <Pill
+            text={`Review status: ${job.providerDecisionStatus || "pending"}`}
+            tone={job.providerDecisionStatus === "accepted" ? "success" : job.providerDecisionStatus === "rejected" ? "neutral" : "info"}
+          />
+        </Card>
+      ) : null}
 
       <CoarseAreaPreview job={job} />
 
@@ -486,7 +529,7 @@ export default function JobDetailScreen() {
         </Card>
       ) : showOffer ? (
         <Card>
-          <SectionTitle title="Make an offer" />
+            <SectionTitle title={isPrivateRequest ? "Accept with a quote" : "Make an offer"} />
           <Field
             label={`Your quote amount (${currency})`}
             value={amount}
@@ -562,7 +605,7 @@ export default function JobDetailScreen() {
             </Text>
           </Pressable>
           <Button
-            title="Submit Bid"
+            title={isPrivateRequest ? "Accept and send quote" : "Submit Bid"}
             icon={<Send color="white" size={17} />}
             onPress={() => submit.mutate()}
             loading={submit.isPending}
@@ -574,8 +617,35 @@ export default function JobDetailScreen() {
             onPress={() => setShowOffer(false)}
           />
         </Card>
+      ) : job.providerDecisionStatus === "rejected" ? (
+        <Card>
+          <Text style={[styles.cardTitle, { color: colors.ink }]}>Request declined</Text>
+          <Text style={[styles.muted, { color: colors.muted }]}>The buyer has been notified.</Text>
+        </Card>
       ) : (
-        <Button title="Make an offer" onPress={() => setShowOffer(true)} />
+        <View style={styles.offerList}>
+          <Button
+            title={isPrivateRequest ? "Review and accept" : "Make an offer"}
+            onPress={() => setShowOffer(true)}
+          />
+          {privateRequestPending ? (
+            <Button
+              title="Decline request"
+              variant="secondary"
+              loading={reject.isPending}
+              onPress={() =>
+                Alert.alert(
+                  "Decline this request?",
+                  "The buyer will receive an email that you declined.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Decline", style: "destructive", onPress: () => reject.mutate() },
+                  ],
+                )
+              }
+            />
+          ) : null}
+        </View>
       )}
 
       <Button

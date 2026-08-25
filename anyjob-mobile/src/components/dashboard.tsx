@@ -20,6 +20,7 @@ import {
   MessageCircle,
   MonitorCog,
   PawPrint,
+  PlusCircle,
   ShieldAlert,
   Search,
   Send,
@@ -32,7 +33,8 @@ import {
   UsersRound,
   type LucideIcon,
 } from "lucide-react-native";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { AppHeader } from "@/components/app-header";
 import {
   ProviderCard,
@@ -153,6 +155,19 @@ const discoveryServices = [
     category: "painting",
   },
 ];
+
+const searchableServices = Array.from(
+  new Map(
+    [...categoryItems, ...discoveryServices].map((item) => [
+      item.title.toLowerCase(),
+      {
+        title: item.title,
+        category: item.category === "painting" ? "handyman" : item.category,
+        body: "body" in item ? item.body : `${item.title} services`,
+      },
+    ]),
+  ).values(),
+);
 
 function ServiceIcon({
   item,
@@ -334,7 +349,27 @@ export function Dashboard() {
   const { colors, isDark } = useAppTheme();
   const { copy, content } = useAppContent();
   const provider = isProviderRole(user?.role);
+  const [serviceSearch, setServiceSearch] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const name = user?.displayName?.split(" ")[0] || "there";
+  const serviceSuggestions = useMemo(() => {
+    const needle = serviceSearch.trim().toLowerCase();
+    if (!needle) return searchableServices.slice(0, 6);
+    return searchableServices
+      .filter((item) => `${item.title} ${item.body} ${item.category}`.toLowerCase().includes(needle))
+      .slice(0, 6);
+  }, [serviceSearch]);
+  const openServiceRequest = (category: string, customQuery = "") => {
+    setSearchFocused(false);
+    router.push({
+      pathname: "/request/new",
+      params: {
+        category,
+        ...(customQuery ? { custom_query: customQuery } : {}),
+        requestKey: String(Date.now()),
+      },
+    });
+  };
   const providers = useQuery({
     queryKey: ["providers"],
     queryFn: () => api<{ providers: ProviderCardData[] }>("/api/providers"),
@@ -707,23 +742,62 @@ export function Dashboard() {
             {copy("home.hero.body", "Trusted help for everyday tasks.")}
           </Text>
         </View>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push("/(app)/explore")}
+        <View
           style={[
             styles.heroSearch,
             { backgroundColor: colors.surface, borderColor: colors.line },
           ]}
         >
           <Search color={colors.muted} size={19} />
-          <Text
-            numberOfLines={1}
-            style={[styles.heroSearchText, { color: colors.muted }]}
-          >
-            {copy("home.hero.search", "What do you need help with?")}
-          </Text>
-        </Pressable>
+          <TextInput
+            accessibilityLabel="Post a job"
+            value={serviceSearch}
+            onChangeText={setServiceSearch}
+            onFocus={() => setSearchFocused(true)}
+            onSubmitEditing={() => {
+              const first = serviceSuggestions[0];
+              if (first) openServiceRequest(first.category);
+              else openServiceRequest("custom", serviceSearch.trim());
+            }}
+            placeholder={copy("home.hero.search", "Post a job")}
+            placeholderTextColor={colors.muted}
+            returnKeyType="go"
+            style={[styles.heroSearchText, { color: colors.ink }]}
+          />
+        </View>
       </View>
+      {searchFocused || serviceSearch.trim() ? (
+        <View style={[styles.searchSuggestions, { backgroundColor: colors.surface, borderColor: colors.line }] }>
+          {serviceSuggestions.length ? serviceSuggestions.map((item) => (
+            <Pressable
+              key={`${item.category}-${item.title}`}
+              accessibilityRole="button"
+              onPress={() => openServiceRequest(item.category)}
+              style={({ pressed }) => [styles.searchSuggestion, pressed && styles.pressed]}
+            >
+              <Search color={colors.brand} size={16} />
+              <View style={styles.searchSuggestionCopy}>
+                <Text style={[styles.searchSuggestionTitle, { color: colors.ink }]}>{item.title}</Text>
+                <Text numberOfLines={1} style={[styles.searchSuggestionBody, { color: colors.muted }]}>{item.body}</Text>
+              </View>
+              <ArrowRight color={colors.subtle} size={16} />
+            </Pressable>
+          )) : (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => openServiceRequest("custom", serviceSearch.trim())}
+              style={({ pressed }) => [styles.customSuggestion, { backgroundColor: colors.brand }, pressed && styles.pressed]}
+            >
+              <PlusCircle color="white" size={18} />
+              <View style={styles.searchSuggestionCopy}>
+                <Text style={styles.customSuggestionTitle}>Create a custom job</Text>
+                <Text numberOfLines={1} style={styles.customSuggestionBody}>{serviceSearch.trim()}</Text>
+              </View>
+              <ArrowRight color="white" size={16} />
+            </Pressable>
+          )}
+        </View>
+      ) : null}
       <HomeSectionHeader
         title={copy("home.services.title", "Popular services")}
         action="View all"
@@ -1057,7 +1131,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 9,
   },
-  heroSearchText: { flex: 1, fontSize: 11, fontWeight: "700" },
+  heroSearchText: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: "700", paddingVertical: 0 },
+  searchSuggestions: { marginTop: -5, borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  searchSuggestion: { minHeight: 53, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 10 },
+  searchSuggestionCopy: { flex: 1, minWidth: 0 },
+  searchSuggestionTitle: { fontSize: 13, fontWeight: "900" },
+  searchSuggestionBody: { marginTop: 2, fontSize: 10.5 },
+  customSuggestion: { minHeight: 58, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 10 },
+  customSuggestionTitle: { color: "white", fontSize: 13, fontWeight: "900" },
+  customSuggestionBody: { marginTop: 2, color: "rgba(255,255,255,.78)", fontSize: 10.5 },
   horizontal: { gap: 9, paddingRight: 18, paddingBottom: 4 },
   discoveryCard: {
     width: 156,

@@ -82,6 +82,7 @@ const STEP_COPY = [
 ] as const;
 
 type Form = {
+  request_visibility: "public" | "private";
   category_slug: string;
   subcategory_slug: string;
   custom_tags: string[];
@@ -216,13 +217,16 @@ function createInitialForm({
   category,
   subcategory,
   customQuery,
+  requestVisibility = "public",
 }: {
   category: string;
   subcategory: string;
   customQuery?: string;
+  requestVisibility?: "public" | "private";
 }): Form {
   const query = customQuery?.trim() || "";
   return {
+    request_visibility: requestVisibility,
     category_slug: category,
     subcategory_slug: subcategory,
     custom_tags: query ? [query] : [],
@@ -350,8 +354,9 @@ export default function NewRequestScreen() {
         category: initialCategory,
         subcategory: initialSubcategory,
         customQuery: params.custom_query,
+        requestVisibility: params.providerId ? "private" : "public",
       }),
-    [initialCategory, initialSubcategory, params.custom_query],
+    [initialCategory, initialSubcategory, params.custom_query, params.providerId],
   );
   const [step, setStep] = useState(initialStep);
   const [draftReady, setDraftReady] = useState(false);
@@ -432,7 +437,11 @@ export default function NewRequestScreen() {
     setForm((current) => {
       if (current.category_slug === category) return current;
       return {
-        ...createInitialForm({ category, subcategory }),
+        ...createInitialForm({
+          category,
+          subcategory,
+          requestVisibility: current.request_visibility,
+        }),
         city: current.city,
         postal_code: current.postal_code,
         coarse_latitude: current.coarse_latitude,
@@ -616,10 +625,12 @@ export default function NewRequestScreen() {
       void client.invalidateQueries({ queryKey: ["requests"] });
       router.replace(`/requests/${result.inquiry.id}`);
       Alert.alert(
-        "Request submitted",
+        form.request_visibility === "private" ? "Requirements sent" : "Request submitted",
         result.failedUploads
           ? "Your request was submitted, but one or more photos could not be uploaded."
-          : "AnyJob will review it before providers can quote.",
+          : form.request_visibility === "private"
+            ? `${params.providerName || "The provider"} will review your requirements. Payment becomes available only after they accept and send a quote.`
+            : "AnyJob will review it before providers can quote.",
       );
     },
     onError: (error: Error) => Alert.alert("Could not submit", error.message),
@@ -1126,6 +1137,28 @@ export default function NewRequestScreen() {
                 </View>
               </View>
             ) : null}
+            {params.providerId ? (
+              <OptionSection title="Who should receive this request?">
+                <View style={styles.choiceList}>
+                  <Choice
+                    title={`Send only to ${params.providerName || "this provider"}`}
+                    description="Private. The provider reviews your requirements and sends a quote before you can pay."
+                    selected={form.request_visibility === "private"}
+                    onPress={() =>
+                      setForm((current) => ({ ...current, request_visibility: "private" }))
+                    }
+                  />
+                  <Choice
+                    title="Post publicly"
+                    description="Other eligible providers in your country can also view the job and send quotes."
+                    selected={form.request_visibility === "public"}
+                    onPress={() =>
+                      setForm((current) => ({ ...current, request_visibility: "public" }))
+                    }
+                  />
+                </View>
+              </OptionSection>
+            ) : null}
             <Card>
               <ReviewRow
                 label="Service"
@@ -1329,7 +1362,9 @@ export default function NewRequestScreen() {
               step === TOTAL_STEPS && !user
                 ? "Create account to submit"
                 : step === TOTAL_STEPS
-                  ? copy("request.action.submit", "Submit for approval")
+                  ? form.request_visibility === "private"
+                    ? "Send requirements"
+                    : copy("request.action.submit", "Submit for approval")
                   : copy("request.action.continue", "Continue")
             }
             loading={mutation.isPending}

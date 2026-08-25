@@ -198,6 +198,7 @@ function buildCoarseLocationLabel(city: string, postalCode: string) {
 }
 
 interface FormData {
+  request_visibility: "public" | "private";
   category_slug: string;
   subcategory_slug: string;
   service_type: string;
@@ -274,6 +275,7 @@ type ShiftBusinessPostForm = {
 };
 
 const INITIAL_FORM_DATA: FormData = {
+  request_visibility: "public",
   category_slug: "",
   subcategory_slug: "",
   service_type: "",
@@ -315,10 +317,6 @@ const SHIFT_TOTAL_STEPS = 5;
 
 function hasMeaningfulText(value: string) {
   return /[\p{L}\p{N}]/u.test(value);
-}
-
-function buildStoredJobDescription(title: string, description: string) {
-  return [title.trim(), description.trim()].filter(Boolean).join("\n\n");
 }
 
 function initialShiftBusinessPostForm(): ShiftBusinessPostForm {
@@ -449,8 +447,32 @@ function ServiceQuestionnaireContent() {
     const urgency = searchParams.get("urgency");
     const customQuery = searchParams.get("custom_query")?.trim();
     const providerId = searchParams.get("provider");
+    const providerCategory = searchParams.get("providerCategory") || "";
     const isTaskrabbitSelection = searchParams.get("source") === "taskrabbit";
-    if (cat && !providerId) {
+    if (providerId) {
+      const categoryAliases: Record<string, string> = {
+        cleaning: "menage",
+        handyman: "bricolage",
+        gardening: "jardinage",
+        moving: "demenagement",
+        childcare: "enfants",
+        "pet-care": "animaux",
+        "it-support": "informatique",
+        "home-help": "aide-domicile",
+        tutoring: "cours-particuliers",
+        winter: "hiver",
+      };
+      const selectedCategory = categoryAliases[providerCategory] || providerCategory;
+      setFormData((prev) => ({
+        ...prev,
+        request_visibility: "private",
+        category_slug: CATEGORIES.some((category) => category.slug === selectedCategory)
+          ? selectedCategory
+          : prev.category_slug,
+      }));
+      setCurrentStep(2);
+      setStepKey(2);
+    } else if (cat) {
       setFormData((prev) => ({
         ...prev,
         category_slug: cat,
@@ -465,9 +487,7 @@ function ServiceQuestionnaireContent() {
       // Taskrabbit dropdown selections already name the custom job, so skip tag collection.
       const nextStep = isTaskrabbitSelection && cat === "custom" && customQuery
         ? 3
-        : subcategory
-          ? 3
-          : 2;
+        : 2;
       setCurrentStep(nextStep);
       setStepKey(nextStep);
     }
@@ -701,52 +721,25 @@ function ServiceQuestionnaireContent() {
         localStorage.setItem("inquiry_session_id", sessionId);
       }
 
-      // Parse budget range
-      const budgetOption = BUDGET_OPTIONS.find((b) => b.value === formData.budget_range);
-      const storedJobDescription = buildStoredJobDescription(formData.job_title, formData.job_description);
-
-      // Create service request (now that user is authenticated)
-      const { data: inquiry, error: inquiryError } = await supabase
-        .from("service_inquiries")
-        .insert({
-          user_id: userId, // Link to the authenticated user
-          email: formData.email || currentUser?.email,
-          phone: formData.phone,
-          first_name: formData.first_name,
-          last_name: formData.last_name,
-          category_slug: formData.category_slug,
-          subcategory_slug: formData.subcategory_slug,
-          custom_tags: formData.custom_tags,
-          service_type: formData.service_type,
-          job_description: storedJobDescription,
-          job_urgency: formData.job_urgency,
+      const requestResponse = await fetch("/api/mobile/requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
           preferred_date: formData.preferred_date ? format(formData.preferred_date, "yyyy-MM-dd") : undefined,
-          preferred_time_start: formData.preferred_time_start,
-          preferred_time_end: formData.preferred_time_end,
-          flexible_timing: formData.flexible_timing,
-          address: formData.address,
-          city: formData.city,
-          postal_code: formData.postal_code,
-          latitude: formData.latitude,
-          longitude: formData.longitude,
-          coarse_latitude: formData.coarse_latitude,
-          coarse_longitude: formData.coarse_longitude,
-          location_accuracy_meters: formData.location_accuracy_meters,
-          coarse_location_label: formData.coarse_location_label || buildCoarseLocationLabel(formData.city, formData.postal_code),
-          estimated_duration_hours: formData.estimated_duration_hours,
-          number_of_people_needed: formData.number_of_people_needed,
-          budget_range_min: budgetOption?.min || 0,
-          budget_range_max: budgetOption?.max || 999999,
-          materials_provided: formData.materials_provided,
-          equipment_needed: formData.equipment_needed,
-          status: "pending",
+          work_images: undefined,
+          tag_input: undefined,
           session_id: sessionId,
-          submitted_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (inquiryError) throw inquiryError;
+          preferredProviderId: searchParams.get("provider"),
+          preferredServiceId: searchParams.get("serviceId"),
+          preferredPackageTier: searchParams.get("packageTier"),
+        }),
+      });
+      const requestPayload = await requestResponse.json().catch(() => ({}));
+      if (!requestResponse.ok) {
+        throw new Error(requestPayload.error || "Could not create service request.");
+      }
+      const inquiry = requestPayload.inquiry;
 
       // Upload images if any were provided
       if (formData.work_images.length > 0) {
@@ -786,7 +779,7 @@ function ServiceQuestionnaireContent() {
       localStorage.setItem("last_inquiry_id", inquiry.id);
 
       // Navigate to dashboard to show the new request
-      router.push("/dashboard/requests");
+      router.push(`/dashboard/requests/${inquiry.id}`);
     } catch (error) {
       console.error("Error submitting inquiry:", error);
       setSubmitError("An error occurred. Please try again.");
@@ -975,6 +968,8 @@ function ServiceQuestionnaireContent() {
             error={submitError}
             isLoggedIn={Boolean(currentUser)}
             displayEmail={currentUser?.email || formData.email}
+            providerId={searchParams.get("provider") || ""}
+            providerName={searchParams.get("providerName") || "the selected provider"}
           />
         );
       default:
@@ -2468,6 +2463,8 @@ function Step9Contact({
   error,
   isLoggedIn,
   displayEmail,
+  providerId,
+  providerName,
 }: {
   formData: FormData;
   updateFormData: (field: keyof FormData, value: unknown) => void;
@@ -2477,6 +2474,8 @@ function Step9Contact({
   error: string | null;
   isLoggedIn: boolean;
   displayEmail: string;
+  providerId: string;
+  providerName: string;
 }) {
   const validateStep = (): boolean => {
     if (isLoggedIn) return true;
@@ -2513,6 +2512,44 @@ function Step9Contact({
           <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
         </div>
       )}
+
+      {providerId ? (
+        <div>
+          <Label className="text-base font-medium">Who should receive this request?</Label>
+          <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => updateFormData("request_visibility", "private")}
+              className={cn(
+                "rounded-lg border-2 p-4 text-left transition-colors",
+                formData.request_visibility === "private"
+                  ? "border-red-600 bg-red-50"
+                  : "border-gray-200 bg-white hover:border-gray-300",
+              )}
+            >
+              <span className="block font-bold text-gray-950">Send only to {providerName}</span>
+              <span className="mt-1 block text-sm leading-5 text-gray-600">
+                Private. Payment is available after the provider accepts and sends a quote.
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => updateFormData("request_visibility", "public")}
+              className={cn(
+                "rounded-lg border-2 p-4 text-left transition-colors",
+                formData.request_visibility === "public"
+                  ? "border-red-600 bg-red-50"
+                  : "border-gray-200 bg-white hover:border-gray-300",
+              )}
+            >
+              <span className="block font-bold text-gray-950">Post publicly</span>
+              <span className="mt-1 block text-sm leading-5 text-gray-600">
+                Other eligible providers can also view the job and send quotes.
+              </span>
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="space-y-4">
         {isLoggedIn ? (
@@ -2659,7 +2696,13 @@ function Step9Contact({
             </>
           ) : (
             <>
-              {isLoggedIn ? "Post Job" : formData.isNewUser ? "Create Account & Submit Request" : "Submit Request"} <ArrowRight className="w-4 h-4 ml-2" />
+              {isLoggedIn
+                ? formData.request_visibility === "private"
+                  ? "Send Requirements"
+                  : "Post Job"
+                : formData.isNewUser
+                  ? "Create Account & Submit Request"
+                  : "Submit Request"} <ArrowRight className="w-4 h-4 ml-2" />
             </>
           )}
         </Button>

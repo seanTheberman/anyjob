@@ -100,6 +100,22 @@ export async function GET(
       return NextResponse.json({ error: acceptedBidError.message }, { status: 500 });
     }
 
+    const targetProviderId = String((inquiry as LooseRow).target_provider_id || "");
+    const [{ data: requestConversation }, { data: targetProvider }] = await Promise.all([
+      admin
+        .from("eloo_conversations")
+        .select("id")
+        .eq("inquiry_id", id)
+        .maybeSingle(),
+      targetProviderId
+        ? admin
+            .from("sellers")
+            .select("first_name,last_name")
+            .eq("id", targetProviderId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
     const { data: workImages, error: imageError } = await admin
       .from("user_images")
       .select("id,image_url,public_id,image_type,title,description")
@@ -118,6 +134,10 @@ export async function GET(
         accepted_bid_id: acceptedBid?.id || null,
         visit_verification_code: acceptedBid?.visit_verification_code || null,
         visit_verification_code_created_at: acceptedBid?.visit_verification_code_created_at || null,
+        conversation_id: requestConversation?.id || null,
+        target_provider_name: targetProvider
+          ? [targetProvider.first_name, targetProvider.last_name].filter(Boolean).join(" ") || "Provider"
+          : null,
       },
       workImages: workImages || [],
     });

@@ -1,5 +1,5 @@
 import { Image, type ImageSource } from "expo-image";
-import { Heart, MapPin, Star } from "lucide-react-native";
+import { BriefcaseBusiness, Heart, MapPin, Star } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/ui";
 import { serviceCover } from "@/lib/service-assets";
@@ -19,6 +19,7 @@ export type ProviderCardData = {
   completedJobs?: number;
   rate?: number;
   level?: string;
+  availableForShifts?: boolean;
 };
 
 export function ProviderCard({
@@ -75,6 +76,12 @@ export function ProviderCard({
         {provider.level && !compact ? (
           <View style={[styles.level, { backgroundColor: colors.brand }]}>
             <Text style={styles.levelText}>{provider.level}</Text>
+          </View>
+        ) : null}
+        {provider.availableForShifts ? (
+          <View style={[styles.shiftBadge, compact && styles.compactShiftBadge]}>
+            <BriefcaseBusiness color="white" size={compact ? 10 : 12} />
+            {!compact ? <Text style={styles.shiftBadgeText}>Work shifts</Text> : null}
           </View>
         ) : null}
       </View>
@@ -209,6 +216,27 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   levelText: { color: "white", fontSize: 11, fontWeight: "900" },
+  shiftBadge: {
+    position: "absolute",
+    left: 10,
+    bottom: 10,
+    minHeight: 25,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(5,150,105,.96)",
+  },
+  compactShiftBadge: {
+    left: 6,
+    bottom: 6,
+    width: 22,
+    minHeight: 22,
+    paddingHorizontal: 0,
+    justifyContent: "center",
+  },
+  shiftBadgeText: { color: "white", fontSize: 9.5, fontWeight: "900" },
   body: { padding: 12, gap: 8 },
   gridBody: { padding: 10 },
   compactBody: { padding: 7, gap: 5 },

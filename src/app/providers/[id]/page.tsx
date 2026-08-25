@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import {
   BadgeCheck,
+  BriefcaseBusiness,
   Check,
   ChevronRight,
   Clock,
@@ -72,7 +73,14 @@ function formatRate(value: number) {
 function RelatedProviderCard({ provider }: { provider: ProviderMarketplaceData }) {
   return (
     <Link href={`/providers/${provider.id}`} className="group block min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition-shadow hover:shadow-md">
-      <MediaTile image={provider.heroImage} label={`${provider.name} service preview`} className="aspect-[16/10] w-full transition-transform duration-300 group-hover:scale-[1.02]" />
+      <div className="relative">
+        <MediaTile image={provider.heroImage} label={`${provider.name} service preview`} className="aspect-[16/10] w-full transition-transform duration-300 group-hover:scale-[1.02]" />
+        {provider.availableForShifts ? (
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white shadow-sm">
+            <BriefcaseBusiness className="h-3 w-3" /> Work shifts
+          </span>
+        ) : null}
+      </div>
       <div className="p-3">
         <div className="flex min-w-0 items-center justify-between gap-2">
           <span className="min-w-0 truncate text-sm font-bold text-slate-950">{provider.name}</span>
@@ -162,6 +170,11 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
               )}
               <span className="min-w-0 truncate font-bold text-slate-950">{provider.name}</span>
             </Link>
+            {provider.availableForShifts ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">
+                <BriefcaseBusiness className="h-3.5 w-3.5" /> Available for work shifts
+              </span>
+            ) : null}
             <span className="hidden h-4 w-px bg-slate-300 sm:block" />
             {provider.level ? (
             <span className="inline-flex items-center gap-1 font-semibold text-slate-700">

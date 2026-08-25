@@ -82,6 +82,11 @@ interface JobDetails {
   equipment: string;
   postedAt: string;
   status: string;
+  requestVisibility?: "public" | "private";
+  providerDecisionStatus?: "not_required" | "pending" | "accepted" | "rejected";
+  providerRejectionReason?: string | null;
+  targetProviderId?: string | null;
+  isTargetedProvider?: boolean;
   anyjobSelect?: boolean;
   adminPosted?: boolean;
   bid_count: number;
@@ -159,6 +164,7 @@ export default function JobDetailsPage() {
   const [job, setJob] = useState<JobDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingBid, setSubmittingBid] = useState(false);
+  const [rejectingRequest, setRejectingRequest] = useState(false);
   const [bidAmount, setBidAmount] = useState("");
   const [bidMessage, setBidMessage] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -259,6 +265,26 @@ export default function JobDetailsPage() {
     }
   };
 
+  const handleRejectRequest = async () => {
+    if (!window.confirm("Decline this private request? The buyer will be notified by email.")) return;
+    try {
+      setRejectingRequest(true);
+      setError(null);
+      const response = await fetch(`/api/provider/private-requests/${jobId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject" }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || "Could not decline request.");
+      await fetchJobDetails();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not decline request.");
+    } finally {
+      setRejectingRequest(false);
+    }
+  };
+
   if (loading) {
     return (
       <ProviderLayout>
@@ -320,6 +346,9 @@ export default function JobDetailsPage() {
                 {job.anyjobSelect ? (
                   <span className="rounded-full bg-red-600 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-white">AnyJob Select</span>
                 ) : null}
+                {job.requestVisibility === "private" ? (
+                  <span className="rounded-full bg-amber-100 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-amber-900">Private request</span>
+                ) : null}
                 <span className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-slate-600">{job.status}</span>
                 <span className="rounded-full bg-blue-50 px-4 py-1.5 text-xs font-black uppercase tracking-wide text-blue-700">{job.bid_count} offer{job.bid_count === 1 ? "" : "s"}</span>
               </div>
@@ -327,6 +356,13 @@ export default function JobDetailsPage() {
               <div className="mt-5">
                 <BuyerTrustBadges trust={buyerTrust} />
               </div>
+              {job.requestVisibility === "private" && job.isTargetedProvider ? (
+                <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold leading-6 text-amber-950">
+                  <p className="font-black">The buyer requested you directly.</p>
+                  <p>Review the full requirements and send a quote to accept, or decline. Payment stays locked until you accept.</p>
+                  <p className="mt-1">Review status: {job.providerDecisionStatus || "pending"}</p>
+                </div>
+              ) : null}
               <div className="mt-8 grid gap-6 md:grid-cols-3">
                 <div className="flex gap-3">
                   <MapPin className="mt-1 h-6 w-6 text-blue-950" />
@@ -511,11 +547,18 @@ export default function JobDetailsPage() {
             </section>
 
             {/* Bidding Section */}
-            {!existingBid ? (
+            {job.providerDecisionStatus === "rejected" ? (
+              <section className="rounded-lg border border-slate-200 bg-slate-50 p-7">
+                <h2 className="text-xl font-black text-slate-950">Request declined</h2>
+                <p className="mt-2 text-sm font-semibold text-slate-600">The buyer has been notified by email.</p>
+              </section>
+            ) : !existingBid ? (
               <section className="rounded-lg border border-slate-200 bg-white p-7">
                   <div className="mb-5 flex items-center gap-2">
                     <Gavel className="h-5 w-5 text-blue-700" />
-                    <h2 className="text-2xl font-black text-blue-950">Make an offer</h2>
+                    <h2 className="text-2xl font-black text-blue-950">
+                      {job.requestVisibility === "private" ? "Accept with a quote" : "Make an offer"}
+                    </h2>
                   </div>
                   <form onSubmit={handleSubmitBid} className="space-y-4">
                     <div>
@@ -626,10 +669,20 @@ export default function JobDetailsPage() {
                       ) : (
                         <>
                           <Send className="w-4 h-4 mr-2" />
-                          Submit Bid
+                          {job.requestVisibility === "private" ? "Accept and send quote" : "Submit Bid"}
                         </>
                       )}
                     </button>
+                    {job.requestVisibility === "private" && job.providerDecisionStatus === "pending" ? (
+                      <button
+                        type="button"
+                        disabled={rejectingRequest}
+                        onClick={() => void handleRejectRequest()}
+                        className="inline-flex h-12 w-full items-center justify-center rounded border border-slate-300 px-5 text-sm font-bold text-slate-800 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {rejectingRequest ? "Declining..." : "Decline request"}
+                      </button>
+                    ) : null}
                   </form>
               </section>
             ) : (

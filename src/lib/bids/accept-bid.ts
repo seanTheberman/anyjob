@@ -11,6 +11,7 @@ type BidWithInquiry = {
   status: string;
   inquiry: {
     user_id: string;
+    request_visibility?: string | null;
   };
 };
 
@@ -65,7 +66,18 @@ export async function acceptBidAndUnlockChat(
     throw inquiryUpdateError;
   }
 
-  const { data: existingConversation } = await supabase
+  const { data: inquiryConversation } = await supabase
+    .from("eloo_conversations")
+    .select("*")
+    .eq("inquiry_id", bid.inquiry_id)
+    .eq("client_id", bid.inquiry.user_id)
+    .eq("provider_id", bid.provider_id)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  const { data: bidConversation } = inquiryConversation
+    ? { data: null }
+    : await supabase
     .from("eloo_conversations")
     .select("*")
     .eq("client_id", bid.inquiry.user_id)
@@ -74,10 +86,12 @@ export async function acceptBidAndUnlockChat(
     .eq("is_active", true)
     .maybeSingle();
 
+  const existingConversation = inquiryConversation || bidConversation;
+
   const { data: conversation } = existingConversation
     ? await supabase
         .from("eloo_conversations")
-        .update({ last_message_at: timestamp })
+        .update({ bid_id: bid.id, inquiry_id: bid.inquiry_id, last_message_at: timestamp })
         .eq("id", existingConversation.id)
         .select()
         .single()
@@ -87,6 +101,7 @@ export async function acceptBidAndUnlockChat(
           client_id: bid.inquiry.user_id,
           provider_id: bid.provider_id,
           bid_id: bid.id,
+          inquiry_id: bid.inquiry_id,
           is_active: true,
           last_message_at: timestamp,
         })

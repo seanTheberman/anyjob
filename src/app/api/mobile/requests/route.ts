@@ -7,6 +7,8 @@ import {
   persistUserMarketLocation,
   verifyMarketLocationToken,
 } from "@/lib/location/market-location";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
+import { createPrivateRequestConversation } from "@/lib/private-requests";
 
 const BUDGETS: Record<string, { min: number; max: number }> = {
   "0-50": { min: 0, max: 50 },
@@ -77,6 +79,11 @@ export async function POST(request: NextRequest) {
   );
   const budgetRange = text(value(body, "budget_range", "budgetRange"));
   const budget = BUDGETS[budgetRange];
+  const requestedVisibility = text(value(body, "request_visibility", "requestVisibility"));
+  const requestVisibility = requestedVisibility === "private" ? "private" : "public";
+  const preferredProviderId = text(value(body, "preferredProviderId", "target_provider_id"));
+  const preferredServiceId = text(value(body, "preferredServiceId", "preferred_service_id"));
+  const preferredPackageTier = text(value(body, "preferredPackageTier", "preferred_package_tier"));
 
   const validationError =
     (!category && "Choose a service category.") ||
@@ -90,7 +97,8 @@ export async function POST(request: NextRequest) {
     (!validDate(preferredDate) && "Choose a valid preferred date.") ||
     ((!address || !city) && "Enter both the service address and city.") ||
     (duration === 0 && "Choose the estimated duration.") ||
-    (!budget && "Choose a valid budget range.");
+    (!budget && "Choose a valid budget range.") ||
+    (requestVisibility === "private" && !preferredProviderId && "Choose a provider for a private request.");
 
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
@@ -113,9 +121,53 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .maybeSingle(),
   ]);
+  const { data: targetProvider, error: targetProviderError } = preferredProviderId
+    ? await admin
+        .from("sellers")
+        .select("id,email,first_name,last_name,status,country_code")
+        .eq("id", preferredProviderId)
+        .eq("status", "approved")
+        .maybeSingle()
+    : { data: null, error: null };
+  const { data: preferredService, error: preferredServiceError } =
+    requestVisibility === "private" && preferredServiceId
+      ? await admin
+          .from("eloo_provider_services")
+          .select("id,provider_id,title,is_active")
+          .eq("id", preferredServiceId)
+          .eq("provider_id", preferredProviderId)
+          .eq("is_active", true)
+          .maybeSingle()
+      : { data: null, error: null };
+  if (requestVisibility === "private") {
+    if (targetProviderError || !targetProvider) {
+      return NextResponse.json({ error: "The selected provider is no longer available." }, { status: 404 });
+    }
+    if (targetProvider.id === user.id) {
+      return NextResponse.json({ error: "You cannot send a private request to yourself." }, { status: 403 });
+    }
+    if (targetProvider.country_code !== location.countryCode) {
+      return NextResponse.json({ error: "The selected provider is outside your marketplace country." }, { status: 403 });
+    }
+    if (preferredServiceId && (preferredServiceError || !preferredService)) {
+      return NextResponse.json({ error: "The selected provider package is no longer available." }, { status: 404 });
+    }
+  }
   const person = buyer || profile || {};
   const postalCode = location.postalCode;
   const customTags = value(body, "custom_tags", "tags");
+  const packageLabel = preferredService
+    ? [text(preferredService.title), preferredPackageTier ? `${preferredPackageTier} package` : ""]
+        .filter(Boolean)
+        .join(" - ")
+    : "";
+  const storedDescription = [
+    title,
+    description,
+    packageLabel ? `Selected provider package: ${packageLabel}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
   const defaultCoarseLabel = [
     city,
     postalCode ? `${postalCode.slice(0, 3)} area` : "",
@@ -140,7 +192,7 @@ export async function POST(request: NextRequest) {
             .slice(0, 8)
         : [],
       service_type: serviceType,
-      job_description: `${title}\n\n${description}`,
+      job_description: storedDescription,
       job_urgency: urgency,
       preferred_date: preferredDate,
       preferred_time_start:
@@ -173,6 +225,9 @@ export async function POST(request: NextRequest) {
         value(body, "materials_provided", "materialsProvided") === true,
       equipment_needed:
         text(value(body, "equipment_needed", "equipmentNeeded")) || null,
+      request_visibility: requestVisibility,
+      target_provider_id: requestVisibility === "private" ? preferredProviderId : null,
+      provider_decision_status: requestVisibility === "private" ? "pending" : "not_required",
       status: "pending",
       session_id: text(body.session_id) || randomUUID(),
       submitted_at: new Date().toISOString(),
@@ -183,7 +238,29 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ inquiry: data }, { status: 201 });
+  let conversation = null;
+  if (requestVisibility === "private" && targetProvider) {
+    try {
+      conversation = await createPrivateRequestConversation(admin, data, targetProvider.id);
+    } catch (conversationError) {
+      await admin.from("service_inquiries").delete().eq("id", data.id).eq("user_id", user.id);
+      throw conversationError;
+    }
+
+    const notificationResult = await notifyJobEvent({
+      action: "direct_request_received",
+      jobId: data.id,
+      inquiryId: data.id,
+      buyerUserId: user.id,
+      providerUserId: targetProvider.id,
+      providerEmail: targetProvider.email,
+      providerName: [targetProvider.first_name, targetProvider.last_name].filter(Boolean).join(" "),
+    });
+    if (!notificationResult.ok) {
+      console.error("Private request email failed:", notificationResult);
+    }
+  }
+  return NextResponse.json({ inquiry: data, conversation }, { status: 201 });
   } catch (error) {
     if (error instanceof MarketLocationError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

@@ -139,7 +139,7 @@ export async function getServiceInquiry(jobId: string) {
   const supabase = createAdminClient();
   const { data, error } = await supabase
     .from("service_inquiries")
-    .select("id,user_id,email,first_name,last_name,category_slug,subcategory_slug,job_description,city,status,submitted_at,created_at")
+    .select("id,user_id,email,first_name,last_name,category_slug,subcategory_slug,job_description,city,status,submitted_at,created_at,request_visibility,target_provider_id,provider_decision_status")
     .eq("id", jobId)
     .maybeSingle();
   if (error) throw error;

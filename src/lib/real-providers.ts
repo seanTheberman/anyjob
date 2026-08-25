@@ -11,6 +11,7 @@ export type ProviderCardData = {
   image: string | null;
   isNew?: boolean;
   tags: string[];
+  availableForShifts?: boolean;
 };
 
 export type ProviderMarketplaceData = ProviderCardData & {
@@ -84,6 +85,7 @@ export type ProviderProfileData = {
   relatedProviders: ProviderMarketplaceData[];
   serviceAreas?: ProviderServiceAreaData[];
   worksInViewerArea?: boolean;
+  availableForShifts?: boolean;
 };
 
 export type ProviderPackageData = {
@@ -367,7 +369,11 @@ function serviceList(provider: SellerRow) {
   return serviceTags(provider).filter((value, index, array) => value && array.indexOf(value) === index);
 }
 
-function mapSellerToCard(provider: SellerRow, providerStats?: ProviderStats): ProviderCardData {
+function mapSellerToCard(
+  provider: SellerRow,
+  providerStats?: ProviderStats,
+  availableForShifts = false,
+): ProviderCardData {
   return {
     id: provider.id,
     slug: provider.id,
@@ -377,6 +383,7 @@ function mapSellerToCard(provider: SellerRow, providerStats?: ProviderStats): Pr
     image: provider.profile_image_url || null,
     isNew: (providerStats?.completedJobs || 0) === 0,
     tags: serviceTags(provider),
+    availableForShifts,
   };
 }
 
@@ -386,6 +393,7 @@ function mapSellerToMarketplace(
   ratingStats?: RatingStats,
   providerStats?: ProviderStats,
   badges: string[] = [],
+  availableForShifts = false,
 ): ProviderMarketplaceData {
   const category = provider.service_category || "Service provider";
   const categorySlug = categorySlugFor(category);
@@ -422,7 +430,7 @@ function mapSellerToMarketplace(
   ].filter(Boolean).join(" ").toLowerCase();
 
   return {
-    ...mapSellerToCard(provider, providerStats),
+    ...mapSellerToCard(provider, providerStats, availableForShifts),
     category,
     categorySlug,
     city,
@@ -559,6 +567,7 @@ function mapSellerToProfile(
   relatedProviders: ProviderMarketplaceData[] = [],
   badges: string[] = [],
   packages: ProviderPackageData[] = [],
+  availableForShifts = false,
 ): ProviderProfileData {
   const category = provider.service_category || "Service provider";
   const categorySlug = categorySlugFor(category);
@@ -604,7 +613,26 @@ function mapSellerToProfile(
     reviewDistribution: ratingStats.distribution,
     writtenReviews,
     relatedProviders,
+    availableForShifts,
   };
+}
+
+async function getShiftWorkerProviderIds(providerIds: string[]) {
+  const ids = new Set<string>();
+  if (!providerIds.length) return ids;
+  const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
+  const { data, error } = await supabase
+    .from("shift_worker_profiles")
+    .select("user_id")
+    .in("user_id", providerIds);
+  if (error) {
+    console.error("Failed to load provider shift availability:", error.message);
+    return ids;
+  }
+  for (const row of data || []) {
+    if (row.user_id) ids.add(String(row.user_id));
+  }
+  return ids;
 }
 
 async function getApprovedSellers() {
@@ -627,19 +655,26 @@ export async function getProviderCards(categorySlug?: string) {
   const providers = await getApprovedSellers();
   const filteredProviders = providers.filter((provider) => providerMatchesCategory(provider, categorySlug));
   const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
-  const statsMap = await getProviderStatsMap(supabase, filteredProviders.map((provider) => provider.id));
-  return filteredProviders.map((provider) => mapSellerToCard(provider, statsMap.get(provider.id)));
+  const providerIds = filteredProviders.map((provider) => provider.id);
+  const [statsMap, shiftWorkerIds] = await Promise.all([
+    getProviderStatsMap(supabase, providerIds),
+    getShiftWorkerProviderIds(providerIds),
+  ]);
+  return filteredProviders.map((provider) =>
+    mapSellerToCard(provider, statsMap.get(provider.id), shiftWorkerIds.has(provider.id)),
+  );
 }
 
 export async function getMarketplaceProviders() {
   const providers = await getApprovedSellers();
   const providerIds = providers.map((provider) => provider.id);
   const supabase = createAdminSupabaseClient() as never as { from(table: string): any };
-  const [mediaMap, ratingMap, statsMap, badgeMap] = await Promise.all([
+  const [mediaMap, ratingMap, statsMap, badgeMap, shiftWorkerIds] = await Promise.all([
     getProviderMediaMap(providerIds),
     getProviderRatingMap(providerIds),
     getProviderStatsMap(supabase, providerIds),
     getProviderBadgeMap(providerIds),
+    getShiftWorkerProviderIds(providerIds),
   ]);
 
   return providers.map((provider) => mapSellerToMarketplace(
@@ -648,6 +683,7 @@ export async function getMarketplaceProviders() {
     ratingMap.get(provider.id),
     statsMap.get(provider.id),
     badgeMap.get(provider.id) || [],
+    shiftWorkerIds.has(provider.id),
   ));
 }
 
@@ -883,11 +919,12 @@ export async function getProviderProfileById(id: string) {
   const sameCategoryProviders = possibleRelatedProviders.filter((seller) => providerMatchesCategory(seller, categorySlugFor(providerRow.service_category)));
   const relatedSellerRows = (sameCategoryProviders.length ? sameCategoryProviders : possibleRelatedProviders).slice(0, 4);
   const relatedIds = relatedSellerRows.map((seller) => seller.id);
-  const [relatedMediaMap, relatedRatingMap, relatedStatsMap, relatedBadgeMap] = await Promise.all([
+  const [relatedMediaMap, relatedRatingMap, relatedStatsMap, relatedBadgeMap, shiftWorkerIds] = await Promise.all([
     getProviderMediaMap(relatedIds),
     getProviderRatingMap(relatedIds),
     getProviderStatsMap(supabase, relatedIds),
     getProviderBadgeMap(relatedIds),
+    getShiftWorkerProviderIds([id, ...relatedIds]),
   ]);
   const relatedProviders = relatedSellerRows
     .map((seller) => mapSellerToMarketplace(
@@ -896,6 +933,7 @@ export async function getProviderProfileById(id: string) {
       relatedRatingMap.get(seller.id),
       relatedStatsMap.get(seller.id),
       relatedBadgeMap.get(seller.id) || [],
+      shiftWorkerIds.has(seller.id),
     ))
     .slice(0, 4);
   const writtenReviews = mapReviewRows(reviewResult.data || [], providerRow);
@@ -908,5 +946,15 @@ export async function getProviderProfileById(id: string) {
   };
 
   const packages = packagesFromServices((servicesResult.data || []) as ProviderServiceRow[]);
-  return mapSellerToProfile(providerRow, media, ratings, providerStats, writtenReviews, relatedProviders, badges, packages);
+  return mapSellerToProfile(
+    providerRow,
+    media,
+    ratings,
+    providerStats,
+    writtenReviews,
+    relatedProviders,
+    badges,
+    packages,
+    shiftWorkerIds.has(id),
+  );
 }

@@ -23,6 +23,8 @@ interface ServiceInquiry {
   budget_range_min?: number;
   budget_range_max?: number;
   status: string;
+  request_visibility?: "public" | "private";
+  provider_decision_status?: "not_required" | "pending" | "accepted" | "rejected";
   created_at: string;
   quotes?: {
     total: number;
@@ -208,6 +210,15 @@ export default function MyRequestsPage() {
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
                     <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${getJobStatusColor(inquiry.status)}`}>{getJobStatusLabel(inquiry.status)}</span>
+                    {inquiry.request_visibility === "private" ? (
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900">
+                        {inquiry.provider_decision_status === "accepted"
+                          ? "Provider accepted"
+                          : inquiry.provider_decision_status === "rejected"
+                            ? "Provider declined"
+                            : "Requirements sent"}
+                      </span>
+                    ) : null}
                     <span className="font-bold text-blue-600">{inquiry.quotes?.total || 0} offer{(inquiry.quotes?.total || 0) === 1 ? "" : "s"}</span>
                     {(inquiry.workImages?.length || 0) > 0 ? <span className="text-slate-500">{inquiry.workImages?.length} photo{inquiry.workImages?.length === 1 ? "" : "s"}</span> : null}
                   </div>
@@ -222,6 +233,15 @@ export default function MyRequestsPage() {
                 <div>
                   <div className="flex flex-wrap items-center gap-3">
                     <span className={`rounded-full px-3 py-1 text-xs font-bold ${getJobStatusColor(selectedInquiry.status)}`}>{getJobStatusLabel(selectedInquiry.status)}</span>
+                    {selectedInquiry.request_visibility === "private" ? (
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-900">
+                        {selectedInquiry.provider_decision_status === "accepted"
+                          ? "Provider accepted"
+                          : selectedInquiry.provider_decision_status === "rejected"
+                            ? "Provider declined"
+                            : "Requirements sent"}
+                      </span>
+                    ) : null}
                     <span className="text-sm font-semibold text-slate-500">Posted {new Date(selectedInquiry.created_at).toLocaleDateString()}</span>
                   </div>
                   <h2 className="mt-5 text-4xl font-black leading-tight tracking-tight text-blue-950">{getServiceName(selectedInquiry.category_slug, selectedInquiry.subcategory_slug)}</h2>

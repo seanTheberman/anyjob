@@ -41,7 +41,7 @@ export const CATEGORIES: Category[] = [
     },
     keywords: {
       fr: ["ménage", "nettoyage", "femme de ménage", "menage", "propreté", "entretien"],
-      en: ["cleaning", "house cleaning", "maid", "housekeeper", "cleaner", "tidy"],
+      en: ["cleaning", "house cleaning", "deep cleaning", "window cleaning", "ironing", "maid", "housekeeper", "cleaner", "tidy"],
       es: ["limpieza", "limpiadora", "ordenar", "aseo", "casa limpia"],
       de: ["reinigung", "putzfrau", "saubermachen", "aufräumen", "hausmeister"],
       it: ["pulizie", "pulizie", "signora delle pulizie", "pulire", "domestica"],
@@ -74,7 +74,7 @@ export const CATEGORIES: Category[] = [
     },
     keywords: {
       fr: ["bricolage", "bricoleur", "réparation", "dépannage", "artisan", "main d'oeuvre"],
-      en: ["handyman", "repair", "fix", "maintenance", "diy", "craftsman"],
+      en: ["handyman", "repair", "fix", "maintenance", "diy", "craftsman", "plumbing", "plumber", "electrical", "electrician", "painting", "furniture assembly", "shelf mounting"],
       es: ["fontanería", "reparación", "fontanero", "arreglo", "mantenimiento"],
       de: ["handwerker", "reparatur", "instellung", "wartung", "schreiner"],
       it: ["fai da te", "riparazione", "artigiano", "manutenzione", "riparatore"],
@@ -445,6 +445,17 @@ export function searchCategories(query: string, language?: string): Category[] {
     } else if (originalName.includes(queryLower)) {
       score += 40;
       matchType = 'partial-original';
+    }
+
+    const localizedKeywords = category.keywords[searchLanguage] || [];
+    const englishKeywords = searchLanguage === "en" ? [] : category.keywords.en || [];
+    const keywordMatches = [...localizedKeywords, ...englishKeywords].filter((keyword) => {
+      const normalizedKeyword = keyword.toLowerCase();
+      return normalizedKeyword.includes(queryLower) || queryLower.includes(normalizedKeyword);
+    });
+    if (keywordMatches.length > 0) {
+      score += keywordMatches.some((keyword) => keyword.toLowerCase() === queryLower) ? 70 : 35;
+      matchType = matchType || 'keyword';
     }
     
     // Check subcategories - lower priority

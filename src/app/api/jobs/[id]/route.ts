@@ -149,6 +149,14 @@ export async function GET(
       return NextResponse.json({ error: "Job not found", details: error?.message }, { status: 404 });
     }
 
+    const isPrivateRequest = job.request_visibility === "private";
+    const canViewPrivateRequest = Boolean(
+      user && (job.user_id === user.id || job.target_provider_id === user.id)
+    );
+    if (isPrivateRequest && !canViewPrivateRequest) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+
     // Get bid count for this job
     const { count: bidCount } = await supabase
       .from('bids')
@@ -327,6 +335,11 @@ export async function GET(
       equipment: job.equipment_needed || 'No specific equipment needed',
       postedAt: new Date(job.submitted_at).toLocaleDateString(),
       status: job.status || 'submitted',
+      requestVisibility: job.request_visibility || 'public',
+      providerDecisionStatus: job.provider_decision_status || 'not_required',
+      providerRejectionReason: job.provider_rejection_reason || null,
+      targetProviderId: job.target_provider_id || null,
+      isTargetedProvider: Boolean(user && job.target_provider_id === user.id),
       anyjobSelect: isAnyJobSelect,
       adminPosted: job.admin_posted === true,
       bid_count: bidCount || 0,

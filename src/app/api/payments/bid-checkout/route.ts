@@ -41,6 +41,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only pending bids can be accepted" }, { status: 409 });
     }
 
+    const inquiry = Array.isArray(bid.inquiry) ? bid.inquiry[0] : bid.inquiry;
+    if (
+      inquiry?.request_visibility === "private" &&
+      (inquiry.provider_decision_status !== "accepted" || inquiry.target_provider_id !== bid.provider_id)
+    ) {
+      return NextResponse.json(
+        { error: "Payment is available only after the selected provider accepts this request" },
+        { status: 409 },
+      );
+    }
+
     const admin = createAdminSupabaseClient() as never as { from(table: string): any };
     const buyerKyc = await getBuyerKycStatus(admin, user.id);
     if (!buyerKyc.isComplete) {
@@ -60,7 +71,6 @@ export async function POST(request: NextRequest) {
 
     const origin = request.nextUrl.origin;
     if (process.env.STRIPE_ENABLED !== "true" || !getStripeSecretKey()) {
-      const inquiry = Array.isArray(bid.inquiry) ? bid.inquiry[0] : bid.inquiry;
       await acceptBidAndUnlockChat(supabase, { ...bid, inquiry });
       return NextResponse.json({
         checkoutUrl: `${origin}/dashboard/requests/${bid.inquiry_id}?payment=success&mode=dummy`,

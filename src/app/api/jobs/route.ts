@@ -49,23 +49,37 @@ export async function GET(request: NextRequest) {
 
     // Fetch approved/open inquiries for bidding. In the current Supabase enum,
     // "submitted" is the live/admin-approved value and "pending" is review.
-    let query = supabase
+    let publicQuery = admin
       .from("service_inquiries")
       .select("*")
       .eq("status", "submitted")
+      .eq("request_visibility", "public")
       .eq("country_code", marketCountry)
       .neq("user_id", user.id)
       .order("submitted_at", { ascending: false });
 
+    let privateQuery = admin
+      .from("service_inquiries")
+      .select("*")
+      .eq("request_visibility", "private")
+      .eq("target_provider_id", user.id)
+      .in("provider_decision_status", ["pending", "accepted"])
+      .eq("country_code", marketCountry)
+      .order("submitted_at", { ascending: false });
+
     if (category) {
-      query = query.eq("category_slug", category);
+      publicQuery = publicQuery.eq("category_slug", category);
+      privateQuery = privateQuery.eq("category_slug", category);
     }
     if (city) {
-      query = query.ilike("city", `%${city}%`);
+      publicQuery = publicQuery.ilike("city", `%${city}%`);
+      privateQuery = privateQuery.ilike("city", `%${city}%`);
     }
 
-    const { data: jobs, error } = await query;
-    if (error) throw error;
+    const [publicResult, privateResult] = await Promise.all([publicQuery, privateQuery]);
+    if (publicResult.error) throw publicResult.error;
+    if (privateResult.error) throw privateResult.error;
+    const jobs = [...(privateResult.data || []), ...(publicResult.data || [])];
 
     const { data: providerProfile } = await supabase
       .from("eloo_profiles")
@@ -83,6 +97,7 @@ export async function GET(request: NextRequest) {
       )
     );
     const visibleJobs = (jobs || []).filter((job) => {
+      if (job.request_visibility === "private") return true;
       if (isAnyJobSelectInquiry(job)) return true;
       return buyerKycByUser.get(String(job.user_id || ""))?.isComplete;
     });

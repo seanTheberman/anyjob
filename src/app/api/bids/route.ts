@@ -169,7 +169,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Service inquiry not found" }, { status: 404 });
     }
 
-    if (!["approved", "submitted"].includes(String(inquiry.status || "").toLowerCase())) {
+    const isPrivateDirectedRequest =
+      inquiry.request_visibility === "private" &&
+      inquiry.target_provider_id === user.id;
+    if (inquiry.request_visibility === "private" && !isPrivateDirectedRequest) {
+      return NextResponse.json({ error: "This private request was sent to another provider." }, { status: 403 });
+    }
+    if (isPrivateDirectedRequest) {
+      if (inquiry.provider_decision_status !== "pending") {
+        return NextResponse.json({ error: "This private request has already been reviewed." }, { status: 409 });
+      }
+      if (!["pending", "submitted"].includes(String(inquiry.status || "").toLowerCase())) {
+        return NextResponse.json({ error: "This private request is no longer open." }, { status: 409 });
+      }
+    } else if (!["approved", "submitted"].includes(String(inquiry.status || "").toLowerCase())) {
       return NextResponse.json({ error: "This job is not approved for quotes yet" }, { status: 409 });
     }
 
@@ -180,7 +193,9 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminSupabaseClient() as never as { from(table: string): any };
     const isAnyJobSelect = isAnyJobSelectInquiry(inquiry);
-    const buyerKyc = isAnyJobSelect ? { isComplete: true, missing: [] as string[] } : await getBuyerKycStatus(admin, inquiry.user_id);
+    const buyerKyc = isAnyJobSelect || isPrivateDirectedRequest
+      ? { isComplete: true, missing: [] as string[] }
+      : await getBuyerKycStatus(admin, inquiry.user_id);
     if (!buyerKyc.isComplete) {
       return NextResponse.json(
         {
@@ -325,6 +340,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (isPrivateDirectedRequest) {
+      const decisionAt = new Date().toISOString();
+      const { data: acceptedRequest, error: decisionError } = await admin
+        .from("service_inquiries")
+        .update({
+          provider_decision_status: "accepted",
+          provider_decision_at: decisionAt,
+          provider_rejection_reason: null,
+          updated_at: decisionAt,
+        })
+        .eq("id", inquiry_id)
+        .eq("target_provider_id", user.id)
+        .eq("provider_decision_status", "pending")
+        .select("id")
+        .maybeSingle();
+      if (decisionError || !acceptedRequest) {
+        await admin.from("provider_terms_acceptances").delete().eq("bid_id", bid.id);
+        await admin.from("bids").delete().eq("id", bid.id).eq("provider_id", user.id);
+        return NextResponse.json(
+          { error: decisionError ? "Could not accept this private request." : "This private request has already been reviewed." },
+          { status: decisionError ? 500 : 409 },
+        );
+      }
+    }
+
     if (isAnyJobSelect) {
       let token = "";
       const recipientEmail = String(inquiry.select_quote_recipient_email || inquiry.email || "").trim().toLowerCase();
@@ -381,7 +421,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!isAnyJobSelect) {
+    if (isPrivateDirectedRequest) {
+      const directEmailResult = await notifyJobEvent({
+        action: "direct_request_accepted",
+        tenantSlug: "default",
+        jobId: inquiry_id,
+        inquiryId: inquiry_id,
+        bidId: bid.id,
+        buyerUserId: inquiry.user_id,
+        providerUserId: user.id,
+        providerEmail,
+        providerName: [provider.first_name, provider.last_name].filter(Boolean).join(" "),
+        amount: formatMoney(Number(amount || 0), "€"),
+        message: String(message || ""),
+      });
+      if (!directEmailResult.ok) {
+        console.error("Private request acceptance email failed:", directEmailResult);
+      }
+    } else if (!isAnyJobSelect) {
       const quoteEmailResult = await notifyJobEvent({
         action: "quote_received",
         tenantSlug: "default",
