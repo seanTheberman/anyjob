@@ -260,5 +260,6 @@ export function countryCodeFromName(value: unknown) {
   if (["ireland", "ie", "eire", "éire"].includes(normalized)) return "IE";
   if (["united kingdom", "uk", "gb", "great britain", "england", "scotland", "wales", "northern ireland"].includes(normalized)) return "GB";
   if (["france", "fr"].includes(normalized)) return "FR";
+  if (["india", "in"].includes(normalized)) return "IN";
   return cleanCountryCode(String(value || ""));
 }
