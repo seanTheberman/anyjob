@@ -428,6 +428,7 @@ export default function PublicProviderScreen() {
         providerName: name,
         serviceId: textValue(gig?.id),
         packageTier: activePackage?.tier || String(selectedPackage),
+        requestKey: String(Date.now()),
       },
     });
 

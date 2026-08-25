@@ -606,9 +606,15 @@ export default function WorkScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={provider ? "Find work" : "Post a task"}
-          onPress={() =>
-            router.push(provider ? "/(app)/explore" : "/request/new")
-          }
+          onPress={() => {
+            if (provider) router.push("/(app)/explore");
+            else {
+              router.push({
+                pathname: "/request/new",
+                params: { requestKey: String(Date.now()) },
+              });
+            }
+          }}
           style={[styles.addButton, { backgroundColor: colors.brand }]}
         >
           {provider ? (
@@ -701,9 +707,15 @@ export default function WorkScreen() {
             filter === "all" ? (
               <Button
                 title={provider ? "Find work" : "Post a task"}
-                onPress={() =>
-                  router.push(provider ? "/(app)/explore" : "/request/new")
-                }
+                onPress={() => {
+                  if (provider) router.push("/(app)/explore");
+                  else {
+                    router.push({
+                      pathname: "/request/new",
+                      params: { requestKey: String(Date.now()) },
+                    });
+                  }
+                }}
               />
             ) : undefined
           }

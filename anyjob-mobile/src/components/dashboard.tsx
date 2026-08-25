@@ -737,7 +737,10 @@ export function Dashboard() {
             onPress={() =>
               router.push({
                 pathname: "/request/new",
-                params: { category: item.category },
+                params: {
+                  category: item.category,
+                  requestKey: String(Date.now()),
+                },
               })
             }
           />
@@ -760,7 +763,10 @@ export function Dashboard() {
             onPress={() =>
               router.push({
                 pathname: "/request/new",
-                params: { category: item.category },
+                params: {
+                  category: item.category,
+                  requestKey: String(Date.now()),
+                },
               })
             }
             style={({ pressed }) => [
@@ -977,7 +983,12 @@ export function Dashboard() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Post a task"
-          onPress={() => router.push("/request/new")}
+          onPress={() =>
+            router.push({
+              pathname: "/request/new",
+              params: { requestKey: String(Date.now()) },
+            })
+          }
           style={[styles.startButton, { backgroundColor: colors.brand }]}
         >
           <ArrowRight color="white" size={20} />

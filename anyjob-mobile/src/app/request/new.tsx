@@ -28,7 +28,7 @@ import {
   Truck,
   X,
 } from "lucide-react-native";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Modal,
@@ -121,6 +121,7 @@ type RequestRouteParams = {
   serviceId?: string;
   packageTier?: string;
   resumeDraft?: string;
+  requestKey?: string;
 };
 
 type StoredRequestDraft = Partial<Form> & {
@@ -277,21 +278,9 @@ function draftMatchesRoute(
     draftParams.category || draft.category_slug || "",
   );
   if (!routeCategory || draftCategory !== routeCategory) return false;
-
-  const hasDirectHireContext = Boolean(
-    params.providerId ||
-      params.serviceId ||
-      params.packageTier ||
-      draftParams.providerId ||
-      draftParams.serviceId ||
-      draftParams.packageTier,
-  );
-  if (!hasDirectHireContext) return true;
-
   return (
-    (draftParams.providerId || "") === (params.providerId || "") &&
-    (draftParams.serviceId || "") === (params.serviceId || "") &&
-    (draftParams.packageTier || "") === (params.packageTier || "")
+    requestContextKey(draftParams, draftCategory) ===
+    requestContextKey(params, routeCategory)
   );
 }
 
@@ -332,6 +321,7 @@ export default function NewRequestScreen() {
       serviceId: params.serviceId,
       packageTier: params.packageTier,
       resumeDraft: params.resumeDraft,
+      requestKey: params.requestKey,
     }),
     [
       params.category,
@@ -340,6 +330,7 @@ export default function NewRequestScreen() {
       params.providerId,
       params.providerName,
       params.resumeDraft,
+      params.requestKey,
       params.serviceId,
       params.subcategory,
     ],
@@ -361,16 +352,10 @@ export default function NewRequestScreen() {
       }),
     [initialCategory, initialSubcategory, params.custom_query],
   );
-  const routeContext = useMemo(
-    () => requestContextKey(routeParams, initialCategory),
-    [initialCategory, routeParams],
-  );
   const [step, setStep] = useState(1);
   const [draftReady, setDraftReady] = useState(false);
   const [restoredDraft, setRestoredDraft] = useState(false);
   const [discardConfirmVisible, setDiscardConfirmVisible] = useState(false);
-  const [hydratedContext, setHydratedContext] = useState("");
-  const submittedRef = useRef(false);
   const [locating, setLocating] = useState(false);
   const [pickingImages, setPickingImages] = useState(false);
   const marketLocation = useMarketLocation();
@@ -393,7 +378,6 @@ export default function NewRequestScreen() {
 
   useEffect(() => {
     let cancelled = false;
-    submittedRef.current = false;
     setDraftReady(false);
     setRestoredDraft(false);
 
@@ -413,8 +397,8 @@ export default function NewRequestScreen() {
       const shouldResume = Boolean(
         draft &&
           !expired &&
-          (routeParams.resumeDraft === "1" ||
-            draftMatchesRoute(draft, routeParams, initialCategory)),
+          routeParams.resumeDraft === "1" &&
+          draftMatchesRoute(draft, routeParams, initialCategory),
       );
 
       if (shouldResume && draft) {
@@ -431,7 +415,6 @@ export default function NewRequestScreen() {
         }
       }
       if (!cancelled) {
-        setHydratedContext(routeContext);
         setDraftReady(true);
       }
     };
@@ -440,69 +423,29 @@ export default function NewRequestScreen() {
     return () => {
       cancelled = true;
     };
-  }, [initialCategory, initialForm, routeContext, routeParams]);
-
-  useEffect(() => {
-    if (
-      !draftReady ||
-      hydratedContext !== routeContext ||
-      submittedRef.current ||
-      step <= 1
-    ) {
-      return;
-    }
-    const saveTimer = setTimeout(() => {
-      const storedParams = {
-        category: form.category_slug || routeParams.category || "",
-        subcategory: routeParams.subcategory || "",
-        custom_query: routeParams.custom_query || "",
-        providerId: routeParams.providerId || "",
-        providerName: routeParams.providerName || "",
-        serviceId: routeParams.serviceId || "",
-        packageTier: routeParams.packageTier || "",
-      };
-      void AsyncStorage.setItem(
-        PENDING_REQUEST_KEY,
-        JSON.stringify({
-          ...form,
-          version: REQUEST_DRAFT_VERSION,
-          savedAt: Date.now(),
-          contextKey: requestContextKey(storedParams, form.category_slug),
-          work_images: [],
-          step,
-          params: storedParams,
-        }),
-      );
-    }, 300);
-    return () => clearTimeout(saveTimer);
-  }, [draftReady, form, hydratedContext, routeContext, routeParams, step]);
+  }, [initialCategory, initialForm, routeParams]);
 
   const setText = (key: keyof Form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+  const selectCategory = (category: string, subcategory = "") => {
+    setForm((current) => {
+      if (current.category_slug === category) return current;
+      return {
+        ...createInitialForm({ category, subcategory }),
+        city: current.city,
+        postal_code: current.postal_code,
+        coarse_latitude: current.coarse_latitude,
+        coarse_longitude: current.coarse_longitude,
+        location_accuracy_meters: current.location_accuracy_meters,
+        coarse_location_label: current.coarse_location_label,
+        location_token: current.location_token,
+      };
+    });
+    setRestoredDraft(false);
+    void AsyncStorage.removeItem(PENDING_REQUEST_KEY).catch(() => undefined);
+  };
   const selectedBudget = BUDGET_OPTIONS.find(
     (option) => option.value === form.budget_range,
-  );
-  const returnTo = useMemo(
-    () =>
-      buildReturnTo({
-        category: params.category,
-        subcategory: params.subcategory,
-        custom_query: params.custom_query,
-        providerId: params.providerId,
-        providerName: params.providerName,
-        serviceId: params.serviceId,
-        packageTier: params.packageTier,
-        resumeDraft: "1",
-      }),
-    [
-      params.category,
-      params.custom_query,
-      params.packageTier,
-      params.providerId,
-      params.providerName,
-      params.serviceId,
-      params.subcategory,
-    ],
   );
   const areaLabel = useMemo(
     () =>
@@ -623,13 +566,11 @@ export default function NewRequestScreen() {
   };
 
   const discardDraft = async () => {
-    submittedRef.current = true;
     setDiscardConfirmVisible(false);
     setForm(initialForm);
     setStep(1);
     setRestoredDraft(false);
     await AsyncStorage.removeItem(PENDING_REQUEST_KEY).catch(() => undefined);
-    submittedRef.current = false;
   };
 
   const mutation = useMutation({
@@ -670,7 +611,6 @@ export default function NewRequestScreen() {
       return { ...result, failedUploads };
     },
     onSuccess: async (result) => {
-      submittedRef.current = true;
       await AsyncStorage.removeItem(PENDING_REQUEST_KEY);
       void client.invalidateQueries({ queryKey: ["requests"] });
       router.replace(`/requests/${result.inquiry.id}`);
@@ -708,6 +648,10 @@ export default function NewRequestScreen() {
             params: storedParams,
           }),
         );
+        const returnTo = buildReturnTo({
+          ...storedParams,
+          resumeDraft: "1",
+        });
         Alert.alert(
           "Create your account",
           "Your request is saved. Sign in or create a buyer account to submit it.",
@@ -735,14 +679,7 @@ export default function NewRequestScreen() {
                 title={category.name}
                 icon={categoryIcon(category.slug, category.color)}
                 selected={form.category_slug === category.slug}
-                onPress={() =>
-                  setForm((current) => ({
-                    ...current,
-                    category_slug: category.slug,
-                    subcategory_slug: "",
-                    custom_tags: [],
-                  }))
-                }
+                onPress={() => selectCategory(category.slug)}
               />
             ))}
             <View style={styles.fullWidth}>
@@ -751,13 +688,7 @@ export default function NewRequestScreen() {
                 description="Use this when your task does not match a listed service."
                 icon={<Sparkles color={colors.brand} size={24} />}
                 selected={form.category_slug === "custom"}
-                onPress={() =>
-                  setForm((current) => ({
-                    ...current,
-                    category_slug: "custom",
-                    subcategory_slug: "custom-job",
-                  }))
-                }
+                onPress={() => selectCategory("custom", "custom-job")}
               />
             </View>
           </View>
