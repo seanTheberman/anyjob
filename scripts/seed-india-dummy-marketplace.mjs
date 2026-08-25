@@ -218,6 +218,9 @@ if (listError) throw listError;
 const targetEmails = new Set(allAccounts.map((account) => account.email));
 const oldUsers = listed.users.filter((user) => targetEmails.has(user.email || ""));
 const oldIds = oldUsers.map((user) => user.id);
+const existingUsersByEmail = new Map(
+  oldUsers.map((user) => [user.email, user]),
+);
 
 if (oldIds.length) {
   const [{ data: clientConversations }, { data: providerConversations }] = await Promise.all([
@@ -244,11 +247,24 @@ if (oldIds.length) {
   await requireSuccess(await db.from("buyers").delete().in("id", oldIds), "delete old buyers");
   await requireSuccess(await db.from("sellers").delete().in("id", oldIds), "delete old sellers");
   await requireSuccess(await db.from("eloo_profiles").delete().in("id", oldIds), "delete old profiles");
-  for (const user of oldUsers) await db.auth.admin.deleteUser(user.id);
 }
 
 const ids = new Map();
 for (const account of allAccounts) {
+  const existingUser = existingUsersByEmail.get(account.email);
+  if (existingUser) {
+    const { data, error } = await db.auth.admin.updateUserById(existingUser.id, {
+      password,
+      user_metadata: {
+        role: account.authRole,
+        first_name: account.firstName,
+        last_name: account.lastName,
+      },
+    });
+    if (error || !data.user) throw new Error(`update ${account.email}: ${error?.message || "missing user"}`);
+    ids.set(account.email, data.user.id);
+    continue;
+  }
   const { data, error } = await db.auth.admin.createUser({
     email: account.email,
     password,
