@@ -1,9 +1,11 @@
 import { calculateShiftAgreedAmount } from "@/lib/shift-payments";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { getStripe, getStripeSecretKey } from "@/lib/stripe/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { viewerCountryCode } from "@/lib/location/market-location";
 
 function text(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -25,12 +27,13 @@ async function getUser() {
   return getFastAuthUser(supabase);
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const user = await getUser();
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const marketCountry = await viewerCountryCode(request, user.id);
 
     const admin = createAdminSupabaseClient() as never as LooseAdminClient;
     const { data: applications, error } = await admin
@@ -43,12 +46,14 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const applicationRows = (applications || []) as LooseRow[];
+    const applicationRows = ((applications || []) as LooseRow[]).filter(
+      (application) => application.post?.country_code === marketCountry,
+    );
     const providerIds = Array.from(new Set(applicationRows.map((item: LooseRow) => item.provider_user_id).filter(Boolean)));
     const [profilesResult, sellersResult] = providerIds.length
       ? await Promise.all([
           admin.from("eloo_profiles").select("id,first_name,last_name,email,city,phone,is_verified").in("id", providerIds),
-          admin.from("sellers").select("id,first_name,last_name,email,city,service_category,rating,total_jobs,status").in("id", providerIds),
+          admin.from("sellers").select("id,first_name,last_name,email,city,service_category,rating,total_jobs,status,country_code").eq("country_code", marketCountry).in("id", providerIds),
         ])
       : [{ data: [], error: null }, { data: [], error: null }];
 
@@ -103,6 +108,7 @@ export async function POST(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const marketCountry = await viewerCountryCode(request, user.id);
 
     const body = await request.json();
     const applicationId = text(body.applicationId);
@@ -127,6 +133,9 @@ export async function POST(request: NextRequest) {
     }
 
     const post = application.post;
+    if (post?.country_code !== marketCountry) {
+      return NextResponse.json({ error: "This application is outside your marketplace country" }, { status: 403 });
+    }
 
     if (action === "reject") {
       const { data, error } = await admin
@@ -136,6 +145,17 @@ export async function POST(request: NextRequest) {
         .select("*")
         .single();
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      void notifyJobEvent({
+        action: "shift_application_rejected",
+        tenantSlug: "default",
+        applicationId,
+        postId: application.business_work_post_id,
+        ownerUserId: application.owner_user_id,
+        providerUserId: application.provider_user_id,
+        message: `${post?.role_title || "Shift"} application was not selected.`,
+      }).then((result) => {
+        if (!result.ok) console.error("Shift rejection email failed:", result);
+      });
       return NextResponse.json({ application: data });
     }
 
@@ -181,6 +201,17 @@ export async function POST(request: NextRequest) {
       }
 
       await admin.from("business_work_posts").update({ status: "filled" }).eq("id", application.business_work_post_id);
+      void notifyJobEvent({
+        action: "shift_application_accepted",
+        tenantSlug: "default",
+        applicationId,
+        postId: application.business_work_post_id,
+        ownerUserId: application.owner_user_id,
+        providerUserId: application.provider_user_id,
+        message: `${post?.role_title || "Shift"} application accepted. Payment is now required to hold the work.`,
+      }).then((result) => {
+        if (!result.ok) console.error("Shift acceptance email failed:", result);
+      });
       return NextResponse.json({ application: appResult.data, payment: paymentResult.data });
     }
 
@@ -237,6 +268,17 @@ export async function POST(request: NextRequest) {
         if (paymentResult.error || walletResult.error) {
           return NextResponse.json({ error: paymentResult.error?.message || walletResult.error?.message }, { status: 500 });
         }
+        void notifyJobEvent({
+          action: "shift_payment_received",
+          tenantSlug: "default",
+          applicationId,
+          postId: application.business_work_post_id,
+          ownerUserId: application.owner_user_id,
+          providerUserId: payment.provider_user_id,
+          message: `${post?.role_title || "Shift"} payment is held by AnyJob.`,
+        }).then((result) => {
+          if (!result.ok) console.error("Shift payment email failed:", result);
+        });
         return NextResponse.json({ payment: paymentResult.data, walletEntry: walletResult.data, localPayment: true });
       }
 
@@ -305,6 +347,17 @@ export async function POST(request: NextRequest) {
       if (paymentResult.error || walletResult.error) {
         return NextResponse.json({ error: paymentResult.error?.message || walletResult.error?.message }, { status: 500 });
       }
+      void notifyJobEvent({
+        action: "shift_payment_received",
+        tenantSlug: "default",
+        applicationId,
+        postId: application.business_work_post_id,
+        ownerUserId: application.owner_user_id,
+        providerUserId: payment.provider_user_id,
+        message: `${post?.role_title || "Shift"} payment is held by AnyJob.`,
+      }).then((result) => {
+        if (!result.ok) console.error("Shift payment email failed:", result);
+      });
       return NextResponse.json({ payment: paymentResult.data, walletEntry: walletResult.data });
     }
 
@@ -344,6 +397,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      void notifyJobEvent({
+        action: "shift_completed",
+        tenantSlug: "default",
+        applicationId,
+        postId: application.business_work_post_id,
+        ownerUserId: application.owner_user_id,
+        providerUserId: payment.provider_user_id,
+        message: `${post?.role_title || "Shift"} is completed and payment has been released.`,
+      }).then((result) => {
+        if (!result.ok) console.error("Shift completion email failed:", result);
+      });
       return NextResponse.json({ application: appResult.data, payment: paymentResult.data, walletEntry: walletResult.data });
     }
 

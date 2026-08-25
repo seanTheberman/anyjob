@@ -3,6 +3,11 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { upsertCustomAuthUser } from "@/lib/custom-auth/users";
 import { invokeEmailFunction } from "@/lib/notifications/email-functions";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MarketLocationError,
+  persistUserMarketLocation,
+  verifyMarketLocationToken,
+} from "@/lib/location/market-location";
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -32,8 +37,7 @@ export async function POST(request: NextRequest) {
       phone,
       password,
       address,
-      city,
-      postalCode,
+      locationToken,
       birthDate,
       serviceCategory,
       experience,
@@ -58,6 +62,10 @@ export async function POST(request: NextRequest) {
       termsAccepted,
       newsletterAccepted
     } = body;
+    const location = verifyMarketLocationToken(
+      request,
+      locationToken || request.cookies.get("anyjob_market_location")?.value,
+    );
 
     const providerAccountType = accountType === "business" || accountType === "agency" ? accountType : "individual";
     const providerBusinessName = cleanString(businessName);
@@ -71,8 +79,8 @@ export async function POST(request: NextRequest) {
     const dayRate = cleanNumber(preferredDayRate);
 
     // Validation
-    if (!firstName || !lastName || !email || !phone || !password || !address || 
-        !city || !postalCode || !birthDate || !serviceCategory) {
+    if (!firstName || !lastName || !email || !phone || !password || !address ||
+        !location.city || !birthDate || !serviceCategory) {
       return NextResponse.json(
         { error: "All required fields must be filled" },
         { status: 400 }
@@ -192,8 +200,12 @@ export async function POST(request: NextRequest) {
           last_name: lastName,
           phone: phone,
           address: address,
-          city: city,
-          postal_code: postalCode,
+          city: location.city,
+          postal_code: location.postalCode || "N/A",
+          country: location.country,
+          country_code: location.countryCode,
+          region: location.region || null,
+          location_verified_at: new Date().toISOString(),
           birth_date: birthDate,
           service_category: serviceCategory,
           experience_level: experience || null,
@@ -233,8 +245,12 @@ export async function POST(request: NextRequest) {
         first_name: firstName,
         last_name: lastName,
         phone,
-        city,
-        postal_code: postalCode,
+        city: location.city,
+        postal_code: location.postalCode || null,
+        country: location.country,
+        country_code: location.countryCode,
+        region: location.region || null,
+        location_verified_at: new Date().toISOString(),
         role: 'provider',
         is_verified: false,
         kyc_status: idDocumentUrl && selfieVideoUrl && (insuranceDocumentUrl || insurance) ? 'submitted' : 'not_started',
@@ -284,6 +300,7 @@ export async function POST(request: NextRequest) {
           open_to_urgent_shifts: openToUrgentShifts === true,
           open_to_recurring_shifts: openToRecurringShifts === true,
           status: "available",
+          country_code: location.countryCode,
         }, { onConflict: "user_id" })
         .select("*")
         .single();
@@ -296,6 +313,8 @@ export async function POST(request: NextRequest) {
         );
       }
     }
+
+    await persistUserMarketLocation(authData.user.id, location);
 
     await upsertCustomAuthUser({
       supabaseUserId: authData.user.id,
@@ -337,6 +356,9 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
+    if (error instanceof MarketLocationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Seller registration error:', error);
     return NextResponse.json(
       { error: "An unexpected error occurred during registration" },

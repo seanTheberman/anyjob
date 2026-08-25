@@ -1,6 +1,7 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { getProviderApplicationEntitlement } from "@/lib/plans/provider-plan-server";
 
 function text(value: unknown) {
@@ -70,6 +71,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "This shift does not match your enabled worker niches" }, { status: 403 });
     }
 
+    if (workerProfile.country_code !== post.country_code) {
+      return NextResponse.json({ error: "This shift is outside your marketplace country" }, { status: 403 });
+    }
+
     const { data: existingApplication } = await admin
       .from("shift_applications")
       .select("id")
@@ -115,6 +120,18 @@ export async function POST(request: NextRequest) {
     if (applyError) {
       return NextResponse.json({ error: applyError.message }, { status: 500 });
     }
+
+    void notifyJobEvent({
+      action: "shift_application_received",
+      tenantSlug: "default",
+      applicationId: application.id,
+      postId: post.id,
+      ownerUserId: post.owner_user_id,
+      providerUserId: user.id,
+      message: text(body.message) || `${post.role_title || "Shift"} application received.`,
+    }).then((result) => {
+      if (!result.ok) console.error("Shift application email failed:", result);
+    });
 
     return NextResponse.json({ application }, { status: 201 });
   } catch (error) {

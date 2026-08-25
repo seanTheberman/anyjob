@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Home, Heart, HandHelping, Utensils } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const HOME_HELP_SUBCATEGORIES = [
 
 
 export default async function AideDomicilePage() {
-    const providers = await getProviderCards("aide-domicile");
+    const providers = await getCountryProviderCards("aide-domicile");
 
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">

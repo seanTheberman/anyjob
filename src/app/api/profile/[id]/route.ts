@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
 import { createClient } from "@supabase/supabase-js";
 import { getProviderProfileById } from "@/lib/real-providers";
+import { countryCodeFromName, viewerCountryCode } from "@/lib/location/market-location";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { getSellerServiceAreas, serviceAreaMatches, serviceAreasForDisplay, viewerServiceLocation } from "@/lib/location/service-areas";
 
 const getCachedProviderProfile = unstable_cache(
   (providerId: string) => getProviderProfileById(providerId),
@@ -28,17 +32,21 @@ export async function GET(
   );
 
   try {
+    const auth = await createServerSupabaseClient();
+    const viewer = await getFastAuthUser(auth);
+    const marketCountry = await viewerCountryCode(request, viewer?.id);
+    const viewerLocation = await viewerServiceLocation(request, viewer?.id);
     const preferProvider =
       new URL(request.url).searchParams.get("role") === "provider";
     const loadProvider = async () => {
       const { data: seller } = await supabase
         .from("sellers")
-        .select("id")
+        .select("id,country,country_code")
         .eq("id", profileId)
         .eq("status", "approved")
         .single();
 
-      if (!seller) return null;
+      if (!seller || (seller.country_code || countryCodeFromName(seller.country)) !== marketCountry) return null;
       const { data: services } = await supabase
         .from("eloo_provider_services")
         .select(
@@ -48,7 +56,17 @@ export async function GET(
         .eq("is_active", true)
         .order("created_at", { ascending: false });
       const provider = await getCachedProviderProfile(profileId);
-      return NextResponse.json({ provider, gigs: services || [] });
+      const serviceAreaMap = await getSellerServiceAreas([profileId]);
+      const serviceAreas = serviceAreaMap.get(profileId) || [];
+      const visibleProvider = {
+        ...provider,
+        serviceAreas: serviceAreasForDisplay(serviceAreas),
+        worksInViewerArea: serviceAreaMatches(serviceAreas, viewerLocation),
+        relatedProviders: provider.relatedProviders.filter(
+          (related) => countryCodeFromName(related.country) === marketCountry,
+        ),
+      };
+      return NextResponse.json({ provider: visibleProvider, gigs: services || [] });
     };
 
     if (preferProvider) {

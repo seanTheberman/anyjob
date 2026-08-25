@@ -15,6 +15,7 @@ import {
   SectionHeader,
 } from "@/components/ui";
 import { OptionCards } from "@/components/form-options";
+import { ServiceAreaPicker, type ServiceAreaValue } from "@/components/service-area-picker";
 import { api, jsonBody } from "@/lib/api";
 import { CATEGORIES } from "@/lib/questionnaire";
 import { uploadMarketplaceFile } from "@/lib/uploads";
@@ -40,6 +41,8 @@ const emptyForm = {
   postalCode: "",
   hourlyRate: "25",
   profileImageUrl: "",
+  country: "",
+  serviceAreaRadiusKm: "15",
 };
 
 const experienceOptions = [
@@ -68,6 +71,7 @@ export default function ProviderProfileScreen() {
   });
   const [form, setForm] = useState(emptyForm);
   const [uploading, setUploading] = useState<string | null>(null);
+  const [serviceAreas, setServiceAreas] = useState<ServiceAreaValue[]>([]);
 
   useEffect(() => {
     const row = query.data?.seller;
@@ -94,7 +98,10 @@ export default function ProviderProfileScreen() {
         postalCode: row.postal_code || "",
         hourlyRate: String(row.hourly_rate || 25),
         profileImageUrl: row.profile_image_url || "",
+        country: row.country || "",
+        serviceAreaRadiusKm: String(row.service_area_radius_km || 15),
       });
+    if (Array.isArray(query.data?.serviceAreas)) setServiceAreas(query.data.serviceAreas);
   }, [query.data]);
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -110,6 +117,8 @@ export default function ProviderProfileScreen() {
             .split(/\r?\n/)
             .map((line) => line.trim())
             .filter(Boolean),
+          serviceAreas,
+          serviceAreaRadiusKm: Number(form.serviceAreaRadiusKm),
         }),
       }),
     onSuccess: async () => {
@@ -338,13 +347,20 @@ export default function ProviderProfileScreen() {
           value={form.address}
           onChangeText={set("address")}
         />
-        <Field label="City" value={form.city} onChangeText={set("city")} />
+        <Field label="City" value={form.city} editable={false} />
         <Field
           label="Postal code"
           value={form.postalCode}
-          onChangeText={set("postalCode")}
+          editable={false}
         />
-        <Field label="Country" value="Ireland" editable={false} />
+        <Field label="Country" value={form.country} editable={false} />
+        <ServiceAreaPicker
+          areas={serviceAreas}
+          country={form.country}
+          radiusKm={Number(form.serviceAreaRadiusKm) || 15}
+          onAreasChange={setServiceAreas}
+          onRadiusChange={(value) => set("serviceAreaRadiusKm")(String(value))}
+        />
       </Card>
       <Button
         title="Save profile"

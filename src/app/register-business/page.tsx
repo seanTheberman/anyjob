@@ -26,6 +26,8 @@ import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { SHIFT_NICHES, WORK_TYPES } from "@/lib/shift-work";
 import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
+import { VerifiedLocationFields } from "@/components/location/VerifiedLocationFields";
+import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
 
 type BusinessProfile = {
   id: string;
@@ -235,6 +237,17 @@ export default function RegisterBusinessPage() {
   const [formData, setFormData] = useState<BusinessRegistrationForm>(defaultForm);
   const [uploadingDocumentKey, setUploadingDocumentKey] = useState<BusinessDocumentKey | null>(null);
   const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
+  const marketLocation = useVerifiedMarketLocation();
+
+  useEffect(() => {
+    if (!marketLocation.location) return;
+    setFormData((current) => ({
+      ...current,
+      city: marketLocation.location?.city || "",
+      postalCode: marketLocation.location?.postalCode || "",
+      country: marketLocation.location?.country || "",
+    }));
+  }, [marketLocation.location]);
 
   const selectedNiche = useMemo(
     () => SHIFT_NICHES.find((item) => item.industry === formData.industry) || SHIFT_NICHES[0],
@@ -373,7 +386,7 @@ export default function RegisterBusinessPage() {
     if (step === 1) return formData.typicalWorkTypes.length > 0;
     if (step === 2) return Boolean(formData.industry && formData.typicalRolesNeeded.length && Number(formData.expectedWorkerCount) > 0);
     if (step === 3) return Boolean(formData.businessName && formData.registrationNumber && formData.businessType);
-    if (step === 4) return Boolean(formData.contactName && formData.contactEmail && formData.contactPhone && formData.address && formData.city);
+    if (step === 4) return Boolean(formData.contactName && formData.contactEmail && formData.contactPhone && formData.address && formData.city && marketLocation.token);
     if (step === 5) return hasRequiredBusinessDocument(formData);
     return true;
   }
@@ -402,7 +415,7 @@ export default function RegisterBusinessPage() {
       const response = await fetch("/api/business/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...formData, documents: buildBusinessDocuments(formData) }),
+        body: JSON.stringify({ ...formData, locationToken: marketLocation.token, documents: buildBusinessDocuments(formData) }),
       });
       const payload = await response.json().catch(() => ({}));
 
@@ -554,7 +567,14 @@ export default function RegisterBusinessPage() {
               <StepBusinessDetails formData={formData} updateField={updateField} />
             ) : null}
             {currentStep === 4 ? (
-              <StepContact formData={formData} updateField={updateField} />
+              <StepContact
+                formData={formData}
+                updateField={updateField}
+                location={marketLocation.location}
+                locationLoading={marketLocation.loading}
+                locationError={marketLocation.error}
+                retryLocation={() => void marketLocation.requestLocation()}
+              />
             ) : null}
             {currentStep === 5 ? (
               <StepDocuments
@@ -938,7 +958,21 @@ function StepBusinessDetails({ formData, updateField }: { formData: BusinessRegi
   );
 }
 
-function StepContact({ formData, updateField }: { formData: BusinessRegistrationForm; updateField: (field: keyof BusinessRegistrationForm, value: string | string[]) => void }) {
+function StepContact({
+  formData,
+  updateField,
+  location,
+  locationLoading,
+  locationError,
+  retryLocation,
+}: {
+  formData: BusinessRegistrationForm;
+  updateField: (field: keyof BusinessRegistrationForm, value: string | string[]) => void;
+  location: ReturnType<typeof useVerifiedMarketLocation>["location"];
+  locationLoading: boolean;
+  locationError: string;
+  retryLocation: () => void;
+}) {
   return (
     <div>
       <h3 className="text-xl font-bold text-gray-950">Contact and location</h3>
@@ -959,22 +993,13 @@ function StepContact({ formData, updateField }: { formData: BusinessRegistration
           <span className="text-sm font-semibold text-gray-700">Contact phone *</span>
           <input value={formData.contactPhone} onChange={(event) => updateField("contactPhone", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="+353 87 123 4567" />
         </label>
-        <label className="block">
-          <span className="text-sm font-semibold text-gray-700">Country</span>
-          <input value="Ireland" readOnly className="mt-2 w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-gray-600" />
-        </label>
         <label className="block md:col-span-2">
           <span className="text-sm font-semibold text-gray-700">Business address *</span>
           <input value={formData.address} onChange={(event) => updateField("address", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="12 O'Connell Street, Dublin 1" />
         </label>
-        <label className="block">
-          <span className="text-sm font-semibold text-gray-700">City *</span>
-          <input value={formData.city} onChange={(event) => updateField("city", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="Dublin" />
-        </label>
-        <label className="block">
-          <span className="text-sm font-semibold text-gray-700">Eircode</span>
-          <input value={formData.postalCode} onChange={(event) => updateField("postalCode", event.target.value)} className="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2" placeholder="D01 F5P2" />
-        </label>
+        <div className="md:col-span-2">
+          <VerifiedLocationFields location={location} loading={locationLoading} error={locationError} onRetry={retryLocation} />
+        </div>
       </div>
       <div className="mt-5 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm leading-6 text-gray-600">
         Add the main work location, not only the billing office, if providers usually need to arrive on site. You can

@@ -2,6 +2,11 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MarketLocationError,
+  persistUserMarketLocation,
+  verifyMarketLocationToken,
+} from "@/lib/location/market-location";
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
@@ -76,6 +81,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const location = verifyMarketLocationToken(
+      request,
+      body.locationToken || request.cookies.get("anyjob_market_location")?.value,
+    );
+    await persistUserMarketLocation(user.id, location);
     const businessName = cleanString(body.businessName);
     const legalName = cleanString(body.legalName);
     const registrationNumber = cleanString(body.registrationNumber);
@@ -85,9 +95,9 @@ export async function POST(request: NextRequest) {
     const contactEmail = cleanString(body.contactEmail);
     const contactPhone = cleanString(body.contactPhone);
     const address = cleanString(body.address);
-    const city = cleanString(body.city);
-    const postalCode = cleanString(body.postalCode);
-    const country = "Ireland";
+    const city = location.city;
+    const postalCode = location.postalCode;
+    const country = location.country;
     const submittedDocuments = cleanDocuments(body.documents);
     const legacyDocumentUrl = cleanString(body.documentUrl) || cleanString(body.documentDataUrl);
     const documentUrl = submittedDocuments.length ? JSON.stringify(submittedDocuments) : legacyDocumentUrl;
@@ -178,6 +188,9 @@ export async function POST(request: NextRequest) {
         city,
         postal_code: postalCode || null,
         country,
+        country_code: location.countryCode,
+        region: location.region || null,
+        location_verified_at: new Date().toISOString(),
         document_url: documentUrl,
         document_source: documentSource,
         typical_work_types: typicalWorkTypes,
@@ -203,6 +216,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ business }, { status: 201 });
   } catch (error) {
+    if (error instanceof MarketLocationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error("Business registration failed:", error);
     return NextResponse.json({ error: "Failed to register business" }, { status: 500 });
   }

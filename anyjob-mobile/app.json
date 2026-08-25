@@ -32,8 +32,7 @@
       "predictiveBackGestureEnabled": true,
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.RECORD_AUDIO"
       ],
       "blockedPermissions": [
         "android.permission.ACCESS_FINE_LOCATION"

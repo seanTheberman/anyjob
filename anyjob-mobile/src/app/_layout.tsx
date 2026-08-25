@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppQueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import { ThemeProvider, useAppTheme } from "@/providers/theme-provider";
+import { MarketLocationProvider } from "@/providers/market-location-provider";
 
 LogBox.ignoreLogs(["Unknown event handler property"]);
 
@@ -15,7 +16,7 @@ function NavigationRoot() {
 }
 
 export default function RootLayout() {
-  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><ThemeProvider><AppQueryProvider><AuthProvider>
+  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><ThemeProvider><AppQueryProvider><AuthProvider><MarketLocationProvider>
     <NavigationRoot />
-  </AuthProvider></AppQueryProvider></ThemeProvider></SafeAreaProvider></GestureHandlerRootView>;
+  </MarketLocationProvider></AuthProvider></AppQueryProvider></ThemeProvider></SafeAreaProvider></GestureHandlerRootView>;
 }

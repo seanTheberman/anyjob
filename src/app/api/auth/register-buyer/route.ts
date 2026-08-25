@@ -3,6 +3,11 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { upsertCustomAuthUser } from "@/lib/custom-auth/users";
 import { invokeEmailFunction } from "@/lib/notifications/email-functions";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  MarketLocationError,
+  persistUserMarketLocation,
+  verifyMarketLocationToken,
+} from "@/lib/location/market-location";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,15 +21,18 @@ export async function POST(request: NextRequest) {
       password,
       phone,
       address,
-      city,
-      postalCode,
+      locationToken,
       newsletterSubscribed
     } = body;
+    const location = verifyMarketLocationToken(
+      request,
+      locationToken || request.cookies.get("anyjob_market_location")?.value,
+    );
 
     // Validation
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !email || !password || !address) {
       return NextResponse.json(
-        { error: "First name, last name, email, and password are required" },
+        { error: "First name, last name, email, password, and address are required" },
         { status: 400 }
       );
     }
@@ -103,8 +111,12 @@ export async function POST(request: NextRequest) {
           last_name: lastName,
           phone: phone || null,
           address: address || null,
-          city: city || null,
-          postal_code: postalCode || null,
+          city: location.city,
+          postal_code: location.postalCode || null,
+          country: location.country,
+          country_code: location.countryCode,
+          region: location.region || null,
+          location_verified_at: new Date().toISOString(),
           newsletter_subscribed: newsletterSubscribed || false,
           email_verified: false,
           phone_verified: false
@@ -120,6 +132,8 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    await persistUserMarketLocation(authData.user.id, location);
 
     await upsertCustomAuthUser({
       supabaseUserId: authData.user.id,
@@ -158,6 +172,9 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
+    if (error instanceof MarketLocationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Registration error:', error);
     return NextResponse.json(
       { error: "An unexpected error occurred during registration" },

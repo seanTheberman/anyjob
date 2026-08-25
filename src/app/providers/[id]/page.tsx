@@ -15,6 +15,10 @@ import { ProviderPackageCard } from "./ProviderPackageCard";
 import { ProviderProfileLayout } from "@/components/providers/ProviderProfileLayout";
 import type { ProviderMarketplaceData } from "@/lib/real-providers";
 import { getProviderProfileById } from "@/lib/real-providers";
+import { headers } from "next/headers";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { getSellerServiceAreas, serviceAreaMatches, serviceAreasForDisplay, viewerServiceLocation } from "@/lib/location/service-areas";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +95,18 @@ function RelatedProviderCard({ provider }: { provider: ProviderMarketplaceData }
 export default async function ProviderProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const normalizedId = decodeURIComponent(id).replace(/\.$/, "");
-  const provider = await getProviderProfileById(normalizedId);
+  const baseProvider = await getProviderProfileById(normalizedId);
+  const requestHeaders = await headers();
+  const auth = await createServerSupabaseClient();
+  const viewer = await getFastAuthUser(auth);
+  const serviceAreaMap = await getSellerServiceAreas([baseProvider.id]);
+  const serviceAreas = serviceAreaMap.get(baseProvider.id) || [];
+  const viewerLocation = await viewerServiceLocation(new Request("https://anyjob.local/provider", { headers: requestHeaders }), viewer?.id);
+  const provider = {
+    ...baseProvider,
+    serviceAreas: serviceAreasForDisplay(serviceAreas),
+    worksInViewerArea: serviceAreaMatches(serviceAreas, viewerLocation),
+  };
   const initials = initialsFor(provider.name);
   const bookingHref = `/questionnaire?provider=${encodeURIComponent(provider.id)}&providerName=${encodeURIComponent(provider.name)}&providerCategory=${encodeURIComponent(provider.categorySlug)}`;
   const rating = formatRating(provider.rating);
@@ -102,9 +117,9 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
   const packageCard = (
     <ProviderPackageCard
       bookingHref={bookingHref}
-      category={provider.category}
-      baseRate={provider.rate}
-      responseTime={provider.responseTime}
+      providerId={provider.id}
+      providerName={provider.name}
+      listedPackages={provider.packages}
     />
   );
 
@@ -378,6 +393,18 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
               <MapPin className="h-4 w-4 text-slate-400" />
               {provider.location}
             </div>
+            {provider.serviceAreas.length ? (
+              <div className="rounded-md bg-slate-50 p-3">
+                <p className={provider.worksInViewerArea ? "font-bold text-emerald-700" : "font-semibold text-slate-950"}>
+                  {provider.worksInViewerArea ? "Works in your area" : "Seller preference areas"}
+                </p>
+                <ul className="mt-2 space-y-1">
+                  {provider.serviceAreas.slice(0, 8).map((area) => (
+                    <li key={`${area.countryCode}:${area.label}`} className="break-words">{area.label} · {area.radiusKm} km</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {provider.responseTime ? (
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-slate-400" />

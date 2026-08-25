@@ -2,6 +2,7 @@ import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
+import { viewerCountryCode } from "@/lib/location/market-location";
 
 type Row = Record<string, any>;
 
@@ -46,19 +47,22 @@ export async function GET(request: NextRequest) {
     const price = searchParams.get("price") || "";
     const sort = searchParams.get("sort") || "newest";
     const remoteOnly = searchParams.get("remote") === "true";
+    const marketCountry = await viewerCountryCode(request);
 
     const admin = createAdminSupabaseClient() as never as { from(table: string): any };
     const [inquiriesResult, businessPostsResult, bidsResult, imagesResult] = await Promise.all([
       admin
         .from("service_inquiries")
-        .select("id,user_id,category_slug,subcategory_slug,service_type,job_description,city,postal_code,coarse_location_label,budget_range_min,budget_range_max,preferred_date,status,submitted_at,created_at")
+        .select("id,user_id,category_slug,subcategory_slug,service_type,job_description,city,postal_code,coarse_location_label,budget_range_min,budget_range_max,preferred_date,status,submitted_at,created_at,country_code")
         .eq("status", "submitted")
+        .eq("country_code", marketCountry)
         .order("submitted_at", { ascending: false })
         .limit(100),
       admin
         .from("business_work_posts")
-        .select("id,work_type,industry,niche,role_title,description,city,postal_code,starts_at,business_preferred_hourly_rate,business_preferred_day_rate,status,created_at")
+        .select("id,work_type,industry,niche,role_title,description,city,postal_code,starts_at,business_preferred_hourly_rate,business_preferred_day_rate,status,created_at,country_code")
         .eq("status", "submitted")
+        .eq("country_code", marketCountry)
         .order("created_at", { ascending: false })
         .limit(100),
       admin

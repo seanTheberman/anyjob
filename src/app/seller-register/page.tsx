@@ -6,6 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { ArrowRight, Upload, Check, X, Eye, EyeOff, User, Mail, Phone, MapPin, Calendar, Briefcase, FileText, Shield, AlertCircle, Loader2, Camera } from "lucide-react";
 import { getShiftNiche, SHIFT_NICHES } from "@/lib/shift-work";
 import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
+import { VerifiedLocationFields } from "@/components/location/VerifiedLocationFields";
+import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
 
 type ProviderAccountType = "" | "individual" | "business" | "agency";
 type ProviderWorkMode = "none" | "freelance" | "shift" | "both";
@@ -98,6 +100,16 @@ export default function SellerRegisterPage() {
   const [submitError, setSubmitError] = useState<string>("");
   const [workModePreselected, setWorkModePreselected] = useState(false);
   const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
+  const marketLocation = useVerifiedMarketLocation();
+
+  useEffect(() => {
+    if (!marketLocation.location) return;
+    setFormData((current) => ({
+      ...current,
+      city: marketLocation.location?.city || "",
+      postalCode: marketLocation.location?.postalCode || "",
+    }));
+  }, [marketLocation.location]);
 
   const SERVICE_CATEGORIES = [
     "Cleaning",
@@ -276,7 +288,7 @@ export default function SellerRegisterPage() {
     } else if (step === 3) {
       if (!formData.address.trim()) newErrors.address = "Address is required";
       if (!formData.city.trim()) newErrors.city = "City is required";
-      if (!formData.postalCode.trim()) newErrors.postalCode = "Eircode is required";
+      if (!marketLocation.token) newErrors.location = "Allow location access and verify your marketplace country";
       if (!formData.birthDate) newErrors.birthDate = "Date of birth is required";
       else if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.birthDate)) newErrors.birthDate = "Use YYYY-MM-DD format";
       if (!formData.serviceCategory) newErrors.serviceCategory = "Service category is required";
@@ -334,6 +346,7 @@ export default function SellerRegisterPage() {
             address: formData.address,
             city: formData.city,
             postalCode: formData.postalCode,
+            locationToken: marketLocation.token,
             birthDate: formData.birthDate,
             serviceCategory: formData.serviceCategory,
             experience: formData.experience,
@@ -760,43 +773,12 @@ export default function SellerRegisterPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      City *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.city}
-                      onChange={(e) => handleInputChange("city", e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.city ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Dublin"
-                    />
-                    {errors.city && (
-                      <p className="text-red-500 text-xs mt-1">{errors.city}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Eircode *
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.postalCode}
-                      onChange={(e) => handleInputChange("postalCode", e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                        errors.postalCode ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="D02 X285"
-                    />
-                    {errors.postalCode && (
-                      <p className="text-red-500 text-xs mt-1">{errors.postalCode}</p>
-                    )}
-                  </div>
-                </div>
+                <VerifiedLocationFields
+                  location={marketLocation.location}
+                  loading={marketLocation.loading}
+                  error={marketLocation.error || errors.location || ""}
+                  onRetry={() => void marketLocation.requestLocation()}
+                />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

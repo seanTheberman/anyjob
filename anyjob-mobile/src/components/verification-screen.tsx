@@ -2,14 +2,16 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import {
+  Camera,
   Check,
   CheckCircle2,
   Clock3,
   FileCheck2,
-  Upload,
+  FolderOpen,
+  Video,
 } from "lucide-react-native";
 import { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, StyleSheet, Text, View } from "react-native";
 
 import {
   Button,
@@ -25,13 +27,24 @@ import { api, jsonBody } from "@/lib/api";
 import { uploadDocumentFile, uploadMarketplaceFile } from "@/lib/uploads";
 import { useAppTheme } from "@/providers/theme-provider";
 
+type VerificationStatus = {
+  approved?: boolean;
+  emailVerified?: boolean;
+  phoneVerified?: boolean;
+  idFrontUploaded?: boolean;
+  idBackUploaded?: boolean;
+  selfieUploaded?: boolean;
+  insuranceUploaded?: boolean;
+};
+
 export default function VerificationScreen() {
   const { colors } = useAppTheme();
   const client = useQueryClient();
   const [uploading, setUploading] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["verification"],
-    queryFn: () => api<any>("/api/mobile/verification"),
+    queryFn: () =>
+      api<{ verification: VerificationStatus }>("/api/mobile/verification"),
   });
 
   const chooseDocument = () =>
@@ -40,11 +53,45 @@ export default function VerificationScreen() {
       copyToCacheDirectory: true,
     });
 
-  const uploadIdentity = async (side: "front" | "back") => {
+  const captureWithCamera = async (mediaTypes: ["images"] | ["videos"]) => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert(
+        "Camera access needed",
+        permission.canAskAgain
+          ? "Allow camera access to scan verification documents."
+          : "Camera access is disabled. Open Settings and allow camera access for AnyJob.",
+        permission.canAskAgain
+          ? [{ text: "OK" }]
+          : [
+              { text: "Cancel", style: "cancel" },
+              {
+                text: "Open Settings",
+                onPress: () => void Linking.openSettings(),
+              },
+            ],
+      );
+      return null;
+    }
+
+    return ImagePicker.launchCameraAsync({
+      mediaTypes,
+      quality: mediaTypes[0] === "images" ? 0.9 : 0.75,
+      videoMaxDuration: mediaTypes[0] === "videos" ? 30 : undefined,
+    });
+  };
+
+  const uploadIdentity = async (
+    side: "front" | "back",
+    source: "camera" | "file",
+  ) => {
     try {
       setUploading(side);
-      const result = await chooseDocument();
-      if (result.canceled) return;
+      const result =
+        source === "camera"
+          ? await captureWithCamera(["images"])
+          : await chooseDocument();
+      if (!result || result.canceled) return;
       await uploadMarketplaceFile(result.assets[0], "id_document", {
         title: side === "front" ? "Government ID front" : "Government ID back",
       });
@@ -63,11 +110,14 @@ export default function VerificationScreen() {
     }
   };
 
-  const uploadInsurance = async () => {
+  const uploadInsurance = async (source: "camera" | "file") => {
     try {
       setUploading("insurance");
-      const result = await chooseDocument();
-      if (result.canceled) return;
+      const result =
+        source === "camera"
+          ? await captureWithCamera(["images"])
+          : await chooseDocument();
+      if (!result || result.canceled) return;
       const uploaded = await uploadDocumentFile(
         result.assets[0],
         "anyjob/insurance",
@@ -91,18 +141,23 @@ export default function VerificationScreen() {
     }
   };
 
-  const uploadSelfie = async () => {
+  const uploadSelfie = async (source: "camera" | "library") => {
     try {
       setUploading("selfie");
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted)
-        throw new Error("Photo library permission is required.");
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["videos"],
-        videoMaxDuration: 30,
-      });
-      if (result.canceled) return;
+      let result: ImagePicker.ImagePickerResult | null;
+      if (source === "camera") {
+        result = await captureWithCamera(["videos"]);
+      } else {
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted)
+          throw new Error("Photo library permission is required.");
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["videos"],
+          videoMaxDuration: 30,
+        });
+      }
+      if (!result || result.canceled) return;
       await uploadMarketplaceFile(result.assets[0], "selfie_video");
       await client.invalidateQueries({ queryKey: ["verification"] });
       Alert.alert(
@@ -231,52 +286,103 @@ export default function VerificationScreen() {
               Upload clear, current files. You can replace a file while your
               account is under review.
             </Text>
-            <Button
+            <CaptureActions
               title={
-                status.idFrontUploaded ? "Replace ID front" : "Upload ID front"
+                status.idFrontUploaded
+                  ? "Replace ID front"
+                  : "Government ID front"
               }
-              variant="secondary"
-              icon={<Upload color={colors.ink} size={18} />}
               loading={uploading === "front"}
-              onPress={() => void uploadIdentity("front")}
+              onCamera={() => void uploadIdentity("front", "camera")}
+              onFile={() => void uploadIdentity("front", "file")}
             />
-            <Button
+            <CaptureActions
               title={
-                status.idBackUploaded ? "Replace ID back" : "Upload ID back"
+                status.idBackUploaded
+                  ? "Replace ID back"
+                  : "Government ID back"
               }
-              variant="secondary"
-              icon={<Upload color={colors.ink} size={18} />}
               loading={uploading === "back"}
-              onPress={() => void uploadIdentity("back")}
+              onCamera={() => void uploadIdentity("back", "camera")}
+              onFile={() => void uploadIdentity("back", "file")}
             />
-            <Button
+            <CaptureActions
               title={
-                status.selfieUploaded
-                  ? "Replace selfie video"
-                  : "Upload selfie video"
+                status.selfieUploaded ? "Replace selfie video" : "Selfie video"
               }
-              variant="secondary"
-              icon={<Upload color={colors.ink} size={18} />}
               loading={uploading === "selfie"}
-              onPress={() => void uploadSelfie()}
+              cameraLabel="Record"
+              fileLabel="Choose video"
+              cameraIcon="video"
+              onCamera={() => void uploadSelfie("camera")}
+              onFile={() => void uploadSelfie("library")}
             />
             {typeof status.insuranceUploaded === "boolean" ? (
-              <Button
+              <CaptureActions
                 title={
                   status.insuranceUploaded
                     ? "Replace insurance document"
-                    : "Upload insurance document"
+                    : "Insurance document"
                 }
-                variant="secondary"
-                icon={<Upload color={colors.ink} size={18} />}
                 loading={uploading === "insurance"}
-                onPress={() => void uploadInsurance()}
+                onCamera={() => void uploadInsurance("camera")}
+                onFile={() => void uploadInsurance("file")}
               />
             ) : null}
           </Card>
         </>
       ) : null}
     </Screen>
+  );
+}
+
+function CaptureActions({
+  title,
+  loading,
+  onCamera,
+  onFile,
+  cameraLabel = "Scan",
+  fileLabel = "Choose file",
+  cameraIcon = "camera",
+}: {
+  title: string;
+  loading: boolean;
+  onCamera: () => void;
+  onFile: () => void;
+  cameraLabel?: string;
+  fileLabel?: string;
+  cameraIcon?: "camera" | "video";
+}) {
+  const { colors } = useAppTheme();
+  return (
+    <View style={[styles.captureGroup, { borderTopColor: colors.line }]}>
+      <Text style={[styles.captureTitle, { color: colors.ink }]}>{title}</Text>
+      <View style={styles.captureActions}>
+        <View style={styles.captureAction}>
+          <Button
+            title={cameraLabel}
+            icon={
+              cameraIcon === "video" ? (
+                <Video color="white" size={18} />
+              ) : (
+                <Camera color="white" size={18} />
+              )
+            }
+            loading={loading}
+            onPress={onCamera}
+          />
+        </View>
+        <View style={styles.captureAction}>
+          <Button
+            title={fileLabel}
+            variant="secondary"
+            icon={<FolderOpen color={colors.ink} size={18} />}
+            disabled={loading}
+            onPress={onFile}
+          />
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -316,4 +422,12 @@ const styles = StyleSheet.create({
   checkText: { flex: 1, fontSize: 12.5, fontWeight: "800" },
   checkState: { fontSize: 10.5, fontWeight: "900" },
   uploadCopy: { fontSize: 12, lineHeight: 18, marginBottom: 2 },
+  captureGroup: {
+    gap: 9,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 12,
+  },
+  captureTitle: { fontSize: 13, fontWeight: "900" },
+  captureActions: { flexDirection: "row", gap: 9 },
+  captureAction: { flex: 1, minWidth: 0 },
 });

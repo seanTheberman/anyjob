@@ -2,6 +2,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SHIFT_NICHES } from "@/lib/shift-work";
 import { NextRequest, NextResponse } from "next/server";
+import { viewerCountryCode } from "@/lib/location/market-location";
 
 const VALID_NICHES = new Set(SHIFT_NICHES.map((niche) => niche.value));
 
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const niche = searchParams.get("niche") || "";
+    const marketCountry = await viewerCountryCode(request, user.id);
 
     if (!VALID_NICHES.has(niche as never)) {
       return NextResponse.json({ error: "Choose a valid niche to browse workers" }, { status: 400 });
@@ -63,7 +65,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: workerError.message }, { status: 500 });
     }
 
-    const visibleWorkers = (workers || []).filter((worker) => worker.status === "available");
+    const visibleWorkers = (workers || []).filter(
+      (worker) => worker.status === "available" && worker.country_code === marketCountry,
+    );
     const workerIds = visibleWorkers.map((worker) => String(worker.user_id)).filter(Boolean);
 
     const [profilesResult, sellersResult] = workerIds.length

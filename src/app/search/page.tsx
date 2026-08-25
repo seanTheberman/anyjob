@@ -1,13 +1,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { ArrowRight, ShieldCheck, ThumbsUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
 import { BuyerProviderMarketplace } from "@/components/search/BuyerProviderMarketplace";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getMarketplaceProviders, getProviderCards, type ProviderCardData } from "@/lib/real-providers";
+import { getMarketplaceProviders, type ProviderCardData } from "@/lib/real-providers";
+import { countryCodeFromName } from "@/lib/location/market-location";
+import { getSellerServiceAreas, serviceAreaMatches, serviceAreasForDisplay, viewerServiceLocation } from "@/lib/location/service-areas";
 
 export const dynamic = "force-dynamic";
 
@@ -76,8 +79,8 @@ async function getMarketplaceViewer() {
     ]);
 
     const role = String(profile?.role || user.user_metadata?.role || "client").toLowerCase();
-    if (seller || ["provider", "seller"].includes(role)) return { kind: "provider" as const };
-    if (role === "admin") return { kind: "admin" as const };
+    if (seller || ["provider", "seller"].includes(role)) return { kind: "provider" as const, id: user.id };
+    if (role === "admin") return { kind: "admin" as const, id: user.id };
 
     const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(" ")
         || user.user_metadata?.first_name
@@ -85,11 +88,32 @@ async function getMarketplaceViewer() {
         || user.email?.split("@")[0]
         || "there";
 
-    return { kind: "buyer" as const, displayName };
+    return { kind: "buyer" as const, displayName, id: user.id };
+}
+
+type ViewerServiceLocation = Awaited<ReturnType<typeof viewerServiceLocation>>;
+
+async function withServiceAreas<T extends ProviderCardData>(providers: T[], viewerLocation: ViewerServiceLocation) {
+    const serviceAreaMap = await getSellerServiceAreas(providers.map((provider) => provider.id));
+    return providers.map((provider) => {
+        const serviceAreas = serviceAreaMap.get(provider.id) || [];
+        return {
+            ...provider,
+            serviceAreas: serviceAreasForDisplay(serviceAreas),
+            worksInViewerArea: serviceAreaMatches(serviceAreas, viewerLocation),
+            ...("searchText" in provider ? { searchText: `${String(provider.searchText)} ${serviceAreas.map((area) => area.label).join(" ")}`.toLowerCase() } : {}),
+        };
+    });
 }
 
 export default async function CataloguePage() {
     const viewer = await getMarketplaceViewer();
+    const requestHeaders = await headers();
+    const viewerLocation = await viewerServiceLocation(
+        new Request("https://anyjob.local/search", { headers: requestHeaders }),
+        viewer?.id,
+    );
+    const marketCountry = viewerLocation.countryCode || "IE";
 
     if (viewer?.kind === "provider") {
         redirect("/pro/services");
@@ -100,13 +124,17 @@ export default async function CataloguePage() {
     }
 
     if (viewer?.kind === "buyer") {
-        const marketplaceProviders = await getMarketplaceProviders();
-        return <BuyerProviderMarketplace providers={marketplaceProviders} buyerName={viewer.displayName} />;
+        const marketplaceProviders = (await getMarketplaceProviders()).filter(
+            (provider) => countryCodeFromName(provider.country) === marketCountry,
+        );
+        return <BuyerProviderMarketplace providers={await withServiceAreas(marketplaceProviders, viewerLocation)} buyerName={viewer.displayName} />;
     }
 
-    const providers = await getProviderCards();
+    const providers = (await getMarketplaceProviders()).filter(
+        (provider) => countryCodeFromName(provider.country) === marketCountry,
+    );
 
-    return <OriginalFindProviderPage providers={providers} />;
+    return <OriginalFindProviderPage providers={await withServiceAreas(providers, viewerLocation)} />;
 }
 
 function OriginalFindProviderPage({ providers }: { providers: ProviderCardData[] }) {

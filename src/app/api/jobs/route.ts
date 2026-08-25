@@ -3,6 +3,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isAnyJobSelectInquiry } from "@/lib/anyjob-select";
 import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
 import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
+import { viewerCountryCode } from "@/lib/location/market-location";
 import { NextRequest, NextResponse } from "next/server";
 
 function coarsePostalCode(postalCode?: string | null) {
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get("category");
     const city = searchParams.get("city");
+    const marketCountry = await viewerCountryCode(request, user.id);
 
     // Fetch approved/open inquiries for bidding. In the current Supabase enum,
     // "submitted" is the live/admin-approved value and "pending" is review.
@@ -51,6 +53,7 @@ export async function GET(request: NextRequest) {
       .from("service_inquiries")
       .select("*")
       .eq("status", "submitted")
+      .eq("country_code", marketCountry)
       .neq("user_id", user.id)
       .order("submitted_at", { ascending: false });
 

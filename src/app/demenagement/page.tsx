@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ShieldCheck, ThumbsUp, Truck, Users } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const MOVING_SUBCATEGORIES = [
 
 
 export default async function DemenagementPage() {
-    const providers = await getProviderCards("demenagement");
+    const providers = await getCountryProviderCards("demenagement");
 
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">

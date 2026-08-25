@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Heart, PawPrint } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const PETS_SUBCATEGORIES = [
 
 
 export default async function AnimauxPage() {
-    const providers = await getProviderCards("animaux");
+    const providers = await getCountryProviderCards("animaux");
 
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">

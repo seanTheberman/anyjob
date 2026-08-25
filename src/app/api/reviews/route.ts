@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { syncReviewRatings } from "@/lib/reviews/sync-review-ratings";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -356,6 +357,20 @@ export async function POST(request: NextRequest) {
       void syncReviewRatings({ userId: revieweeId, reviewId: String(review.id || "") }).then((result) => {
         if (!result.ok && !result.skipped) console.error("Review rating sync failed:", result.error);
       });
+      void notifyJobEvent({
+        action: "review_received",
+        tenantSlug: "default",
+        reviewId: String(review.id || ""),
+        reviewerId: user.id,
+        revieweeId,
+        reviewType,
+        rating,
+        title,
+        comment,
+        reviewPath: "/dashboard/reviews",
+      }).then((result) => {
+        if (!result.ok) console.error("Review received email failed:", result);
+      });
       clearReviewListCacheForUsers([user.id, revieweeId]);
 
       return NextResponse.json({ review: enrichReview(review, reviewer || undefined) }, { status: 201 });
@@ -467,6 +482,20 @@ export async function POST(request: NextRequest) {
 
     void syncReviewRatings({ userId: revieweeId, reviewId: String(review.id || "") }).then((result) => {
       if (!result.ok && !result.skipped) console.error("Review rating sync failed:", result.error);
+    });
+    void notifyJobEvent({
+      action: "review_received",
+      tenantSlug: "default",
+      reviewId: String(review.id || ""),
+      reviewerId: user.id,
+      revieweeId,
+      reviewType,
+      rating,
+      title,
+      comment,
+      reviewPath: "/dashboard/reviews",
+    }).then((result) => {
+      if (!result.ok) console.error("Review received email failed:", result);
     });
     clearReviewListCacheForUsers([user.id, revieweeId]);
 

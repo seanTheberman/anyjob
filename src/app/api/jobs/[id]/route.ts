@@ -5,6 +5,7 @@ import { calculateBookingTokenBreakdown } from "@/lib/booking-token";
 import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
 import { getProviderStatsMap } from "@/lib/provider-stats";
 import { NextRequest, NextResponse } from "next/server";
+import { countryCodeFromName, viewerCountryCode } from "@/lib/location/market-location";
 
 function coarsePostalCode(postalCode?: string | null) {
   const prefix = postalCode?.trim().slice(0, 3);
@@ -95,6 +96,7 @@ export async function GET(
     // Await params since Next.js 15
     const resolvedParams = await params;
     const jobId = resolvedParams.id;
+    const marketCountry = await viewerCountryCode(request, user?.id);
 
     const adminSupabase = createAdminSupabaseClient() as any;
 
@@ -121,6 +123,7 @@ export async function GET(
       .from('service_inquiries')
       .select('*')
       .eq('id', jobId)
+      .eq('country_code', marketCountry)
       .maybeSingle();
 
     let job = visibleJob;
@@ -129,6 +132,7 @@ export async function GET(
         .from('service_inquiries')
         .select('*')
         .eq('id', jobId)
+        .eq('country_code', marketCountry)
         .maybeSingle();
 
       if (adminJobError) {
@@ -218,7 +222,7 @@ export async function GET(
             .in("id", providerIds),
           adminSupabase
             .from("sellers")
-            .select("id,first_name,last_name,profile_image_url,service_category,experience_level")
+            .select("id,first_name,last_name,profile_image_url,service_category,experience_level,country,country_code")
             .in("id", providerIds),
           getProviderStatsMap(adminSupabase, providerIds),
         ])
@@ -227,7 +231,10 @@ export async function GET(
     const profilesById = new Map(((providerProfiles || []) as LooseRow[]).map((profile) => [String(profile.id), profile]));
     const sellersById = new Map(((providerSellers || []) as LooseRow[]).map((seller) => [String(seller.id), seller]));
 
-    const offerDetails = ((bids || []) as LooseRow[]).map((bid) => {
+    const offerDetails = ((bids || []) as LooseRow[]).filter((bid) => {
+      const seller = sellersById.get(String(bid.provider_id || ""));
+      return seller && (seller.country_code || countryCodeFromName(seller.country)) === marketCountry;
+    }).map((bid) => {
       const providerId = String(bid.provider_id || "");
       const profile = profilesById.get(providerId) || {};
       const seller = sellersById.get(providerId) || {};

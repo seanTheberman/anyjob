@@ -8,6 +8,7 @@ import { calculateBookingTokenBreakdown, formatMoney } from "@/lib/booking-token
 import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
 import { getProviderApplicationEntitlement } from "@/lib/plans/provider-plan-server";
 import { getProviderStatsMap } from "@/lib/provider-stats";
+import { viewerCountryCode } from "@/lib/location/market-location";
 
 async function hasSellerKycForQuoting(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
@@ -154,12 +155,14 @@ export async function POST(request: NextRequest) {
     if (amount <= 0) {
       return NextResponse.json({ error: "Amount must be positive" }, { status: 400 });
     }
+    const marketCountry = await viewerCountryCode(request, user.id);
 
     // Verify the inquiry exists and has been approved by admin (open for bids)
     const { data: inquiry, error: inquiryError } = await supabase
       .from("service_inquiries")
       .select("*")
       .eq("id", inquiry_id)
+      .eq("country_code", marketCountry)
       .single();
 
     if (inquiryError || !inquiry) {
@@ -375,6 +378,25 @@ export async function POST(request: NextRequest) {
         if (!selectEmailResult.ok) {
           console.error("AnyJob Select quote email failed:", selectEmailResult);
         }
+      }
+    }
+
+    if (!isAnyJobSelect) {
+      const quoteEmailResult = await notifyJobEvent({
+        action: "quote_received",
+        tenantSlug: "default",
+        jobId: inquiry_id,
+        inquiryId: inquiry_id,
+        bidId: bid.id,
+        buyerUserId: inquiry.user_id,
+        providerUserId: user.id,
+        providerEmail,
+        providerName: [provider.first_name, provider.last_name].filter(Boolean).join(" "),
+        amount: formatMoney(Number(amount || 0), "€"),
+        message: String(message || ""),
+      });
+      if (!quoteEmailResult.ok) {
+        console.error("Quote received email failed:", quoteEmailResult);
       }
     }
 

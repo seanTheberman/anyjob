@@ -2,6 +2,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { viewerCountryCode } from "@/lib/location/market-location";
 
 export async function GET(request: NextRequest) {
   try {
@@ -44,11 +45,13 @@ export async function GET(request: NextRequest) {
     }
 
     const requestedNiches = nicheFilter ? [nicheFilter] : niches;
+    const marketCountry = await viewerCountryCode(request, user.id);
 
     const { data: openJobs, error: jobsError } = await adminDb
       .from("business_work_posts")
       .select("*, business:business_profiles(id,business_name,status,industry,city)")
       .eq("status", "submitted")
+      .eq("country_code", marketCountry)
       .in("niche", requestedNiches)
       .order("created_at", { ascending: false });
 
@@ -77,6 +80,7 @@ export async function GET(request: NextRequest) {
       return (
         post &&
         business?.status === "approved" &&
+        post.country_code === marketCountry &&
         post.work_type !== "freelance_service" &&
         requestedNiches.includes(String(post.niche || "")) &&
         !["rejected", "withdrawn"].includes(String(application.status || "").toLowerCase())

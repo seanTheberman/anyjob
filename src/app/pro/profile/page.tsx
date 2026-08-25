@@ -7,6 +7,7 @@ import { ImageUploader } from "@/components/upload/ImageUploader";
 import { CATEGORIES } from "@/lib/categories";
 import { ProviderMediaManager } from "./ProviderMediaManager";
 import { ReceivedReviewsPanel } from "@/components/reviews/ReceivedReviewsPanel";
+import { ServiceAreaPicker, type ServiceAreaValue } from "@/components/location/ServiceAreaPicker";
 
 interface UploadedFile {
   id: string;
@@ -40,6 +41,7 @@ type ProfileState = {
   rating: number;
   totalJobs: number;
   kycStatus: string;
+  serviceAreaRadiusKm: number;
 };
 
 type SecurityState = {
@@ -66,12 +68,13 @@ const emptyProfile: ProfileState = {
   address: "",
   city: "",
   postalCode: "",
-  country: "Ireland",
+  country: "",
   hourlyRate: 0,
   profileImageUrl: "",
   rating: 0,
   totalJobs: 0,
   kycStatus: "not_started",
+  serviceAreaRadiusKm: 15,
 };
 
 const availabilityOptions = ["Today", "This week", "Weekends", "Evenings", "Remote"];
@@ -129,6 +132,8 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [serviceAreas, setServiceAreas] = useState<ServiceAreaValue[]>([]);
+  const [savedServiceAreas, setSavedServiceAreas] = useState<ServiceAreaValue[]>([]);
   const [security, setSecurity] = useState<SecurityState | null>(null);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -174,15 +179,19 @@ export default function ProfilePage() {
             address: seller.address || "",
             city: seller.city || "",
             postalCode: seller.postal_code || "",
-            country: "Ireland",
+            country: seller.country || "",
             hourlyRate: seller.hourly_rate || 0,
             profileImageUrl: seller.profile_image_url || "",
             rating: stats.rating || 0,
             totalJobs: stats.completedJobs || 0,
             kycStatus: seller.verification_status || "not_started",
+            serviceAreaRadiusKm: Number(seller.service_area_radius_km) || 15,
           };
           setProfile(nextProfile);
           setSavedProfile(nextProfile);
+          const loadedAreas = Array.isArray(payload.serviceAreas) ? payload.serviceAreas as ServiceAreaValue[] : [];
+          setServiceAreas(loadedAreas);
+          setSavedServiceAreas(loadedAreas);
         }
 
         setKycFiles(files.filter((file) => ["id_document", "selfie_video"].includes(file.image_type)));
@@ -229,7 +238,7 @@ export default function ProfilePage() {
       address: profile.address.trim(),
       city: profile.city.trim(),
       postalCode: profile.postalCode.trim(),
-      country: "Ireland",
+      country: profile.country,
       hourlyRate: Number.isFinite(profile.hourlyRate) ? profile.hourlyRate : 0,
     };
 
@@ -247,6 +256,8 @@ export default function ProfilePage() {
 
     const profilePayload = {
       ...normalizedProfile,
+      serviceAreas,
+      serviceAreaRadiusKm: normalizedProfile.serviceAreaRadiusKm,
       contactWindows: normalizedProfile.contactWindows
         .split(/\r?\n/)
         .map((line) => line.trim())
@@ -268,6 +279,7 @@ export default function ProfilePage() {
 
     setProfile(normalizedProfile);
     setSavedProfile(normalizedProfile);
+    setSavedServiceAreas(serviceAreas);
     setIsEditing(false);
     setSaving(false);
     setSaveMessage("Profile changes saved.");
@@ -275,6 +287,7 @@ export default function ProfilePage() {
 
   function cancelEditing() {
     setProfile(savedProfile);
+    setServiceAreas(savedServiceAreas);
     setIsEditing(false);
     setSaveError(null);
     setSaveMessage(null);
@@ -813,9 +826,8 @@ export default function ProfilePage() {
               <input
                 type="text"
                 value={profile.city}
-                onChange={(e) => setProfile({ ...profile, city: e.target.value })}
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                readOnly
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
               />
             </div>
             <div>
@@ -823,20 +835,29 @@ export default function ProfilePage() {
               <input
                 type="text"
                 value={profile.postalCode}
-                onChange={(e) => setProfile({ ...profile, postalCode: e.target.value })}
-                disabled={!isEditing}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                readOnly
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
               <input
                 type="text"
-                value="Ireland"
+                value={profile.country}
                 readOnly
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+          </div>
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <ServiceAreaPicker
+              areas={serviceAreas}
+              country={profile.country}
+              disabled={!isEditing}
+              radiusKm={profile.serviceAreaRadiusKm}
+              onAreasChange={setServiceAreas}
+              onRadiusChange={(serviceAreaRadiusKm) => setProfile((current) => ({ ...current, serviceAreaRadiusKm }))}
+            />
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 
 import { requireAdmin } from "@/lib/auth/admin";
 import { logAdminAction } from "@/lib/auth/admin-api";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export type AdminNotification = {
@@ -243,6 +244,29 @@ export async function sendAdminBroadcastNotification(formData: FormData) {
       redirect(`/admin/notifications?broadcast_error=${encodeURIComponent(error.message)}`);
     }
   }
+
+  const { data: recipientProfiles } = await supabase
+    .from("eloo_profiles")
+    .select("id,email")
+    .in("id", recipientIds);
+
+  await Promise.allSettled(
+    (recipientProfiles || []).map((profile: { id: string; email?: string | null }) =>
+      notifyJobEvent({
+        action: "admin_broadcast_email",
+        tenantSlug: "default",
+        userId: profile.id,
+        email: profile.email || undefined,
+        campaignId: broadcastId,
+        audience,
+        title,
+        subject: title,
+        message,
+        actionLabel: "Open AnyJob",
+        actionPath: actionUrl || "/",
+      })
+    )
+  );
 
   await logAdminAction({
     actorId: admin.id,

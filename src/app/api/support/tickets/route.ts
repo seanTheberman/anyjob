@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { notifyJobEvent } from "@/lib/notifications/email-functions";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   SUPPORT_CATEGORIES,
@@ -180,6 +181,22 @@ export async function POST(request: NextRequest) {
       internal_note: false,
     });
 
+    void notifyJobEvent({
+      action: "support_ticket_created",
+      tenantSlug: "default",
+      userId: user.id,
+      email: user.email,
+      ticketId: ticket.id,
+      title,
+      message: description,
+      status: "open",
+      category,
+      priority,
+      actionPath: "/dashboard/account?tab=support",
+    }).then((result) => {
+      if (!result.ok) console.error("Support ticket email failed:", result);
+    });
+
     return NextResponse.json({ ticket: mapSupportTicketRow({ ...(ticket as AnyRecord), support_ticket_messages: [] }) }, { status: 201 });
   } catch (error) {
     console.error("Support ticket creation failed:", error);
@@ -206,6 +223,20 @@ export async function PATCH(request: NextRequest) {
     const { data: reply, error } = await admin.from("support_ticket_messages").insert({ ticket_id: ticketId, sender_user_id: user.id, sender_role: "user", body: message, internal_note: false }).select("*").single();
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     await admin.from("support_tickets").update({ status: ticket.status === "resolved" ? "open" : ticket.status, last_user_response_at: now, updated_at: now }).eq("id", ticketId);
+    void notifyJobEvent({
+      action: "support_ticket_replied",
+      tenantSlug: "default",
+      userId: user.id,
+      email: user.email,
+      ticketId,
+      messageId: reply.id,
+      title: "Support ticket reply",
+      message,
+      status: ticket.status === "resolved" ? "open" : ticket.status,
+      actionPath: "/dashboard/account?tab=support",
+    }).then((result) => {
+      if (!result.ok) console.error("Support ticket reply email failed:", result);
+    });
     return NextResponse.json({ reply });
   } catch (error) {
     console.error("Support ticket reply failed:", error);

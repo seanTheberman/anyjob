@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, TreePine, Flower2, Scissors, Leaf } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const GARDENING_SUBCATEGORIES = [
 
 
 export default async function JardinagePage() {
-    const providers = await getProviderCards("jardinage");
+    const providers = await getCountryProviderCards("jardinage");
 
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">

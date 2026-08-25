@@ -33,6 +33,17 @@ export type ProviderMarketplaceData = ProviderCardData & {
   searchText: string;
   categorySlug: string;
   heroImage: string | null;
+  serviceAreas?: ProviderServiceAreaData[];
+  worksInViewerArea?: boolean;
+};
+
+export type ProviderServiceAreaData = {
+  label: string;
+  locality: string;
+  region: string;
+  country: string;
+  countryCode: string;
+  radiusKm: number;
 };
 
 export type ProviderProfileData = {
@@ -58,6 +69,7 @@ export type ProviderProfileData = {
   experience: string;
   biography: string;
   services: string[];
+  packages: ProviderPackageData[];
   responseTime: string;
   hourlyRate: string;
   availability: string;
@@ -70,6 +82,19 @@ export type ProviderProfileData = {
   reviewDistribution: Record<number, number>;
   writtenReviews: ProviderWrittenReview[];
   relatedProviders: ProviderMarketplaceData[];
+  serviceAreas?: ProviderServiceAreaData[];
+  worksInViewerArea?: boolean;
+};
+
+export type ProviderPackageData = {
+  serviceId: string;
+  tier: string;
+  title: string;
+  description: string;
+  price: number;
+  deliveryDays: number;
+  revisions: number;
+  features: string[];
 };
 
 export type ProviderWrittenReview = {
@@ -124,6 +149,16 @@ type BadgeDefinitionRow = {
   name: string | null;
   slug?: string | null;
   is_active: boolean | null;
+};
+
+type ProviderServiceRow = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  hourly_rate: number | null;
+  min_hours: number | null;
+  tags: string[] | null;
+  gig_details: unknown;
 };
 
 type SellersSupabaseClient = {
@@ -454,6 +489,67 @@ function videoThumbnailFor(row: UserImageRow | null | undefined) {
   return metadata.thumbnailUrl || cloudinaryVideoThumbnail(row.image_url, metadata.thumbnailSecond || 0);
 }
 
+function recordValue(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+        ? parsed as Record<string, unknown>
+        : {};
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+function packageText(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function packageNumber(value: unknown, fallback = 0) {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
+function packagesFromServices(services: ProviderServiceRow[]): ProviderPackageData[] {
+  const service = services[0];
+  if (!service) return [];
+
+  const details = recordValue(service.gig_details);
+  const rawPackages = Array.isArray(details.packages) ? details.packages : [];
+  return rawPackages
+    .map((value, index) => {
+      const item = recordValue(value);
+      const tier = packageText(item.tier) || ["starter", "standard", "premium"][index] || `package-${index + 1}`;
+      const deliveryDays = Math.max(1, packageNumber(item.deliveryDays ?? item.delivery_days, 1));
+      const revisions = Math.max(0, packageNumber(item.revisions, 0));
+      const title = packageText(item.title) || service.title || `${tier} package`;
+      const description = packageText(item.description) || service.description || "";
+      const price = Math.max(0, packageNumber(item.price, service.hourly_rate || 0));
+      const features = [
+        ...(Array.isArray(item.features) ? item.features.map(packageText) : []),
+        ...(service.tags || []),
+      ].filter((feature, featureIndex, all): feature is string => Boolean(feature) && all.indexOf(feature) === featureIndex);
+
+      return {
+        serviceId: service.id,
+        tier,
+        title,
+        description,
+        price,
+        deliveryDays,
+        revisions,
+        features,
+      };
+    })
+    .filter((item) => item.title && item.price > 0)
+    .slice(0, 3);
+}
+
 function mapSellerToProfile(
   provider: SellerRow,
   media: ProviderMedia,
@@ -462,6 +558,7 @@ function mapSellerToProfile(
   writtenReviews: ProviderWrittenReview[] = [],
   relatedProviders: ProviderMarketplaceData[] = [],
   badges: string[] = [],
+  packages: ProviderPackageData[] = [],
 ): ProviderProfileData {
   const category = provider.service_category || "Service provider";
   const categorySlug = categorySlugFor(category);
@@ -494,6 +591,7 @@ function mapSellerToProfile(
     experience: publicExperienceLabel(provider),
     biography: provider.description || "",
     services: serviceList,
+    packages,
     responseTime: providerResponseTime(provider),
     hourlyRate: rate ? `From $${rate} / hour` : "Rate not set",
     availability: providerAvailabilityLabel(provider),
@@ -740,7 +838,7 @@ export async function getProviderProfileById(id: string) {
 
   if (!data) notFound();
 
-  const [portfolioResult, reviewResult, approvedProviders, badgeMap] = await Promise.all([
+  const [portfolioResult, reviewResult, servicesResult, approvedProviders, badgeMap] = await Promise.all([
     supabase
       .from("user_images")
       .select("image_url,image_type,description")
@@ -754,6 +852,13 @@ export async function getProviderProfileById(id: string) {
       .not("booking_id", "is", null)
       .order("created_at", { ascending: false })
       .limit(8),
+    (supabase as any)
+      .from("eloo_provider_services")
+      .select("id,title,description,hourly_rate,min_hours,tags,gig_details")
+      .eq("provider_id", id)
+      .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1),
     getApprovedSellers(),
     getProviderBadgeMap([id]),
   ]);
@@ -764,6 +869,10 @@ export async function getProviderProfileById(id: string) {
 
   if (reviewResult.error) {
     console.error("Failed to load provider written reviews:", reviewResult.error.message);
+  }
+
+  if (servicesResult.error) {
+    console.error("Failed to load provider packages:", servicesResult.error.message);
   }
 
   const providerRow = data as SellerRow;
@@ -798,5 +907,6 @@ export async function getProviderProfileById(id: string) {
     completionRate: 0,
   };
 
-  return mapSellerToProfile(providerRow, media, ratings, providerStats, writtenReviews, relatedProviders, badges);
+  const packages = packagesFromServices((servicesResult.data || []) as ProviderServiceRow[]);
+  return mapSellerToProfile(providerRow, media, ratings, providerStats, writtenReviews, relatedProviders, badges, packages);
 }

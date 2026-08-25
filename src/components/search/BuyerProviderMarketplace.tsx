@@ -713,6 +713,13 @@ function ProviderGigCard({ provider, saved, onSave, compact = false }: { provide
           <div className="mt-auto flex items-end justify-between gap-3">
             <div className="min-w-0">
               <span className="block truncate text-xs font-medium text-slate-500">{provider.category} · {provider.city}</span>
+              {provider.worksInViewerArea ? (
+                <span className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-emerald-700">
+                  <MapPin className="h-3.5 w-3.5" /> Works in your area
+                </span>
+              ) : provider.serviceAreas?.length ? (
+                <span className="mt-1 block truncate text-xs font-medium text-slate-500">Serves {provider.serviceAreas.length} preferred {provider.serviceAreas.length === 1 ? "area" : "areas"}</span>
+              ) : null}
               {provider.badges.some((item) => item === "Business" || item === "Agency") ? (
                 <div className="mt-1 flex flex-wrap gap-1">
                   {provider.badges.filter((item) => item === "Business" || item === "Agency").map((item) => (
@@ -777,7 +784,9 @@ function ProviderGigCard({ provider, saved, onSave, compact = false }: { provide
             </span>
             <span className="inline-flex min-w-0 items-center gap-1.5">
               <MapPin className="h-4 w-4 shrink-0 text-slate-400" />
-              <span className="truncate">{provider.city}</span>
+              <span className={cn("truncate", provider.worksInViewerArea && "font-bold text-emerald-700")}>
+                {provider.worksInViewerArea ? "Works in your area" : provider.city}
+              </span>
             </span>
             {provider.availability ? (
               <span className="inline-flex min-w-0 items-center gap-1.5">

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Snowflake, Home, Car, Heart, TreePine } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const WINTER_SUBCATEGORIES = [
 
 
 export default async function HiverPage() {
-    const providers = await getProviderCards("hiver");
+    const providers = await getCountryProviderCards("hiver");
 
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">

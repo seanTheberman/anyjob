@@ -51,6 +51,8 @@ import { CategoryIcon, SubcategoryIcon } from "@/components/shared/CategoryIcon"
 import type { User } from "@supabase/supabase-js";
 import { SHIFT_NICHES, WORK_TYPES, getShiftNiche } from "@/lib/shift-work";
 import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
+import { VerifiedLocationFields } from "@/components/location/VerifiedLocationFields";
+import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
 
 // Types
 interface Category {
@@ -190,10 +192,6 @@ const BUDGET_OPTIONS = [
   { value: "500+", label: "500€+", min: 500, max: null },
 ];
 
-function roundToCoarseCoordinate(value: number) {
-  return Math.round(value * 100) / 100;
-}
-
 function buildCoarseLocationLabel(city: string, postalCode: string) {
   const postalPrefix = postalCode.trim().slice(0, 3);
   return [city.trim(), postalPrefix ? `${postalPrefix} area` : ""].filter(Boolean).join(", ");
@@ -219,6 +217,7 @@ interface FormData {
   coarse_longitude: number | null;
   location_accuracy_meters: number | null;
   coarse_location_label: string;
+  location_token: string;
   estimated_duration_hours: number;
   number_of_people_needed: number;
   budget_range: string;
@@ -294,6 +293,7 @@ const INITIAL_FORM_DATA: FormData = {
   coarse_longitude: null,
   location_accuracy_meters: null,
   coarse_location_label: "",
+  location_token: "",
   estimated_duration_hours: 2,
   number_of_people_needed: 1,
   budget_range: "",
@@ -414,6 +414,27 @@ function ServiceQuestionnaireContent() {
   const isTaskrabbitSelection = searchParams.get("source") === "taskrabbit";
   const selectedCustomJobName = formData.category_slug === "custom" ? formData.custom_tags[0] : "";
   const selectedShiftNiche = useMemo(() => getShiftNiche(shiftFormData.niche), [shiftFormData.niche]);
+  const marketLocation = useVerifiedMarketLocation();
+
+  useEffect(() => {
+    if (!marketLocation.location || !marketLocation.token) return;
+    const location = marketLocation.location;
+    setFormData((current) => ({
+      ...current,
+      city: location.city,
+      postal_code: location.postalCode,
+      coarse_latitude: location.coarseLatitude,
+      coarse_longitude: location.coarseLongitude,
+      location_accuracy_meters: location.accuracyMeters,
+      coarse_location_label: buildCoarseLocationLabel(location.city, location.postalCode),
+      location_token: marketLocation.token,
+    }));
+    setShiftFormData((current) => ({
+      ...current,
+      city: location.city,
+      postalCode: location.postalCode,
+    }));
+  }, [marketLocation.location, marketLocation.token]);
 
   // Get pre-selected category from URL
   useEffect(() => {
@@ -578,7 +599,7 @@ function ServiceQuestionnaireContent() {
       case 5:
         return !!formData.preferred_date;
       case 6:
-        return !!formData.address && !!formData.city;
+        return !!formData.address && !!formData.city && !!formData.location_token;
       case 7:
         return formData.estimated_duration_hours > 0 && !!formData.budget_range;
       case 8:
@@ -664,6 +685,16 @@ function ServiceQuestionnaireContent() {
       }
 
       // Get or create session ID
+      const locationResponse = await fetch("/api/location/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: formData.location_token }),
+      });
+      const locationPayload = await locationResponse.json().catch(() => ({}));
+      if (!locationResponse.ok) {
+        throw new Error(locationPayload.error || "Verify your location before posting the request.");
+      }
+
       let sessionId = localStorage.getItem("inquiry_session_id");
       if (!sessionId) {
         sessionId = crypto.randomUUID();
@@ -830,6 +861,10 @@ function ServiceQuestionnaireContent() {
             <ShiftScheduleLocationStep
               formData={shiftFormData}
               updateFormData={updateShiftFormData}
+              location={marketLocation.location}
+              locationLoading={marketLocation.loading}
+              locationError={marketLocation.error}
+              retryLocation={() => void marketLocation.requestLocation()}
               onNext={handleNext}
               onPrevious={handlePrevious}
             />
@@ -903,6 +938,10 @@ function ServiceQuestionnaireContent() {
           <Step6Location
             formData={formData}
             updateFormData={updateFormData}
+            location={marketLocation.location}
+            locationLoading={marketLocation.loading}
+            locationError={marketLocation.error}
+            retryLocation={() => void marketLocation.requestLocation()}
             onNext={handleNext}
             onPrevious={handlePrevious}
           />
@@ -1250,11 +1289,19 @@ function ShiftRoleStep({
 function ShiftScheduleLocationStep({
   formData,
   updateFormData,
+  location,
+  locationLoading,
+  locationError,
+  retryLocation,
   onNext,
   onPrevious,
 }: {
   formData: ShiftBusinessPostForm;
   updateFormData: (field: keyof ShiftBusinessPostForm, value: string | boolean) => void;
+  location: ReturnType<typeof useVerifiedMarketLocation>["location"];
+  locationLoading: boolean;
+  locationError: string;
+  retryLocation: () => void;
   onNext: () => void;
   onPrevious: () => void;
 }) {
@@ -1306,14 +1353,9 @@ function ShiftScheduleLocationStep({
           <span className="text-sm font-semibold text-gray-700">Address *</span>
           <Textarea value={formData.address} onChange={(event) => updateFormData("address", event.target.value)} className="mt-2 min-h-20 resize-none" />
         </label>
-        <label className="block">
-          <span className="text-sm font-semibold text-gray-700">City *</span>
-          <Input value={formData.city} onChange={(event) => updateFormData("city", event.target.value)} className="mt-2" />
-        </label>
-        <label className="block">
-          <span className="text-sm font-semibold text-gray-700">Eircode</span>
-          <Input value={formData.postalCode} onChange={(event) => updateFormData("postalCode", event.target.value)} className="mt-2" />
-        </label>
+        <div className="sm:col-span-2">
+          <VerifiedLocationFields location={location} loading={locationLoading} error={locationError} onRetry={retryLocation} />
+        </div>
       </div>
 
       <div className="flex justify-between pt-2">
@@ -1989,42 +2031,22 @@ function Step5Schedule({
 function Step6Location({
   formData,
   updateFormData,
+  location,
+  locationLoading,
+  locationError,
+  retryLocation,
   onNext,
   onPrevious,
 }: {
   formData: FormData;
   updateFormData: (field: keyof FormData, value: unknown) => void;
+  location: ReturnType<typeof useVerifiedMarketLocation>["location"];
+  locationLoading: boolean;
+  locationError: string;
+  retryLocation: () => void;
   onNext: () => void;
   onPrevious: () => void;
 }) {
-  const [locationStatus, setLocationStatus] = useState<string | null>(null);
-
-  const requestLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationStatus("Location access is not available in this browser.");
-      return;
-    }
-
-    setLocationStatus("Requesting location access...");
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-        updateFormData("latitude", latitude);
-        updateFormData("longitude", longitude);
-        updateFormData("coarse_latitude", roundToCoarseCoordinate(latitude));
-        updateFormData("coarse_longitude", roundToCoarseCoordinate(longitude));
-        updateFormData("location_accuracy_meters", Math.round(position.coords.accuracy));
-        updateFormData("coarse_location_label", buildCoarseLocationLabel(formData.city, formData.postal_code));
-        setLocationStatus("Location saved. Providers will only see the approximate area until their quote is accepted.");
-      },
-      () => {
-        setLocationStatus("Location access was not granted. You can still continue with city and address.");
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
-    );
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -2037,17 +2059,8 @@ function Step6Location({
       </div>
 
       <div className="space-y-4">
-        <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-blue-950">Share approximate location</p>
-              <p className="text-sm text-blue-700">This helps nearby providers estimate travel before they quote.</p>
-            </div>
-            <Button type="button" variant="outline" onClick={requestLocation} className="bg-white">
-              <MapPin className="w-4 h-4 mr-2" /> Use my location
-            </Button>
-          </div>
-          {locationStatus && <p className="mt-3 text-sm text-blue-800">{locationStatus}</p>}
+        <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+          <VerifiedLocationFields location={location} loading={locationLoading} error={locationError} onRetry={retryLocation} />
         </div>
 
         <div>
@@ -2066,35 +2079,6 @@ function Step6Location({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label>City</Label>
-            <div className="relative">
-              <Home className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Dublin"
-                value={formData.city}
-                onChange={(e) => {
-                  updateFormData("city", e.target.value);
-                  updateFormData("coarse_location_label", buildCoarseLocationLabel(e.target.value, formData.postal_code));
-                }}
-                className="pl-10"
-              />
-            </div>
-          </div>
-          <div>
-            <Label>Eircode</Label>
-            <Input
-              placeholder="D02 X285"
-              value={formData.postal_code}
-              onChange={(e) => {
-                updateFormData("postal_code", e.target.value);
-                updateFormData("coarse_location_label", buildCoarseLocationLabel(formData.city, e.target.value));
-              }}
-              maxLength={10}
-            />
-          </div>
-        </div>
       </div>
 
       <div className="flex justify-between pt-4">
@@ -2103,7 +2087,7 @@ function Step6Location({
         </Button>
         <Button
           onClick={onNext}
-          disabled={!formData.address || !formData.city}
+          disabled={!formData.address || !formData.city || !formData.location_token}
           className="bg-red-600 hover:bg-red-700 text-white px-8"
         >
           Continue <ArrowRight className="w-4 h-4 ml-2" />

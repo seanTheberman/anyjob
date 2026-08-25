@@ -1,11 +1,12 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft } from "lucide-react-native";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Button, Field, Screen } from "@/components/ui";
 import { fetchApiResponse } from "@/lib/api";
 import { colors } from "@/theme/tokens";
+import { useMarketLocation } from "@/providers/market-location-provider";
 
 type Kind = "buyer" | "seller";
 type WorkMode = "freelance" | "shift" | "both";
@@ -17,6 +18,7 @@ export default function RegisterScreen() {
   const [busy, setBusy] = useState(false);
   const [workMode, setWorkMode] = useState<WorkMode>("freelance");
   const [errorMessage, setErrorMessage] = useState("");
+  const marketLocation = useMarketLocation();
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -35,6 +37,14 @@ export default function RegisterScreen() {
 
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
+  useEffect(() => {
+    if (!marketLocation.location) return;
+    setForm((current) => ({
+      ...current,
+      city: marketLocation.location?.city || "",
+      postalCode: marketLocation.location?.postalCode || "",
+    }));
+  }, [marketLocation.location]);
   const needsShiftProfile = kind === "seller" && workMode !== "freelance";
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
   const complete = Boolean(
@@ -42,11 +52,11 @@ export default function RegisterScreen() {
       form.lastName &&
       validEmail &&
       form.password.length >= 8 &&
+      form.address &&
+      form.city &&
+      marketLocation.token &&
       (kind === "buyer" ||
         (form.phone &&
-          form.address &&
-          form.city &&
-          form.postalCode &&
           form.birthDate &&
           form.serviceCategory &&
           (!needsShiftProfile ||
@@ -68,9 +78,10 @@ export default function RegisterScreen() {
         kind === "buyer" ? "/api/auth/register-buyer" : "/api/auth/register-seller";
       const body =
         kind === "buyer"
-          ? { ...form, newsletterSubscribed: false }
+          ? { ...form, locationToken: marketLocation.token, newsletterSubscribed: false }
           : {
               ...form,
+              locationToken: marketLocation.token,
               workMode,
               termsAccepted: true,
               shiftNiches: form.shiftNiches
@@ -151,8 +162,17 @@ export default function RegisterScreen() {
       />
       <Field label="Phone" value={form.phone} keyboardType="phone-pad" onChangeText={set("phone")} />
       <Field label="Address" value={form.address} onChangeText={set("address")} />
-      <Field label="City" value={form.city} onChangeText={set("city")} />
-      <Field label="Postal code" value={form.postalCode} onChangeText={set("postalCode")} />
+      <Field label="City" value={form.city || "Waiting for location"} editable={false} />
+      <Field label="State / region" value={marketLocation.location?.region || "Not available"} editable={false} />
+      <Field label="Postal code" value={form.postalCode || "Not available"} editable={false} />
+      <Field label="Country" value={marketLocation.location?.country || "Waiting for location"} editable={false} />
+      {marketLocation.error ? <Text style={styles.error}>{marketLocation.error}</Text> : null}
+      <Button
+        title={marketLocation.location ? "Refresh location" : "Verify location"}
+        variant="secondary"
+        loading={marketLocation.loading}
+        onPress={() => void marketLocation.refresh()}
+      />
       {kind === "seller" ? (
         <>
           <Field label="Date of birth (YYYY-MM-DD)" value={form.birthDate} onChangeText={set("birthDate")} />

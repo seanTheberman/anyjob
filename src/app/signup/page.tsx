@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye, EyeOff, ArrowRight, Loader2, User, Briefcase } from "lucide-react";
+import { VerifiedLocationFields } from "@/components/location/VerifiedLocationFields";
+import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
 
 function safeRedirect(value: string | null) {
     if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
@@ -25,91 +27,50 @@ function SignupPageContent() {
     const [password, setPassword] = useState("");
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
+    const [phone, setPhone] = useState("");
+    const [address, setAddress] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [role, setRole] = useState<"client" | "provider">(
         isBusinessRegistrationSignup ? "client" : roleParam === "client" || roleParam === "provider" ? roleParam : "client"
     );
     const signupRole = isBusinessRegistrationSignup ? "client" : role;
+    const marketLocation = useVerifiedMarketLocation();
 
     async function handleSignup(e: React.FormEvent) {
         e.preventDefault();
         setLoading(true);
         setError(null);
 
-        const supabase = createClient();
-        
-        // Create user account
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    first_name: firstName,
-                    last_name: lastName,
-                    role: signupRole,
-                },
-            },
-        });
-
-        if (signUpError) {
-            setError(signUpError.message);
+        if (signupRole === "provider") {
+            window.location.href = "/seller-register";
+            return;
+        }
+        if (!marketLocation.location || !marketLocation.token) {
+            setError("Allow location access and verify your marketplace location before creating an account.");
             setLoading(false);
             return;
         }
 
-        if (authData.user) {
-            // Create profile with role
-            const { error: profileError } = await supabase
-                .from('eloo_profiles')
-                .upsert({
-                    id: authData.user.id,
-                    role: signupRole,
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: email,
-                }, {
-                    onConflict: 'id',
-                });
-
-            if (profileError) {
-                setError(profileError.message);
-                setLoading(false);
-                return;
-            }
-
-            if (signupRole === 'provider') {
-                const providerProfile = await fetch("/api/auth/provider-profile", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ firstName, lastName, email }),
-                });
-
-                if (!providerProfile.ok) {
-                    const payload = await providerProfile.json().catch(() => ({}));
-                    setError(payload.error || "Failed to create provider profile");
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            // Redirect to requested onboarding flow, or the appropriate dashboard.
-            if (redirectTarget) {
-                window.location.href = redirectTarget;
-                return;
-            }
-
-            if (signupRole === 'provider') {
-                window.location.href = "/pro";
-            } else {
-                window.location.href = "/dashboard";
-            }
+        const response = await fetch("/api/auth/register-buyer", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ firstName, lastName, email, password, phone, address, locationToken: marketLocation.token }),
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            setError(payload.error || "Failed to create account");
+            setLoading(false);
+            return;
         }
-
-        setLoading(false);
+        window.location.href = redirectTarget || "/login?registered=1";
     }
 
     async function handleGoogleSignup() {
+        if (!marketLocation.location || !marketLocation.token) {
+            setError("Allow location access before continuing with Google.");
+            return;
+        }
         const supabase = createClient();
         const callbackParams = new URLSearchParams({ role: signupRole });
         if (redirectTarget) callbackParams.set("next", redirectTarget);
@@ -240,6 +201,31 @@ function SignupPageContent() {
                                     className="h-11"
                                 />
                             </div>
+                            <div>
+                                <Input
+                                    type="tel"
+                                    placeholder="Phone number"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    className="h-11"
+                                />
+                            </div>
+                            <div>
+                                <Input
+                                    type="text"
+                                    placeholder="Street address"
+                                    value={address}
+                                    onChange={(e) => setAddress(e.target.value)}
+                                    required={signupRole === "client"}
+                                    className="h-11"
+                                />
+                            </div>
+                            <VerifiedLocationFields
+                                location={marketLocation.location}
+                                loading={marketLocation.loading}
+                                error={marketLocation.error}
+                                onRetry={() => void marketLocation.requestLocation()}
+                            />
                             <div className="relative">
                                 <Input
                                     type={showPassword ? "text" : "password"}
@@ -257,7 +243,7 @@ function SignupPageContent() {
                                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 </button>
                             </div>
-                            <Button type="submit" className="w-full h-11" disabled={loading}>
+                            <Button type="submit" className="w-full h-11" disabled={loading || (signupRole === "client" && !marketLocation.token)}>
                                 {loading ? (
                                     <>
                                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -265,7 +251,7 @@ function SignupPageContent() {
                                     </>
                                 ) : (
                                     <>
-                                        {isBusinessRegistrationSignup ? "Create account and continue" : "Create Account"}
+                                        {signupRole === "provider" ? "Continue provider registration" : isBusinessRegistrationSignup ? "Create account and continue" : "Create Account"}
                                         <ArrowRight className="w-4 h-4 ml-2" />
                                     </>
                                 )}

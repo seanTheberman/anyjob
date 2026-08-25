@@ -55,6 +55,23 @@ const notificationFunctionByAction: Record<string, string> = {
   process_job_expirations: "job-expiry-notifications",
   process_unread_alerts: "unread-alert-notifications",
   anyjob_select_quote_received: "select-quote-notifications",
+  welcome_email: "welcome-notifications",
+  thank_you_email: "welcome-notifications",
+  promo_campaign: "promo-notifications",
+  admin_broadcast_email: "promo-notifications",
+  review_received: "review-notifications",
+  support_ticket_created: "support-notifications",
+  support_ticket_replied: "support-notifications",
+  support_ticket_updated: "support-notifications",
+  quote_received: "quote-notifications",
+  quote_updated: "quote-notifications",
+  quote_declined: "quote-notifications",
+  shift_application_received: "shift-notifications",
+  shift_application_accepted: "shift-notifications",
+  shift_application_rejected: "shift-notifications",
+  shift_payment_received: "shift-notifications",
+  shift_completed: "shift-notifications",
+  shift_review_received: "shift-notifications",
 };
 
 export async function notifyJobEvent(payload: Record<string, unknown>) {

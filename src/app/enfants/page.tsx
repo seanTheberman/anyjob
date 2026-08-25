@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Baby, Heart, BookOpen, Gamepad2 } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const CHILDREN_SUBCATEGORIES = [
 
 
 export default async function EnfantsPage() {
-    const providers = await getProviderCards("enfants");
+    const providers = await getCountryProviderCards("enfants");
 
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">

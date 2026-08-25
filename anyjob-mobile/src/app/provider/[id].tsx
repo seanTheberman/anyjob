@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
+import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
   BadgeCheck,
@@ -17,6 +18,9 @@ import {
 import { useEffect, useState } from "react";
 import {
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,14 +32,16 @@ import {
   Avatar,
   Button,
   ErrorState,
+  Field,
   Header,
   LoadingState,
   Pill,
   Screen,
   SectionHeader,
 } from "@/components/ui";
-import { api } from "@/lib/api";
+import { api, ApiError, jsonBody } from "@/lib/api";
 import { serviceCover } from "@/lib/service-assets";
+import { useAuth } from "@/providers/auth-provider";
 import { useAppTheme } from "@/providers/theme-provider";
 
 type GigPackage = {
@@ -125,6 +131,8 @@ type ProviderProfile = {
   relatedProviders?: RelatedProvider[];
   status?: string;
   is_verified?: boolean;
+  serviceAreas?: Array<{ label?: string; radiusKm?: number }>;
+  worksInViewerArea?: boolean;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -252,9 +260,21 @@ export default function PublicProviderScreen() {
   const providerId = textValue(id);
   const router = useRouter();
   const { colors } = useAppTheme();
+  const { session } = useAuth();
   const [saved, setSaved] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState(0);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [showDirectHire, setShowDirectHire] = useState(false);
+  const [hiring, setHiring] = useState(false);
+  const [hireError, setHireError] = useState("");
+  const [hireForm, setHireForm] = useState({
+    preferredDate: "",
+    preferredTime: "",
+    address: "",
+    city: "",
+    postalCode: "",
+    notes: "",
+  });
   const query = useQuery({
     queryKey: ["public-profile", providerId],
     queryFn: () => api<any>(`/api/profile/${providerId}?role=provider`),
@@ -312,34 +332,7 @@ export default function PublicProviderScreen() {
     (Array.isArray(details.packages) ? details.packages : [])
       .map(packageValue)
       .filter((item) => item.title || item.price) || [];
-  const packages: GigPackage[] = authoredPackages.length
-    ? authoredPackages
-    : [
-        {
-          tier: "starter",
-          title: "Starter",
-          description: `A focused ${category.toLowerCase()} booking for one clear task.`,
-          price: baseRate,
-          deliveryDays: 1,
-          revisions: 0,
-        },
-        {
-          tier: "standard",
-          title: "Standard",
-          description: `A longer session covering the most common ${category.toLowerCase()} needs.`,
-          price: Math.max(baseRate * 2, baseRate + 25),
-          deliveryDays: 2,
-          revisions: 1,
-        },
-        {
-          tier: "premium",
-          title: "Premium",
-          description: `Complete support for larger or multi-step ${category.toLowerCase()} work.`,
-          price: Math.max(baseRate * 3, baseRate + 50),
-          deliveryDays: 4,
-          revisions: 2,
-        },
-      ];
+  const packages: GigPackage[] = authoredPackages;
   const activePackage =
     packages[Math.min(selectedPackage, packages.length - 1)] || packages[0];
   const media = [
@@ -372,6 +365,9 @@ export default function PublicProviderScreen() {
       .join(", ") ||
     "Location not provided";
   const contactWindows = textArray(profile.contactWindows);
+  const serviceAreas = (Array.isArray(profile.serviceAreas) ? profile.serviceAreas : [])
+    .map((area) => ({ label: textValue(area.label), radiusKm: numberValue(area.radiusKm) }))
+    .filter((area) => area.label);
   const reviews = (Array.isArray(profile.writtenReviews)
     ? profile.writtenReviews
     : []
@@ -434,6 +430,93 @@ export default function PublicProviderScreen() {
         packageTier: activePackage?.tier || String(selectedPackage),
       },
     });
+
+  const openDirectHire = () => {
+    if (!session) {
+      router.push({
+        pathname: "/(auth)/sign-in",
+        params: { redirectTo: `/provider/${providerId}` },
+      });
+      return;
+    }
+    setHireError("");
+    setShowDirectHire(true);
+  };
+
+  const setHireField = (key: keyof typeof hireForm) => (value: string) => {
+    setHireForm((current) => ({ ...current, [key]: value }));
+    setHireError("");
+  };
+
+  const hirePackage = async () => {
+    if (!gig?.id || !activePackage?.tier) {
+      setHireError("This package is no longer available.");
+      return;
+    }
+    if (!hireForm.preferredDate || !/^\d{4}-\d{2}-\d{2}$/.test(hireForm.preferredDate)) {
+      setHireError("Enter the booking date as YYYY-MM-DD.");
+      return;
+    }
+    if (!hireForm.preferredTime || !/^\d{2}:\d{2}$/.test(hireForm.preferredTime)) {
+      setHireError("Enter the preferred time as HH:MM.");
+      return;
+    }
+    if (!hireForm.address.trim() || !hireForm.city.trim()) {
+      setHireError("Enter the service address and city.");
+      return;
+    }
+
+    let inquiryId = "";
+    try {
+      setHiring(true);
+      setHireError("");
+      const direct = await api<any>("/api/direct-hire", {
+        method: "POST",
+        ...jsonBody({
+          providerId,
+          serviceId: gig.id,
+          packageTier: activePackage.tier,
+          ...hireForm,
+        }),
+      });
+      inquiryId = textValue(direct.inquiry?.id);
+      const checkout = await api<any>("/api/payments/bid-checkout", {
+        method: "POST",
+        ...jsonBody({ bid_id: direct.bid?.id }),
+      });
+
+      setShowDirectHire(false);
+      if (checkout.checkoutUrl && !checkout.dummyPayment) {
+        await WebBrowser.openBrowserAsync(checkout.checkoutUrl);
+      }
+      if (inquiryId) router.push(`/requests/${inquiryId}`);
+      Alert.alert(
+        checkout.dummyPayment ? "Provider hired" : "Payment started",
+        checkout.dummyPayment
+          ? "Your package booking is confirmed and messaging is unlocked."
+          : "Return to AnyJob after payment to see the confirmed booking.",
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setShowDirectHire(false);
+        router.push({
+          pathname: "/(auth)/sign-in",
+          params: { redirectTo: `/provider/${providerId}` },
+        });
+        return;
+      }
+      const message = error instanceof Error ? error.message : "Could not hire this package.";
+      if (inquiryId) {
+        setShowDirectHire(false);
+        router.push(`/requests/${inquiryId}`);
+        Alert.alert("Booking created; payment pending", message);
+      } else {
+        setHireError(message);
+      }
+    } finally {
+      setHiring(false);
+    }
+  };
 
   if (query.isLoading)
     return (
@@ -536,7 +619,7 @@ export default function PublicProviderScreen() {
         </View>
       </View>
 
-      <View
+      {activePackage ? <View
         style={[
           styles.packageCard,
           { backgroundColor: colors.surface, borderColor: colors.line },
@@ -622,18 +705,31 @@ export default function PublicProviderScreen() {
               </Text>
             </View>
           ))}
-          <Button title="Continue" onPress={continueBooking} />
+          <Button title="Hire this package" onPress={openDirectHire} />
+          <Button
+            title="Post a custom request instead"
+            variant="secondary"
+            onPress={continueBooking}
+          />
           <Text
             style={[
               styles.safetyCopy,
               { color: colors.muted, backgroundColor: colors.soft },
             ]}
           >
-            Share the job details first. You only confirm after the scope is
-            clear.
+            The package price comes from the provider's published service. Your
+            exact address stays private until booking is confirmed.
           </Text>
         </View>
-      </View>
+      </View> : (
+        <View style={[styles.packageCard, styles.packageBody, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <Text style={[styles.packageName, { color: colors.ink }]}>Custom requests only</Text>
+          <Text style={[styles.packageDescription, { color: colors.muted }]}>
+            {name} has not published a fixed-price package yet.
+          </Text>
+          <Button title="Post a custom request" onPress={continueBooking} />
+        </View>
+      )}
 
       <SectionHeader title="About this gig" />
       <Text style={[styles.bodyCopy, { color: colors.muted }]}>
@@ -729,6 +825,20 @@ export default function PublicProviderScreen() {
             </Text>
           </View>
         </View>
+        {serviceAreas.length ? (
+          <View style={[styles.contactWindows, { borderTopColor: colors.line }]}>
+            <Text style={[styles.detailLabel, { color: profile.worksInViewerArea ? colors.success : colors.muted }]}>
+              {profile.worksInViewerArea ? "Works in your area" : "Seller preference areas"}
+            </Text>
+            <View style={styles.windowPills}>
+              {serviceAreas.slice(0, 8).map((area) => (
+                <View key={area.label} style={[styles.windowPill, { backgroundColor: colors.soft, borderColor: colors.line }]}>
+                  <Text style={[styles.windowText, { color: colors.ink }]}>{area.label} · {area.radiusKm || 15} km</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
         {contactWindows.length ? (
           <View style={[styles.contactWindows, { borderTopColor: colors.line }]}>
             <Text style={[styles.detailLabel, { color: colors.muted }]}>
@@ -970,7 +1080,63 @@ export default function PublicProviderScreen() {
           </Text>
         </View>
       </View>
-      <Button title={`Continue with ${name}`} onPress={continueBooking} />
+      {activePackage ? (
+        <Button title={`Hire ${activePackage.title || "this package"}`} onPress={openDirectHire} />
+      ) : (
+        <Button title="Post a custom request" onPress={continueBooking} />
+      )}
+
+      <Modal
+        visible={showDirectHire}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDirectHire(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalBackdrop}
+        >
+          <View style={[styles.modalSheet, { backgroundColor: colors.surface }] }>
+            <View style={styles.modalHead}>
+              <View style={styles.modalCopy}>
+                <Text style={[styles.modalEyebrow, { color: colors.brand }]}>DIRECT HIRE</Text>
+                <Text style={[styles.modalTitle, { color: colors.ink }]}>
+                  {activePackage?.title || "Service package"}
+                </Text>
+                <Text style={[styles.modalSubtitle, { color: colors.muted }]}>
+                  {name} · €{Number(activePackage?.price || 0).toFixed(0)}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close direct hire"
+                onPress={() => setShowDirectHire(false)}
+                style={[styles.modalClose, { backgroundColor: colors.soft }]}
+              >
+                <Text style={[styles.modalCloseText, { color: colors.ink }]}>×</Text>
+              </Pressable>
+            </View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalFields}
+            >
+              <Field label="Date" placeholder="YYYY-MM-DD" value={hireForm.preferredDate} onChangeText={setHireField("preferredDate")} />
+              <Field label="Preferred time" placeholder="HH:MM" value={hireForm.preferredTime} onChangeText={setHireField("preferredTime")} />
+              <Field label="Service address" placeholder="Street address" value={hireForm.address} onChangeText={setHireField("address")} />
+              <Field label="City" placeholder="City" value={hireForm.city} onChangeText={setHireField("city")} />
+              <Field label="Postal code" placeholder="Optional" value={hireForm.postalCode} onChangeText={setHireField("postalCode")} />
+              <Field label="Notes for provider" placeholder="Access, scope, or timing details" multiline value={hireForm.notes} onChangeText={setHireField("notes")} />
+              {hireError ? (
+                <Text accessibilityRole="alert" style={[styles.hireError, { color: colors.danger, backgroundColor: colors.soft }]}>
+                  {hireError}
+                </Text>
+              ) : null}
+              <Button title="Pay and hire package" loading={hiring} onPress={() => void hirePackage()} />
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </Screen>
   );
 }
@@ -1151,4 +1317,31 @@ const styles = StyleSheet.create({
   trustCopy: { flex: 1, gap: 3 },
   trustTitle: { fontSize: 13.5, fontWeight: "900" },
   trustBody: { fontSize: 11, lineHeight: 16 },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+  },
+  modalSheet: {
+    maxHeight: "92%",
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 18,
+    gap: 16,
+  },
+  modalHead: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  modalCopy: { flex: 1, gap: 3 },
+  modalEyebrow: { fontSize: 10.5, fontWeight: "900" },
+  modalTitle: { fontSize: 20, lineHeight: 25, fontWeight: "900" },
+  modalSubtitle: { fontSize: 12.5, fontWeight: "700" },
+  modalClose: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalCloseText: { fontSize: 27, lineHeight: 29, fontWeight: "500" },
+  modalFields: { gap: 13, paddingBottom: 20 },
+  hireError: { borderRadius: 11, padding: 11, fontSize: 12, lineHeight: 18, fontWeight: "800" },
 });

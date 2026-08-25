@@ -2,6 +2,11 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  MarketLocationError,
+  persistUserMarketLocation,
+  verifyMarketLocationToken,
+} from "@/lib/location/market-location";
 
 const BUDGETS: Record<string, { min: number; max: number }> = {
   "0-50": { min: 0, max: 50 },
@@ -27,12 +32,6 @@ function number(input: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function nullableNumber(input: unknown) {
-  if (input === null || input === undefined || input === "") return null;
-  const parsed = Number(input);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
 function meaningfulLength(input: string) {
   return input.replace(/[^a-zA-Z0-9]/g, "").length;
 }
@@ -45,6 +44,7 @@ function validDate(input: string) {
 }
 
 export async function POST(request: NextRequest) {
+  try {
   const auth = await createServerSupabaseClient();
   const {
     data: { user },
@@ -58,6 +58,11 @@ export async function POST(request: NextRequest) {
     string,
     unknown
   >;
+  const location = verifyMarketLocationToken(
+    request,
+    value(body, "location_token", "locationToken") || request.cookies.get("anyjob_market_location")?.value,
+  );
+  await persistUserMarketLocation(user.id, location);
   const category = text(value(body, "category_slug", "category"));
   const subcategory = text(value(body, "subcategory_slug", "subcategory"));
   const serviceType = text(value(body, "service_type", "serviceType"));
@@ -66,7 +71,7 @@ export async function POST(request: NextRequest) {
   const description = text(value(body, "job_description", "description"));
   const preferredDate = text(value(body, "preferred_date", "preferredDate"));
   const address = text(body.address);
-  const city = text(body.city);
+  const city = location.city;
   const duration = number(
     value(body, "estimated_duration_hours", "durationHours"),
   );
@@ -109,15 +114,7 @@ export async function POST(request: NextRequest) {
       .maybeSingle(),
   ]);
   const person = buyer || profile || {};
-  const postalCode = text(value(body, "postal_code", "postalCode"));
-  const latitude = nullableNumber(body.latitude);
-  const longitude = nullableNumber(body.longitude);
-  const coarseLatitude = nullableNumber(
-    value(body, "coarse_latitude", "coarseLatitude"),
-  );
-  const coarseLongitude = nullableNumber(
-    value(body, "coarse_longitude", "coarseLongitude"),
-  );
+  const postalCode = location.postalCode;
   const customTags = value(body, "custom_tags", "tags");
   const defaultCoarseLabel = [
     city,
@@ -155,28 +152,16 @@ export async function POST(request: NextRequest) {
       address,
       city,
       postal_code: postalCode,
-      latitude:
-        latitude != null && latitude >= -90 && latitude <= 90 ? latitude : null,
-      longitude:
-        longitude != null && longitude >= -180 && longitude <= 180
-          ? longitude
-          : null,
-      coarse_latitude:
-        coarseLatitude != null && coarseLatitude >= -90 && coarseLatitude <= 90
-          ? coarseLatitude
-          : null,
-      coarse_longitude:
-        coarseLongitude != null &&
-        coarseLongitude >= -180 &&
-        coarseLongitude <= 180
-          ? coarseLongitude
-          : null,
-      location_accuracy_meters: nullableNumber(
-        value(body, "location_accuracy_meters", "locationAccuracyMeters"),
-      ),
-      coarse_location_label:
-        text(value(body, "coarse_location_label", "coarseLocationLabel")) ||
-        defaultCoarseLabel,
+      country: location.country,
+      country_code: location.countryCode,
+      region: location.region || null,
+      latitude: null,
+      longitude: null,
+      coarse_latitude: location.coarseLatitude,
+      coarse_longitude: location.coarseLongitude,
+      location_accuracy_meters: location.accuracyMeters,
+      location_verified_at: new Date().toISOString(),
+      coarse_location_label: defaultCoarseLabel,
       estimated_duration_hours: duration,
       number_of_people_needed: Math.max(
         1,
@@ -199,4 +184,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   return NextResponse.json({ inquiry: data }, { status: 201 });
+  } catch (error) {
+    if (error instanceof MarketLocationError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+    console.error("Mobile request creation failed:", error);
+    return NextResponse.json({ error: "Could not create request" }, { status: 500 });
+  }
 }

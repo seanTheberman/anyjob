@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Users, ThumbsUp, ShieldCheck, Computer, Wifi, Monitor } from "lucide-react";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
-import { getProviderCards } from "@/lib/real-providers";
+import { getCountryProviderCards } from "@/lib/location/country-providers";
 
 export const dynamic = "force-dynamic";
 
@@ -48,7 +48,7 @@ const IT_SUBCATEGORIES = [
 
 
 export default async function InformatiquePage() {
-    const providers = await getProviderCards("informatique");
+    const providers = await getCountryProviderCards("informatique");
 
     return (
         <div className="pt-40 pb-20 min-h-screen bg-white dark:bg-gray-950">

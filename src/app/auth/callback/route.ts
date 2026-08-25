@@ -1,7 +1,8 @@
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { persistUserMarketLocation, verifyMarketLocationToken } from "@/lib/location/market-location";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     const { searchParams, origin } = new URL(request.url);
     const code = searchParams.get("code");
     const roleParam = searchParams.get("role");
@@ -19,6 +20,12 @@ export async function GET(request: Request) {
             } = await supabase.auth.getUser();
 
             if (user) {
+                const token = request.cookies.get("anyjob_market_location")?.value;
+                if (!token) {
+                    return NextResponse.redirect(`${origin}/signup?error=location_required`);
+                }
+                const location = verifyMarketLocationToken(request, token);
+                await persistUserMarketLocation(user.id, location);
                 const { data: existingProfile } = await supabase
                     .from("eloo_profiles")
                     .select("id, role")
