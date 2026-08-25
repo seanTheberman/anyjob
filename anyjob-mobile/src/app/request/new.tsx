@@ -343,6 +343,7 @@ export default function NewRequestScreen() {
       : "";
   const initialSubcategory =
     params.subcategory || (initialCategory === "custom" ? "custom-job" : "");
+  const initialStep = initialCategory ? 2 : 1;
   const initialForm = useMemo(
     () =>
       createInitialForm({
@@ -352,7 +353,7 @@ export default function NewRequestScreen() {
       }),
     [initialCategory, initialSubcategory, params.custom_query],
   );
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(initialStep);
   const [draftReady, setDraftReady] = useState(false);
   const [restoredDraft, setRestoredDraft] = useState(false);
   const [discardConfirmVisible, setDiscardConfirmVisible] = useState(false);
@@ -407,7 +408,7 @@ export default function NewRequestScreen() {
         setRestoredDraft(true);
       } else {
         setForm(initialForm);
-        setStep(1);
+        setStep(initialStep);
         if (draft) {
           await AsyncStorage.removeItem(PENDING_REQUEST_KEY).catch(
             () => undefined,
@@ -423,7 +424,7 @@ export default function NewRequestScreen() {
     return () => {
       cancelled = true;
     };
-  }, [initialCategory, initialForm, routeParams]);
+  }, [initialCategory, initialForm, initialStep, routeParams]);
 
   const setText = (key: keyof Form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -568,7 +569,7 @@ export default function NewRequestScreen() {
   const discardDraft = async () => {
     setDiscardConfirmVisible(false);
     setForm(initialForm);
-    setStep(1);
+    setStep(initialStep);
     setRestoredDraft(false);
     await AsyncStorage.removeItem(PENDING_REQUEST_KEY).catch(() => undefined);
   };
