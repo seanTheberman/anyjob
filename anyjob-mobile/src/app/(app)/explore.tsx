@@ -119,6 +119,11 @@ export default function ExploreScreen() {
   const [shiftType, setShiftType] = useState("all");
   const [shiftState, setShiftState] = useState("all");
   const [shiftRate, setShiftRate] = useState("all");
+  const [showBuyerFilters, setShowBuyerFilters] = useState(false);
+  const [buyerCategory, setBuyerCategory] = useState("all");
+  const [buyerAreaOnly, setBuyerAreaOnly] = useState(false);
+  const [buyerShiftOnly, setBuyerShiftOnly] = useState(false);
+  const [buyerSort, setBuyerSort] = useState<"recommended" | "rate" | "rating">("recommended");
   const query = useQuery({
     queryKey: [provider ? "jobs" : "providers"],
     queryFn: () => api<any>(provider ? "/api/jobs" : "/api/providers"),
@@ -152,12 +157,41 @@ export default function ExploreScreen() {
       ? ((query.data?.jobs || []) as Job[])
       : ((query.data?.providers || []) as ProviderCardData[]);
     const needle = search.trim().toLowerCase();
-    return needle
-      ? source.filter((row) =>
-          JSON.stringify(row).toLowerCase().includes(needle),
-        )
+    const searched = needle
+      ? source.filter((row) => JSON.stringify(row).toLowerCase().includes(needle))
       : source;
-  }, [provider, query.data, search]);
+    if (provider) return searched;
+    const filtered = (searched as ProviderCardData[]).filter((row) => {
+      if (buyerCategory !== "all" && row.category !== buyerCategory) return false;
+      if (buyerAreaOnly && row.worksInViewerArea !== true) return false;
+      if (buyerShiftOnly && row.availableForShifts !== true) return false;
+      return true;
+    });
+    if (buyerSort === "rate") {
+      return [...filtered].sort((a, b) => {
+        const left = Number(a.rate || Number.MAX_SAFE_INTEGER);
+        const right = Number(b.rate || Number.MAX_SAFE_INTEGER);
+        return left - right;
+      });
+    }
+    if (buyerSort === "rating") {
+      return [...filtered].sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0));
+    }
+    return filtered;
+  }, [buyerAreaOnly, buyerCategory, buyerShiftOnly, buyerSort, provider, query.data, search]);
+  const buyerCategories = useMemo(
+    () => Array.from(new Set(
+      ((query.data?.providers || []) as ProviderCardData[])
+        .map((row) => row.category || "")
+        .filter(Boolean),
+    )).sort(),
+    [query.data?.providers],
+  );
+  const buyerFilterCount =
+    (buyerCategory !== "all" ? 1 : 0) +
+    (buyerAreaOnly ? 1 : 0) +
+    (buyerShiftOnly ? 1 : 0) +
+    (buyerSort !== "recommended" ? 1 : 0);
   const shiftRows: any[] = useMemo(
     () => shifts.data?.jobs || [],
     [shifts.data?.jobs],
@@ -283,6 +317,7 @@ export default function ExploreScreen() {
           accessibilityLabel="Filters"
           onPress={() => {
             if (provider) setBoardMode(boardMode === "day" ? "shift" : "day");
+            else setShowBuyerFilters((current) => !current);
           }}
           style={[
             styles.filter,
@@ -290,8 +325,49 @@ export default function ExploreScreen() {
           ]}
         >
           <SlidersHorizontal color={colors.ink} size={20} />
+          {!provider && buyerFilterCount ? (
+            <View style={[styles.filterCount, { backgroundColor: colors.brand }]}>
+              <Text style={styles.filterCountText}>{buyerFilterCount}</Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
+      {!provider && showBuyerFilters ? (
+        <View style={[styles.buyerFilters, { backgroundColor: colors.surface, borderColor: colors.line }]}>
+          <View style={styles.shiftFilterHeader}>
+            <View style={styles.shiftFilterTitle}>
+              <Filter color={colors.brand} size={16} />
+              <Text style={[styles.shiftFilterTitleText, { color: colors.ink }]}>Provider filters</Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setBuyerCategory("all");
+                setBuyerAreaOnly(false);
+                setBuyerShiftOnly(false);
+                setBuyerSort("recommended");
+              }}
+            >
+              <Text style={[styles.clear, { color: colors.brand }]}>Clear</Text>
+            </Pressable>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterChips}>
+            <FilterChip label="All services" selected={buyerCategory === "all"} onPress={() => setBuyerCategory("all")} />
+            {buyerCategories.map((category) => (
+              <FilterChip key={category} label={category} selected={buyerCategory === category} onPress={() => setBuyerCategory(category)} />
+            ))}
+          </ScrollView>
+          <View style={styles.compactFilters}>
+            <FilterChip label="Works in my area" selected={buyerAreaOnly} onPress={() => setBuyerAreaOnly((current) => !current)} />
+            <FilterChip label="Available for shifts" selected={buyerShiftOnly} onPress={() => setBuyerShiftOnly((current) => !current)} />
+          </View>
+          <View style={styles.compactFilters}>
+            <FilterChip label="Recommended" selected={buyerSort === "recommended"} onPress={() => setBuyerSort("recommended")} />
+            <FilterChip label="Lowest rate" selected={buyerSort === "rate"} onPress={() => setBuyerSort("rate")} />
+            <FilterChip label="Top rated" selected={buyerSort === "rating"} onPress={() => setBuyerSort("rating")} />
+          </View>
+        </View>
+      ) : null}
       {provider && boardMode === "shift" ? (
         <View style={styles.shiftFilters}>
           <View style={styles.shiftFilterHeader}>
@@ -748,7 +824,20 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
   },
+  filterCount: {
+    position: "absolute",
+    right: -2,
+    top: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  filterCountText: { color: "white", fontSize: 10, fontWeight: "900" },
+  buyerFilters: { borderWidth: 1, borderRadius: radius.md, padding: 12, gap: 10 },
   boardSummary: { gap: 2 },
   count: { fontSize: 13, fontWeight: "800" },
   summaryHint: { fontSize: 12, lineHeight: 17 },

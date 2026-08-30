@@ -370,6 +370,15 @@ export function Dashboard() {
       },
     });
   };
+  const submitHeroSearch = () => {
+    const query = serviceSearch.trim();
+    const first = serviceSuggestions[0];
+    if (query && first) {
+      openServiceRequest(first.category);
+      return;
+    }
+    openServiceRequest(query ? "custom" : "", query);
+  };
   const providers = useQuery({
     queryKey: ["providers"],
     queryFn: () => api<{ providers: ProviderCardData[] }>("/api/providers"),
@@ -750,23 +759,32 @@ export function Dashboard() {
         >
           <Search color={colors.muted} size={19} />
           <TextInput
-            accessibilityLabel="Post a job"
+            accessibilityLabel="What do you need help with?"
             value={serviceSearch}
             onChangeText={setServiceSearch}
             onFocus={() => setSearchFocused(true)}
-            onSubmitEditing={() => {
-              const first = serviceSuggestions[0];
-              if (first) openServiceRequest(first.category);
-              else openServiceRequest("custom", serviceSearch.trim());
-            }}
-            placeholder={copy("home.hero.search", "Post a job")}
+            onBlur={() => setTimeout(() => setSearchFocused(false), 120)}
+            onSubmitEditing={submitHeroSearch}
+            placeholder={copy("home.hero.search", "What do you need help with?")}
             placeholderTextColor={colors.muted}
             returnKeyType="go"
             style={[styles.heroSearchText, { color: colors.ink }]}
           />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Post a job"
+            onPress={submitHeroSearch}
+            style={({ pressed }) => [
+              styles.heroPostButton,
+              { backgroundColor: colors.brand },
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.heroPostButtonText}>Post a job</Text>
+          </Pressable>
         </View>
       </View>
-      {searchFocused || serviceSearch.trim() ? (
+      {searchFocused ? (
         <View style={[styles.searchSuggestions, { backgroundColor: colors.surface, borderColor: colors.line }] }>
           {serviceSuggestions.length ? serviceSuggestions.map((item) => (
             <Pressable
@@ -1132,6 +1150,14 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   heroSearchText: { flex: 1, minWidth: 0, fontSize: 13, fontWeight: "700", paddingVertical: 0 },
+  heroPostButton: {
+    minHeight: 32,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroPostButtonText: { color: "white", fontSize: 10.5, fontWeight: "900" },
   searchSuggestions: { marginTop: -5, borderWidth: 1, borderRadius: 8, overflow: "hidden" },
   searchSuggestion: { minHeight: 53, paddingHorizontal: 13, flexDirection: "row", alignItems: "center", gap: 10 },
   searchSuggestionCopy: { flex: 1, minWidth: 0 },

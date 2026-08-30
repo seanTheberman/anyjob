@@ -22,7 +22,7 @@ export const MOBILE_CONTENT_CATALOG: MobileContentDefinition[] = [
   entry("home.hero.kicker", "Home banner", "Banner eyebrow", "ANYJOB", "Short text above the main banner heading."),
   entry("home.hero.title", "Home banner", "Banner title", "Get things done, your way.", "Primary buyer home banner heading."),
   entry("home.hero.body", "Home banner", "Banner subtitle", "Trusted help for everyday tasks.", "Supporting buyer home banner copy.", "textarea"),
-  entry("home.hero.search", "Home banner", "Search prompt", "Post a job", "Placeholder in the banner job search control."),
+  entry("home.hero.search", "Home banner", "Search prompt", "What do you need help with?", "Placeholder in the banner job search control."),
   entry("home.hero.image_url", "Home banner", "Banner image URL", "", "Optional HTTPS image URL. Leave blank to use the bundled image.", "url"),
   entry("home.services.title", "Home sections", "Services heading", "Popular services", "Heading above service categories."),
   entry("home.nearby.title", "Home sections", "Nearby heading", "Popular near you", "Heading above nearby service cards."),

@@ -20,6 +20,9 @@ export type ProviderCardData = {
   rate?: number;
   level?: string;
   availableForShifts?: boolean;
+  worksInViewerArea?: boolean;
+  categorySlug?: string;
+  searchText?: string;
 };
 
 export function ProviderCard({
