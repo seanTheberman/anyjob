@@ -77,6 +77,50 @@ type ReverseResult = {
   postalCode: string;
 };
 
+type DeviceLocationResult = {
+  countryCode: string | null;
+  country: string;
+  region: string;
+  city: string;
+  postalCode: string;
+};
+
+function cleanLocationText(value: unknown, maxLength = 120) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
+}
+
+function deviceLocationResult(value: unknown): DeviceLocationResult | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Record<string, unknown>;
+  const countryCode = cleanCountryCode(cleanLocationText(row.countryCode, 2));
+  return {
+    countryCode,
+    country: cleanLocationText(row.country),
+    region: cleanLocationText(row.region),
+    city: cleanLocationText(row.city),
+    postalCode: cleanLocationText(row.postalCode, 30),
+  };
+}
+
+function formatIrishEircode(value: unknown) {
+  const compact = cleanLocationText(value, 30).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (!/^[A-Z0-9]{7}$/.test(compact)) return "";
+  return `${compact.slice(0, 3)} ${compact.slice(3)}`;
+}
+
+function resolvedPostalCode(
+  countryCode: string,
+  reverse: ReverseResult | null,
+  device: DeviceLocationResult | null,
+  ip: ReturnType<typeof ipMarketLocation>,
+) {
+  const matchingDevice = device?.countryCode === countryCode ? device : null;
+  if (countryCode === "IE") {
+    return formatIrishEircode(matchingDevice?.postalCode) || formatIrishEircode(reverse?.postalCode);
+  }
+  return reverse?.postalCode || matchingDevice?.postalCode || (!reverse ? ip.postalCode : "");
+}
+
 async function reverseGeocode(latitude: number, longitude: number): Promise<ReverseResult | null> {
   try {
     const url = new URL("https://nominatim.openstreetmap.org/reverse");
@@ -121,6 +165,7 @@ export async function resolveMarketLocation(request: Request, input: Record<stri
   const longitude = validCoordinate(input.longitude, -180, 180);
   const accuracy = Number(input.accuracyMeters);
   const ip = ipMarketLocation(request);
+  const device = deviceLocationResult(input.deviceLocation);
   const reverse = latitude != null && longitude != null
     ? await reverseGeocode(latitude, longitude)
     : null;
@@ -137,17 +182,18 @@ export async function resolveMarketLocation(request: Request, input: Record<stri
   if (!code) {
     throw new MarketLocationError("AnyJob could not verify your marketplace country. Enable location access and try again.");
   }
-  const city = reverse?.city || ip.city;
+  const matchingDevice = device?.countryCode === code ? device : null;
+  const city = reverse?.city || matchingDevice?.city || ip.city;
   if (!city) {
     throw new MarketLocationError("AnyJob could not determine your city. Move to an area with location signal and try again.");
   }
 
   return {
     countryCode: code,
-    country: reverse?.country || ip.country || countryName(code),
-    region: reverse?.region || ip.region,
+    country: reverse?.country || matchingDevice?.country || ip.country || countryName(code),
+    region: reverse?.region || matchingDevice?.region || ip.region,
     city,
-    postalCode: reverse?.postalCode || ip.postalCode,
+    postalCode: resolvedPostalCode(code, reverse, device, ip),
     coarseLatitude: latitude == null ? (Number.isFinite(ip.latitude) ? Math.round(ip.latitude * 100) / 100 : null) : Math.round(latitude * 100) / 100,
     coarseLongitude: longitude == null ? (Number.isFinite(ip.longitude) ? Math.round(ip.longitude * 100) / 100 : null) : Math.round(longitude * 100) / 100,
     accuracyMeters: Number.isFinite(accuracy) ? Math.max(0, Math.round(accuracy)) : null,

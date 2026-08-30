@@ -168,10 +168,19 @@ export default function RegisterScreen() {
       <Field label="Country" value={marketLocation.location?.country || "Waiting for location"} editable={false} />
       {marketLocation.error ? <Text style={styles.error}>{marketLocation.error}</Text> : null}
       <Button
-        title={marketLocation.location ? "Refresh location" : "Verify location"}
+        title={
+          marketLocation.needsSettings
+            ? "Open location settings"
+            : marketLocation.location
+              ? "Refresh location"
+              : "Verify location"
+        }
         variant="secondary"
         loading={marketLocation.loading}
-        onPress={() => void marketLocation.refresh()}
+        onPress={() => {
+          if (marketLocation.needsSettings) void marketLocation.openSettings();
+          else void marketLocation.refresh();
+        }}
       />
       {kind === "seller" ? (
         <>

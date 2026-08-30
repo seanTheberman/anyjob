@@ -910,12 +910,19 @@ export default function NewRequestScreen() {
               </View>
               <Button
                 title={
-                  locating ? "Finding location..." : "Use current location"
+                  marketLocation.needsSettings
+                    ? "Open location settings"
+                    : locating
+                      ? "Finding location..."
+                      : "Use current location"
                 }
                 variant="secondary"
                 loading={locating}
                 icon={<LocateFixed color={colors.ink} size={18} />}
-                onPress={() => void locateCurrentArea()}
+                onPress={() => {
+                  if (marketLocation.needsSettings) void marketLocation.openSettings();
+                  else void locateCurrentArea();
+                }}
               />
               <Field
                 label="Full address"
