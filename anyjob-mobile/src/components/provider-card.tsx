@@ -1,5 +1,5 @@
 import { Image, type ImageSource } from "expo-image";
-import { BriefcaseBusiness, Heart, MapPin, Star } from "lucide-react-native";
+import { BadgeCheck, BriefcaseBusiness, Heart, MapPin, Star } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/ui";
 import { serviceCover } from "@/lib/service-assets";
@@ -19,6 +19,7 @@ export type ProviderCardData = {
   completedJobs?: number;
   rate?: number;
   level?: string;
+  badges?: string[];
   availableForShifts?: boolean;
   worksInViewerArea?: boolean;
   categorySlug?: string;
@@ -44,6 +45,9 @@ export function ProviderCard({
     provider.heroImage || provider.image
       ? { uri: provider.heroImage || provider.image || "" }
       : serviceCover(provider.category);
+  const accountBadge = provider.badges?.find((badge) =>
+    ["Freelancer", "Business", "Agency"].includes(badge),
+  );
   return (
     <Pressable
       accessibilityRole="button"
@@ -79,6 +83,12 @@ export function ProviderCard({
         {provider.level && !compact ? (
           <View style={[styles.level, { backgroundColor: colors.brand }]}>
             <Text style={styles.levelText}>{provider.level}</Text>
+          </View>
+        ) : null}
+        {accountBadge && !compact ? (
+          <View style={[styles.accountBadge, { backgroundColor: accountBadge === "Freelancer" ? "#7c3aed" : "#2563eb" }] }>
+            <BadgeCheck color="white" size={11} />
+            <Text style={styles.accountBadgeText}>{accountBadge}</Text>
           </View>
         ) : null}
         {provider.availableForShifts ? (
@@ -219,6 +229,18 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   levelText: { color: "white", fontSize: 11, fontWeight: "900" },
+  accountBadge: {
+    position: "absolute",
+    right: 10,
+    bottom: 10,
+    minHeight: 25,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  accountBadgeText: { color: "white", fontSize: 9.5, fontWeight: "900" },
   shiftBadge: {
     position: "absolute",
     left: 10,

@@ -228,12 +228,12 @@ export default function ExploreScreen() {
       <AppHeader compact />
       <View style={styles.heading}>
         <Text style={[styles.title, { color: colors.ink }]}>
-          {provider ? copy("explore.provider.title", "Find work") : copy("explore.buyer.title", "Discover local pros")}
+          {provider ? copy("explore.provider.title", "Find work") : copy("explore.buyer.title", "Find a Jobber")}
         </Text>
         <Text style={[styles.subtitle, { color: colors.muted }]}>
           {provider
             ? copy("explore.provider.subtitle", "Approved jobs with approximate buyer areas.")
-            : copy("explore.buyer.subtitle", "Portfolio work, verified reviews and clear pricing.")}
+            : copy("explore.buyer.subtitle", "Search local Jobbers, compare reviews and find the right fit.")}
         </Text>
       </View>
       {provider ? (

@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { CATEGORIES } from "@/lib/categories";
 
-const JOB_MODES = ["Day to day jobs", "Work shifts"] as const;
+const JOB_MODES = ["Find a Jobber", "Hire for Shifts"] as const;
 
 export function Hero() {
     const [selectedLanguage, setSelectedLanguage] = useState("en");
     const [isClient, setIsClient] = useState(false);
-    const [selectedJobMode, setSelectedJobMode] = useState<(typeof JOB_MODES)[number]>("Day to day jobs");
+    const [selectedJobMode, setSelectedJobMode] = useState<(typeof JOB_MODES)[number]>("Find a Jobber");
 
     function handleJobModeChange(mode: (typeof JOB_MODES)[number]) {
         setSelectedJobMode(mode);
@@ -20,7 +21,7 @@ export function Hero() {
     useEffect(() => {
         setIsClient(true);
         const savedMode = localStorage.getItem("home_job_mode");
-        if (savedMode === "Day to day jobs" || savedMode === "Work shifts") {
+        if (savedMode === "Find a Jobber" || savedMode === "Hire for Shifts") {
             setSelectedJobMode(savedMode);
         }
     }, []);
@@ -92,7 +93,7 @@ export function Hero() {
     };
 
     return (
-        <section className="relative min-h-[600px] sm:min-h-[700px] flex items-center justify-center overflow-visible">
+        <section className="relative min-h-[680px] sm:min-h-[700px] flex items-center justify-center overflow-visible">
             {/* Background Image */}
             <div
                 className="absolute inset-0 bg-cover bg-center bg-no-repeat"
@@ -103,22 +104,24 @@ export function Hero() {
 
             {/* Content */}
             <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center pt-24 pb-16">
-                {/* Badge */}
+                {/* Trust statement */}
                 <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-4 py-1.5 mb-6 sm:mb-8">
                     <span className="w-2 h-2 rounded-full bg-green-400" />
                     <span className="text-xs sm:text-sm text-white/90 font-medium">
-                        388,000+ qualified providers
+                        Local work · Clear profiles · Real reviews
                     </span>
                 </div>
 
                 {/* Headline */}
                 <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold text-white leading-[1.1] tracking-tight mb-4 sm:mb-6">
-                    Book the <span className="text-red-400">ideal service</span> <br className="hidden sm:block" />
-                    <span className="text-red-400">provider</span>
+                    What do you need <span className="text-red-400">help with?</span>
                 </h1>
+                <p className="mx-auto mb-8 max-w-2xl text-base leading-7 text-white/80 sm:text-lg">
+                    Find a local Jobber for a one-off job, or hire extra people for a shift.
+                </p>
 
                 {/* Job mode selector */}
-                <fieldset className="mx-auto mb-16 max-w-2xl sm:mb-20">
+                <fieldset className="mx-auto mb-4 max-w-2xl sm:mb-20">
                     <legend className="sr-only">Choose job type</legend>
                     <div className="grid grid-cols-2 gap-2 rounded-full border border-white/15 bg-white/10 p-1.5 backdrop-blur-md sm:gap-3 sm:p-2">
                         {JOB_MODES.map((mode) => {
@@ -154,7 +157,7 @@ export function Hero() {
                 </fieldset>
 
                 {/* Popular searches */}
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-20 sm:mt-24">
+                <div className="mt-28 flex flex-wrap items-center justify-center gap-2 sm:mt-24">
                     <span className="text-xs text-white/50">{isClient ? getLocalizedPopularText() : "Popular:"}</span>
                     {(isClient ? getPopularCategories() : ["Cleaning", "Handyman", "Gardening", "Moving"]).map((term) => {
                         const category = CATEGORIES.find(cat => 
@@ -165,13 +168,13 @@ export function Hero() {
                             .replace(/[\u0300-\u036f]/g, "")
                             .replace(/\s+/g, "-");
                         return (
-                            <a
+                            <Link
                                 key={term}
                                 href={`/questionnaire?category=${categorySlug}`}
                                 className="text-xs px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white/80 hover:text-white border border-white/10 transition-colors"
                             >
                                 {term}
-                            </a>
+                            </Link>
                         );
                     })}
                 </div>

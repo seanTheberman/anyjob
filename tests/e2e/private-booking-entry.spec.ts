@@ -1,6 +1,18 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/api/search-categories**", (route) => {
+    const query = new URL(route.request().url()).searchParams.get("q") || "";
+    return route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        results: query.toLowerCase().includes("plumb")
+          ? [{ type: "category", slug: "bricolage", name: "Handyman", color: "#F59E0B" }]
+          : [],
+      }),
+    });
+  });
+
   await page.route("**/*", (route) => {
     if (["font", "image", "media"].includes(route.request().resourceType())) {
       return route.abort();

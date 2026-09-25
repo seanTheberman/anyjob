@@ -1,4 +1,7 @@
+import { SERVICE_CATEGORY_CONTENT } from "./service-categories";
+
 export type MobileContentType = "text" | "textarea" | "url";
+export type MobileContentControl = "icon";
 
 export type MobileContentDefinition = {
   key: string;
@@ -7,6 +10,7 @@ export type MobileContentDefinition = {
   defaultValue: string;
   description: string;
   type: MobileContentType;
+  control?: MobileContentControl;
 };
 
 const entry = (
@@ -16,7 +20,8 @@ const entry = (
   defaultValue: string,
   description: string,
   type: MobileContentType = "text",
-): MobileContentDefinition => ({ key, section, label, defaultValue, description, type });
+  control?: MobileContentControl,
+): MobileContentDefinition => ({ key, section, label, defaultValue, description, type, control });
 
 export const MOBILE_CONTENT_CATALOG: MobileContentDefinition[] = [
   entry("home.hero.kicker", "Home banner", "Banner eyebrow", "ANYJOB", "Short text above the main banner heading."),
@@ -25,9 +30,13 @@ export const MOBILE_CONTENT_CATALOG: MobileContentDefinition[] = [
   entry("home.hero.search", "Home banner", "Search prompt", "What do you need help with?", "Placeholder in the banner job search control."),
   entry("home.hero.image_url", "Home banner", "Banner image URL", "", "Optional HTTPS image URL. Leave blank to use the bundled image.", "url"),
   entry("home.services.title", "Home sections", "Services heading", "Popular services", "Heading above service categories."),
+  ...SERVICE_CATEGORY_CONTENT.flatMap((category) => [
+    entry(`home.services.${category.key}.name`, "Popular services", `${category.defaultName} name`, category.defaultName, "Display name used for this service on both the website and mobile app."),
+    entry(`home.services.${category.key}.icon`, "Popular services", `${category.defaultName} icon`, category.defaultIcon, "Icon used for this service on both the website and mobile app.", "text", "icon"),
+  ]),
   entry("home.nearby.title", "Home sections", "Nearby heading", "Popular near you", "Heading above nearby service cards."),
   entry("home.activity.title", "Home sections", "Activity heading", "Your activity", "Heading above the latest request."),
-  entry("home.providers.title", "Home sections", "Providers heading", "Recommended taskers", "Heading above recommended providers."),
+  entry("home.providers.title", "Home sections", "Jobbers heading", "Recommended Jobbers", "Heading above recommended Jobbers."),
   entry("home.trust.title", "Home sections", "Trust heading", "Book with confidence", "Heading above trust information."),
   entry("home.cta.title", "Home call to action", "Call-to-action title", "Ready to get it sorted?", "Bottom home call-to-action heading."),
   entry("home.cta.body", "Home call to action", "Call-to-action subtitle", "Post once and compare local quotes.", "Bottom home call-to-action description.", "textarea"),
@@ -74,8 +83,8 @@ export const MOBILE_CONTENT_CATALOG: MobileContentDefinition[] = [
   entry("request.action.back", "Request actions", "Back button", "Back", "Request wizard secondary action."),
   entry("request.action.continue", "Request actions", "Continue button", "Continue", "Request wizard primary action."),
   entry("request.action.submit", "Request actions", "Submit button", "Submit for approval", "Signed-in request submit action."),
-  entry("explore.buyer.title", "Explore", "Buyer title", "Discover local pros", "Buyer explore screen title."),
-  entry("explore.buyer.subtitle", "Explore", "Buyer subtitle", "Portfolio work, verified reviews and clear pricing.", "Buyer explore screen supporting copy.", "textarea"),
+  entry("explore.buyer.title", "Explore", "Buyer title", "Find a Jobber", "Buyer explore screen title."),
+  entry("explore.buyer.subtitle", "Explore", "Buyer subtitle", "Search local Jobbers, compare reviews and find the right fit.", "Buyer explore screen supporting copy.", "textarea"),
   entry("explore.provider.title", "Explore", "Provider title", "Find work", "Provider explore screen title."),
   entry("explore.provider.subtitle", "Explore", "Provider subtitle", "Approved jobs with approximate buyer areas.", "Provider explore screen supporting copy.", "textarea"),
   entry("account.title", "Account", "Account title", "Account", "Account screen title."),

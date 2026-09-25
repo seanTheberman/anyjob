@@ -1,0 +1,30 @@
+export const SERVICE_ICON_OPTIONS = [
+  { value: "calendar-days", label: "Calendar / shifts" },
+  { value: "briefcase", label: "Briefcase" },
+  { value: "hammer", label: "Hammer" },
+  { value: "wrench", label: "Wrench" },
+  { value: "leaf", label: "Leaf" },
+  { value: "truck", label: "Truck" },
+  { value: "spray-can", label: "Cleaning spray" },
+  { value: "baby", label: "Childcare" },
+  { value: "paw-print", label: "Pet paw" },
+  { value: "monitor-cog", label: "Computer support" },
+  { value: "house-heart", label: "Home care" },
+  { value: "graduation-cap", label: "Education" },
+  { value: "users", label: "People" },
+  { value: "star", label: "Star" },
+  { value: "sparkles", label: "Sparkles" },
+] as const;
+
+export const SERVICE_CATEGORY_CONTENT = [
+  { key: "work_shifts", webSlug: "hiver", defaultName: "Work Shifts", defaultIcon: "calendar-days" },
+  { key: "handyman", webSlug: "bricolage", defaultName: "Handyman", defaultIcon: "hammer" },
+  { key: "gardening", webSlug: "jardinage", defaultName: "Gardening", defaultIcon: "leaf" },
+  { key: "moving", webSlug: "demenagement", defaultName: "Moving", defaultIcon: "truck" },
+  { key: "cleaning", webSlug: "menage", defaultName: "Cleaning", defaultIcon: "spray-can" },
+  { key: "childcare", webSlug: "enfants", defaultName: "Childcare", defaultIcon: "baby" },
+  { key: "pet_care", webSlug: "animaux", defaultName: "Pet care", defaultIcon: "paw-print" },
+  { key: "it_support", webSlug: "informatique", defaultName: "IT support", defaultIcon: "monitor-cog" },
+  { key: "home_help", webSlug: "aide-domicile", defaultName: "Home help", defaultIcon: "house-heart" },
+  { key: "tutoring", webSlug: "cours-particuliers", defaultName: "Tutoring", defaultIcon: "graduation-cap" },
+] as const;

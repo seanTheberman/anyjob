@@ -25,10 +25,10 @@ import {
 
 const NAV_LINKS = [
     { href: "/tasks", label: "Browse Jobs" },
-    { href: "/search", label: "Find a Provider" },
+    { href: "/search", label: "Find a Jobber" },
     { href: "/how-it-works", label: "How it works" },
-    { href: "/become-provider", label: "Become a Provider" },
-    { href: "/register-business", label: "Register as a Business" },
+    { href: "/become-provider", label: "Become a Jobber" },
+    { href: "/register-business", label: "AnyJob for Business" },
 ];
 
 type HeaderAccount = {

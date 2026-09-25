@@ -19,9 +19,9 @@ const cursive = Dancing_Script({
 });
 
 export const metadata: Metadata = {
-  title: "AnyJob — Book the ideal service provider",
+  title: "AnyJob — Post a job. Find a Jobber.",
   description:
-    "Find and book rated and qualified home service providers. Cleaning, DIY, gardening, moving and more.",
+    "Post a job, compare local Jobbers, and get it done. Cleaning, repairs, gardening, moving, work shifts, and more.",
   keywords: [
     "home services",
     "cleaning",
@@ -32,9 +32,9 @@ export const metadata: Metadata = {
     "AnyJob",
   ],
   openGraph: {
-    title: "AnyJob — Book the ideal service provider",
+    title: "AnyJob — Post a job. Find a Jobber.",
     description:
-      "Find and book rated and qualified home service providers.",
+      "Post a job, compare local Jobbers, and get it done.",
     type: "website",
     locale: "en_US",
   },

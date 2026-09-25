@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ImageIcon, RotateCcw, Save, Search } from "lucide-react";
 
 import type { MobileContentDefinition } from "@/lib/mobile-content/catalog";
+import { SERVICE_ICON_OPTIONS } from "@/lib/mobile-content/service-categories";
 
 type SavedEntry = { key: string; value: string; updatedAt: string | null };
 
@@ -96,7 +97,16 @@ export function AdminMobileContentPanel({
                 <code className="mt-2 block break-all text-[11px] text-slate-400">{item.key}</code>
               </div>
               <div className="min-w-0">
-                {item.type === "textarea" ? (
+                {item.control === "icon" ? (
+                  <select
+                    id={item.key}
+                    value={values[item.key] ?? item.defaultValue}
+                    onChange={(event) => setValues((current) => ({ ...current, [item.key]: event.target.value }))}
+                    className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:border-red-300 focus:ring-2 focus:ring-red-100"
+                  >
+                    {SERVICE_ICON_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                ) : item.type === "textarea" ? (
                   <textarea
                     id={item.key}
                     value={values[item.key] ?? ""}
@@ -140,7 +150,7 @@ export function AdminMobileContentPanel({
             className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
           >
             <Save className="h-4 w-4" />
-            {pending ? "Publishing..." : "Publish app content"}
+            {pending ? "Publishing..." : "Publish web & mobile content"}
           </button>
         </div>
       </section>

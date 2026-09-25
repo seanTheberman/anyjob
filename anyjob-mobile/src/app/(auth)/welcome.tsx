@@ -6,13 +6,13 @@ import { Button, Screen } from "@/components/ui";
 import { colors } from "@/theme/tokens";
 
 const benefits = [
-  ["Find trusted help", "Compare providers, quotes, and genuine reviews.", Search],
+  ["Find trusted help", "Compare Jobbers, quotes, and genuine reviews.", Search],
   ["Find flexible work", "Service jobs, business shifts, and clear earnings.", BriefcaseBusiness],
   ["Build marketplace trust", "One verified profile across every AnyJob role.", ShieldCheck],
 ] as const;
 
 export default function WelcomeScreen() {
-  return <Screen style={styles.screen}><View style={styles.brand}><Text style={styles.logo}>AnyJob</Text><Text style={styles.headline}>Get more done, your way.</Text><Text style={styles.lead}>Hire local help, find work, or manage a flexible workforce from one account.</Text></View><View style={styles.benefits}>{benefits.map(([title, body, Icon]) => <View key={title} style={styles.benefit}><View style={styles.icon}><Icon color={colors.brand} size={22} /></View><View style={styles.copy}><Text style={styles.benefitTitle}>{title}</Text><Text style={styles.benefitBody}>{body}</Text></View></View>)}</View><View style={styles.actions}><Link href="/(auth)/sign-in" asChild><Button title="Sign in" /></Link><Link href="/(auth)/register" asChild><Button title="Create account" variant="secondary" /></Link></View></Screen>;
+  return <Screen style={styles.screen}><View style={styles.brand}><Text style={styles.logo}>AnyJob</Text><Text style={styles.headline}>What do you need help with?</Text><Text style={styles.lead}>Post a job, find the right Jobber, and get it done—or hire extra people for a work shift.</Text></View><View style={styles.benefits}>{benefits.map(([title, body, Icon]) => <View key={title} style={styles.benefit}><View style={styles.icon}><Icon color={colors.brand} size={22} /></View><View style={styles.copy}><Text style={styles.benefitTitle}>{title}</Text><Text style={styles.benefitBody}>{body}</Text></View></View>)}</View><View style={styles.actions}><Link href="/(auth)/sign-in" asChild><Button title="Sign in" /></Link><Link href="/(auth)/register" asChild><Button title="Create account" variant="secondary" /></Link></View></Screen>;
 }
 
 const styles = StyleSheet.create({

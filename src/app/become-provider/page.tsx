@@ -20,6 +20,8 @@ const CATEGORIES = [
     { name: "Painting", rate: 48 },
 ];
 
+type WorkChoice = "one-off" | "projects" | "shift";
+
 const FEATURES = [
     {
         icon: "⏰",
@@ -129,28 +131,33 @@ export default function BecomeProviderPage() {
     const [selectedCategory, setSelectedCategory] = useState(CATEGORIES[0]);
     const [openFaq, setOpenFaq] = useState<number | null>(null);
     const [accountType, setAccountType] = useState<"individual" | "contractor">("individual");
-    const [workModes, setWorkModes] = useState<Array<"freelance" | "shift">>(["freelance", "shift"]);
+    const [workChoices, setWorkChoices] = useState<WorkChoice[]>(["one-off", "projects", "shift"]);
     const handleCategoryChange = (value: string) => {
         const cat = CATEGORIES.find(c => c.name === value);
         if (cat) setSelectedCategory(cat);
     };
-    const toggleWorkMode = (mode: "freelance" | "shift") => {
-        setWorkModes((current) => (
-            current.includes(mode)
-                ? current.filter((item) => item !== mode)
-                : [...current, mode]
+    const toggleWorkChoice = (choice: WorkChoice) => {
+        setWorkChoices((current) => (
+            current.includes(choice)
+                ? current.filter((item) => item !== choice)
+                : [...current, choice]
         ));
     };
     const startRegistration = () => {
         const mode = accountType === "contractor"
             ? "freelance"
-            : workModes.includes("freelance") && workModes.includes("shift")
+            : workChoices.some((choice) => choice === "one-off" || choice === "projects") && workChoices.includes("shift")
             ? "both"
-            : workModes.includes("shift")
+            : workChoices.includes("shift")
                 ? "shift"
                 : "freelance";
         const providerType = accountType === "contractor" ? "business" : "individual";
-        router.push(`/seller-register?mode=${mode}&accountType=${providerType}`);
+        const params = new URLSearchParams({
+            mode,
+            accountType: providerType,
+            workChoices: workChoices.join(","),
+        });
+        router.push(`/seller-register?${params.toString()}`);
     };
 
     return (
@@ -176,10 +183,10 @@ export default function BecomeProviderPage() {
                         {/* Right - Content */}
                         <div className="order-1 lg:order-2 lg:max-w-[560px]">
                             <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
-                                Earn money your way
+                                See what you could earn on AnyJob
                             </h1>
                             <p className="text-gray-600 mb-6">
-                                See how much you can make providing services on Anyjob
+                                Choose your area and service to view an example rate.
                             </p>
 
                             {/* Earnings Calculator */}
@@ -225,10 +232,9 @@ export default function BecomeProviderPage() {
 
                                 {/* Rate Display */}
                                 <div className="mt-6 pt-4 border-t border-gray-200">
-                                    <div className="flex items-baseline gap-1">
-                                        <span className="text-4xl font-bold text-gray-900">€{selectedCategory.rate}</span>
-                                        <span className="text-gray-600">per hour</span>
-                                    </div>
+                                    <p className="text-sm font-semibold text-gray-500">Example hourly rate</p>
+                                    <div className="mt-1 text-4xl font-bold text-gray-900">€{selectedCategory.rate}</div>
+                                    <p className="mt-2 text-xs leading-5 text-gray-500">Actual rates are set by each Jobber and may vary by job, location, and experience.</p>
                                 </div>
                             </div>
 
@@ -241,37 +247,45 @@ export default function BecomeProviderPage() {
                                         onClick={() => setAccountType("individual")}
                                         className={`rounded-lg border px-4 py-4 text-left transition-colors ${accountType === "individual" ? "border-[#006340] bg-[#006340] text-white ring-2 ring-green-100" : "border-gray-200 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"}`}
                                     >
-                                        <span className="block text-sm font-bold">I am an individual provider</span>
-                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "individual" ? "text-white/80" : "text-gray-600"}`}>I personally want to work and get screened as a provider.</span>
+                                        <span className="block text-sm font-bold">I&apos;m an Individual Jobber</span>
+                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "individual" ? "text-white/80" : "text-gray-600"}`}>Find local jobs, offer your services, and earn money working for yourself.</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => setAccountType("contractor")}
                                         className={`rounded-lg border px-4 py-4 text-left transition-colors ${accountType === "contractor" ? "border-blue-600 bg-blue-600 text-white ring-2 ring-blue-100" : "border-gray-200 bg-white text-gray-950 hover:border-blue-500 hover:bg-blue-50"}`}
                                     >
-                                        <span className="block text-sm font-bold">We are a contractor</span>
-                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "contractor" ? "text-white/80" : "text-gray-600"}`}>Register a business or team that provides services to customers.</span>
+                                        <span className="block text-sm font-bold">We&apos;re a Business or Team</span>
+                                        <span className={`mt-1 block text-xs leading-5 ${accountType === "contractor" ? "text-white/80" : "text-gray-600"}`}>Register your company or team to find jobs and offer services.</span>
                                     </button>
                                 </div>
                             </div>
 
                             {accountType === "individual" ? (
-                              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-3 sm:grid-cols-3">
                                 <button
                                     type="button"
-                                    onClick={() => toggleWorkMode("freelance")}
-                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workModes.includes("freelance") ? "border-[#006340] bg-green-50 ring-2 ring-green-100" : "border-[#006340]/20 bg-white hover:border-[#006340] hover:bg-green-50"}`}
+                                    onClick={() => toggleWorkChoice("one-off")}
+                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workChoices.includes("one-off") ? "border-[#006340] bg-green-50 ring-2 ring-green-100" : "border-[#006340]/20 bg-white hover:border-[#006340] hover:bg-green-50"}`}
                                 >
-                                    <span className="block text-sm font-bold text-gray-950">I want to work freelance</span>
-                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Quote normal AnyJob service requests and set your own project price.</span>
+                                    <span className="block text-sm font-bold text-gray-950">One-off jobs</span>
+                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Find local jobs and provide your services.</span>
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={() => toggleWorkMode("shift")}
-                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workModes.includes("shift") ? "border-[#006340] bg-green-50 text-gray-950 ring-2 ring-green-100" : "border-[#006340]/20 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"}`}
+                                    onClick={() => toggleWorkChoice("projects")}
+                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workChoices.includes("projects") ? "border-[#006340] bg-green-50 text-gray-950 ring-2 ring-green-100" : "border-[#006340]/20 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"}`}
                                 >
-                                    <span className="block text-sm font-bold">I want to work in shifts</span>
-                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Join the business worker pool for day-wage and shift work.</span>
+                                    <span className="block text-sm font-bold">Quote for projects</span>
+                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Send customers quotes for project work.</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => toggleWorkChoice("shift")}
+                                    className={`rounded-lg border px-4 py-4 text-left transition-colors ${workChoices.includes("shift") ? "border-[#006340] bg-green-50 text-gray-950 ring-2 ring-green-100" : "border-[#006340]/20 bg-white text-gray-950 hover:border-[#006340] hover:bg-green-50"}`}
+                                >
+                                    <span className="block text-sm font-bold">Shift work</span>
+                                    <span className="mt-1 block text-xs leading-5 text-gray-600">Find hourly, daily, or temporary work with businesses.</span>
                                 </button>
                               </div>
                             ) : null}
@@ -279,10 +293,10 @@ export default function BecomeProviderPage() {
                             <button
                                 type="button"
                                 onClick={startRegistration}
-                                disabled={accountType === "individual" && workModes.length === 0}
+                                disabled={accountType === "individual" && workChoices.length === 0}
                                 className="mt-4 w-full rounded-lg bg-[#006340] px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-[#005230] disabled:cursor-not-allowed disabled:bg-gray-300"
                             >
-                                {accountType === "contractor" ? "Start contractor registration" : "Start provider registration"}
+                                {accountType === "contractor" ? "Start team registration" : "Become a Jobber"}
                             </button>
 
                             {/* Sign In Link */}

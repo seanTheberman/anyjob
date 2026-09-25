@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       selfieVideoUrl,
       insuranceDocumentUrl,
       workMode = "freelance",
+      workChoices,
       shiftNiches,
       shiftRoles,
       shiftSkills,
@@ -70,6 +71,9 @@ export async function POST(request: NextRequest) {
     const providerAccountType = accountType === "business" || accountType === "agency" ? accountType : "individual";
     const providerBusinessName = cleanString(businessName);
     const providerWorkMode = workMode === "shift" || workMode === "both" ? workMode : "freelance";
+    const workPreferenceList = cleanStringArray(workChoices).filter((choice) =>
+      ["one-off", "projects", "shift"].includes(choice),
+    );
     const wantsShiftWork = providerWorkMode === "shift" || providerWorkMode === "both";
     const shiftNicheList = cleanStringArray(shiftNiches);
     const shiftRoleList = cleanStringArray(shiftRoles);
@@ -187,6 +191,7 @@ export async function POST(request: NextRequest) {
       businessName: providerBusinessName || null,
       marketplaceAvailability: "",
       responseTime: "",
+      workPreferences: workPreferenceList,
     };
 
     // Insert seller profile data

@@ -11,6 +11,7 @@ import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
 
 type ProviderAccountType = "" | "individual" | "business" | "agency";
 type ProviderWorkMode = "none" | "freelance" | "shift" | "both";
+type WorkPreference = "one-off" | "projects" | "shift";
 
 type SellerRegistrationForm = {
   firstName: string;
@@ -99,6 +100,7 @@ export default function SellerRegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string>("");
   const [workModePreselected, setWorkModePreselected] = useState(false);
+  const [workPreferences, setWorkPreferences] = useState<WorkPreference[]>(["one-off", "projects", "shift"]);
   const { isMobileCamera, requestingCameraPermission, cameraError, requestCameraCapture } = useMobileCameraCapture();
   const marketLocation = useVerifiedMarketLocation();
 
@@ -133,12 +135,16 @@ export default function SellerRegisterPage() {
     const params = new URLSearchParams(window.location.search);
     const mode = params.get("mode");
     const accountTypeParam = params.get("accountType");
+    const requestedPreferences = (params.get("workChoices") || "")
+      .split(",")
+      .filter((value): value is WorkPreference => ["one-off", "projects", "shift"].includes(value));
     const nextAccountType: ProviderAccountType = accountTypeParam === "business" || accountTypeParam === "agency"
       ? accountTypeParam
       : "individual";
     if (mode === "shift" || mode === "both" || mode === "freelance") {
       const niche = getShiftNiche(params.get("niche"));
       setWorkModePreselected(true);
+      if (requestedPreferences.length) setWorkPreferences(requestedPreferences);
       setFormData((prev) => ({
         ...prev,
         accountType: nextAccountType,
@@ -167,12 +173,13 @@ export default function SellerRegisterPage() {
     setErrors((prev) => ({ ...prev, accountType: "" }));
   };
 
-  const handleWorkModeToggle = (mode: "freelance" | "shift") => {
+  const handleWorkPreferenceToggle = (preference: WorkPreference) => {
     const niche = getShiftNiche(formData.shiftNiche);
-    const hasFreelance = formData.workMode === "freelance" || formData.workMode === "both";
-    const hasShift = formData.workMode === "shift" || formData.workMode === "both";
-    const nextFreelance = mode === "freelance" ? !hasFreelance : hasFreelance;
-    const nextShift = mode === "shift" ? !hasShift : hasShift;
+    const nextPreferences = workPreferences.includes(preference)
+      ? workPreferences.filter((item) => item !== preference)
+      : [...workPreferences, preference];
+    const nextFreelance = nextPreferences.includes("one-off") || nextPreferences.includes("projects");
+    const nextShift = nextPreferences.includes("shift");
     const nextMode: ProviderWorkMode = nextFreelance && nextShift
       ? "both"
       : nextFreelance
@@ -186,6 +193,7 @@ export default function SellerRegisterPage() {
       serviceCategory: nextShift ? niche.label : prev.serviceCategory,
       openToFreelanceJobs: nextFreelance,
     }));
+    setWorkPreferences(nextPreferences);
     setErrors((prev) => ({ ...prev, workMode: "" }));
   };
 
@@ -352,6 +360,7 @@ export default function SellerRegisterPage() {
             experience: formData.experience,
             description: formData.description,
             workMode: formData.workMode,
+            workChoices: workPreferences,
             shiftNiches: formData.workMode === "shift" || formData.workMode === "both" ? [formData.shiftNiche] : [],
             shiftRoles: formData.shiftRoles,
             shiftSkills: formData.shiftSkills.split(",").map((item) => item.trim()).filter(Boolean),
@@ -531,7 +540,7 @@ export default function SellerRegisterPage() {
               </div>
               {formData.accountType === "business" || formData.accountType === "agency" ? (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
-                  This creates a service-provider profile that appears in Find a Provider with a {formData.accountType === "agency" ? "Agency" : "Business"} badge.
+                  This creates a Jobber profile that appears in Find a Jobber with a {formData.accountType === "agency" ? "Agency" : "Business"} badge.
                   To post jobs or hire shift workers, use Register as a Business instead.
                 </div>
               ) : null}
@@ -546,26 +555,30 @@ export default function SellerRegisterPage() {
               {!workModePreselected ? (
               <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
                 <p className="mb-3 text-sm font-semibold text-gray-900">How do you want to work on AnyJob?</p>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-3 md:grid-cols-3">
                   {[
                     {
-                      value: "freelance" as const,
-                      title: "I want to work freelance",
-                      description: "Quote normal AnyJob service requests and set your own project price.",
+                      value: "one-off" as const,
+                      title: "One-off jobs",
+                      description: "Take straightforward jobs that customers need completed.",
+                    },
+                    {
+                      value: "projects" as const,
+                      title: "Quote for projects",
+                      description: "Review project requests and provide your own quote.",
                     },
                     {
                       value: "shift" as const,
-                      title: "I want to work in shifts",
+                      title: "Shift work",
                       description: "Join the business worker pool for day-wage and shift work.",
                     },
                   ].map((option) => (
                     <button
                       key={option.value}
                       type="button"
-                      onClick={() => handleWorkModeToggle(option.value)}
+                      onClick={() => handleWorkPreferenceToggle(option.value)}
                       className={`rounded-lg border p-4 text-left transition-colors ${
-                        (option.value === "freelance" && (formData.workMode === "freelance" || formData.workMode === "both")) ||
-                        (option.value === "shift" && (formData.workMode === "shift" || formData.workMode === "both"))
+                        workPreferences.includes(option.value)
                           ? "border-blue-500 bg-white ring-2 ring-blue-100"
                           : "border-gray-200 bg-white hover:border-gray-300"
                       }`}
@@ -576,7 +589,7 @@ export default function SellerRegisterPage() {
                   ))}
                 </div>
                 <p className="mt-3 text-xs text-blue-700">
-                  You can select freelance, shifts, or both. Both are selected by default so you can receive both kinds of work after screening.
+                  Select one or more ways you would like to work. You can update these preferences later.
                 </p>
                 {errors.workMode && <p className="mt-2 text-xs text-red-600">{errors.workMode}</p>}
               </div>

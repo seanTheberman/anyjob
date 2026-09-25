@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { adminForbidden, getAdminApiUser, logAdminAction } from "@/lib/auth/admin-api";
 import { MOBILE_CONTENT_CATALOG, MOBILE_CONTENT_KEYS } from "@/lib/mobile-content/catalog";
+import { SERVICE_ICON_OPTIONS } from "@/lib/mobile-content/service-categories";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
@@ -35,6 +36,9 @@ export async function POST(request: Request) {
         if (url.protocol !== "https:") {
           return NextResponse.json({ error: `${definition.label} must use HTTPS.` }, { status: 400 });
         }
+      }
+      if (definition.control === "icon" && !SERVICE_ICON_OPTIONS.some((option) => option.value === value)) {
+        return NextResponse.json({ error: `${definition.label} is not a supported icon.` }, { status: 400 });
       }
       rows.push({
         content_key: key,

@@ -33,10 +33,10 @@ export function ProviderGrid() {
             <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-10 sm:mb-14">
                     <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-white mb-3">
-                        Our best service providers
+                        Local Jobbers ready to help
                     </h2>
                     <p className="text-base sm:text-lg text-gray-500 dark:text-gray-400 max-w-2xl mx-auto">
-                        Approved professionals from real AnyJob provider profiles
+                        Compare profiles, skills, prices, and genuine reviews.
                     </p>
                 </div>
 
@@ -51,7 +51,7 @@ export function ProviderGrid() {
                         href="/search"
                         className="inline-flex items-center justify-center rounded-full border border-gray-200 px-8 py-4 text-sm font-semibold text-gray-900 transition hover:bg-gray-50 dark:border-gray-700 dark:text-white dark:hover:bg-gray-900"
                     >
-                        View all service providers
+                        Find a Jobber
                         <ArrowRight className="w-4 h-4 ml-2" />
                     </Link>
                 </div>

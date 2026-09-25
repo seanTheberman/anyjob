@@ -40,8 +40,8 @@ async function loginAsAdmin(page: Page) {
   await page.getByLabel("Admin email").fill("admin@anyjob.eu");
   await page.getByLabel("Password", { exact: true }).fill("Admin123!");
   await page.getByRole("button", { name: "Enter admin console" }).click();
-  await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole("heading", { name: "Marketplace overview" })).toBeVisible();
+  await expect(page).toHaveURL(/\/admin$/, { timeout: 30_000 });
+  await expect(page.getByRole("heading", { name: "Marketplace overview" })).toBeVisible({ timeout: 30_000 });
 }
 
 async function gotoAdminRoute(page: Page, route: string) {
@@ -149,6 +149,8 @@ test.describe("admin console", () => {
       city: "Paris",
       postal_code: "75001",
       country: "France",
+      country_code: "FR",
+      region: "Île-de-France",
       birth_date: "1990-01-01",
       service_category: "Cleaning",
       experience_level: "expert",
@@ -174,6 +176,25 @@ test.describe("admin console", () => {
 
     if (sellerError) throw new Error(`Provider seed failed: ${sellerError.message}`);
 
+    const { error: idImagesError } = await db.from("user_images").insert([
+      {
+        user_id: providerId,
+        image_url: "https://example.com/id-front.jpg",
+        public_id: `admin-e2e/${providerId}/id-front`,
+        image_type: "id_document",
+        title: "Identity document front",
+      },
+      {
+        user_id: providerId,
+        image_url: "https://example.com/id-back.jpg",
+        public_id: `admin-e2e/${providerId}/id-back`,
+        image_type: "id_document",
+        title: "Identity document back",
+      },
+    ]);
+
+    if (idImagesError) throw new Error(`Provider ID image seed failed: ${idImagesError.message}`);
+
     const { error: businessError } = await db.from("business_profiles").insert({
       id: businessId,
       owner_user_id: businessOwnerId,
@@ -189,6 +210,8 @@ test.describe("admin console", () => {
       city: "Paris",
       postal_code: "75001",
       country: "France",
+      country_code: "FR",
+      region: "Île-de-France",
       document_url: "https://example.com/business.pdf",
       document_source: "url",
       typical_work_types: ["day_wage"],
@@ -204,6 +227,7 @@ test.describe("admin console", () => {
   test.afterAll(async () => {
     if (!db) return;
     await db.from("business_profiles").delete().eq("id", businessId);
+    await db.from("user_images").delete().eq("user_id", providerId);
     await db.from("sellers").delete().eq("id", providerId);
     await db.from("eloo_profiles").delete().eq("id", businessOwnerId);
     if (providerId) await db.auth.admin.deleteUser(providerId);

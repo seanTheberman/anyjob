@@ -136,7 +136,7 @@ export default async function ProviderProfilePage({ params }: { params: Promise<
       <div className="border-b border-slate-200 bg-white">
         <div className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <nav className="flex min-w-0 items-center gap-2 overflow-hidden text-xs font-semibold text-slate-500">
-            <Link href="/search" className="shrink-0 hover:text-slate-950">Find a Provider</Link>
+            <Link href="/search" className="shrink-0 hover:text-slate-950">Find a Jobber</Link>
             <ChevronRight className="h-3.5 w-3.5 shrink-0" />
             <span className="truncate">{provider.category}</span>
           </nav>

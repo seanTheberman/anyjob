@@ -15,7 +15,7 @@ const CATEGORY_LINKS = [
 
 const COMPANY_LINKS = [
     { href: "/how-it-works", label: "How it works" },
-    { href: "/become-provider", label: "Become a provider" },
+    { href: "/become-provider", label: "Become a Jobber" },
     { href: "/pricing", label: "Pricing" },
     { href: "/how-it-works#about", label: "About" },
     { href: "/dashboard/assistance/new?topic=press", label: "Press" },
@@ -54,8 +54,7 @@ export function Footer() {
                             />
                         </Link>
                         <p className="text-sm text-gray-400 leading-relaxed max-w-xs">
-                            Find and book rated and qualified home service 
-                            providers anywhere.
+                            Post a job, find a local Jobber, and get it done.
                         </p>
                         <div className="flex gap-3 pt-2">
                             {/* Social icons */}

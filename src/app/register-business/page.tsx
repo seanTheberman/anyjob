@@ -107,22 +107,22 @@ const TOTAL_STEPS = 5;
 
 const BUSINESS_STEPS = [
   {
+    icon: Building2,
+    title: "Create your business account",
+    text: "Enter your business details and submit them for verification.",
+    detail: "A verified business profile keeps every job and shift connected to the right company.",
+  },
+  {
     icon: ClipboardList,
-    title: "Choose work type",
-    text: "Tell AnyJob whether your company needs a one-off business service, day-wage staffing, long-duration shift cover, or a mix of all three.",
-    detail: "This decides which posting tools open after approval and how providers see your work.",
+    title: "Post your job or shift",
+    text: "Tell us what you need, where the work is, and when it starts.",
+    detail: "Use one-off jobs for a finished task or Work Shifts for hourly, daily, temporary, or recurring help.",
   },
   {
     icon: Users,
-    title: "Match by niche",
-    text: "Pick your industry, common roles, expected worker count, and staffing plan so irrelevant providers are filtered out before you post.",
-    detail: "Hospitals can reach healthcare workers, restaurants can reach kitchen and service staff, and cleaning companies can reach cleaners.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Verify business",
-    text: "Submit business identity details and a document so admins can approve the account before posting is unlocked.",
-    detail: "Approval keeps business shift posts tied to a real company contact, location, and registration record.",
+    title: "Find the right Jobber",
+    text: "Review interested Jobbers and agree on the work.",
+    detail: "Profiles, badges, availability, and applications help you choose with confidence.",
   },
 ];
 
@@ -634,15 +634,15 @@ function BusinessHero() {
           />
         </div>
         <div className="order-1 lg:order-2">
-          <p className="text-sm font-bold uppercase tracking-wide text-red-600">Register as a business</p>
-          <h1 className="mt-3 text-4xl font-bold text-gray-900 sm:text-5xl">Post work to the right provider pool</h1>
+          <p className="text-sm font-bold uppercase tracking-wide text-red-600">AnyJob for Business</p>
+          <h1 className="mt-3 text-4xl font-bold text-gray-900 sm:text-5xl">Need extra staff or help getting work done?</h1>
           <p className="mt-5 text-lg leading-8 text-gray-600">
-            Register once, get admin approved, then post freelance business jobs, day-wage work, or long-duration shifts.
-            AnyJob routes shift jobs only to providers whose niche matches your business.
+            Find local Jobbers for one-off jobs, temporary shifts, and ongoing work. Whether you run a restaurant,
+            shop, office, or construction company, AnyJob helps you connect with people ready to work.
           </p>
           <div className="mt-6 grid gap-3 text-sm text-gray-700">
-            <HeroPoint icon={MapPin} text="Add your business location so nearby providers understand where the work is based." />
-            <HeroPoint icon={CreditCard} text="Keep business work, agreed fees, completion records, and future posts under one company account." />
+            <HeroPoint icon={MapPin} text="One-off jobs for repairs, cleaning, maintenance, and other tasks." />
+            <HeroPoint icon={CreditCard} text="Work Shifts for busy periods, events, staff shortages, and recurring cover." />
           </div>
           <div className="mt-6 rounded-lg bg-white p-5 shadow-sm">
             <div className="grid gap-4 sm:grid-cols-3">

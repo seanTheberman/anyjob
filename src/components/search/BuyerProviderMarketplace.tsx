@@ -78,6 +78,7 @@ function cardAccent(provider: ProviderMarketplaceData) {
 function ProviderBadgePill({ label }: { label: string }) {
   const isAgency = label === "Agency";
   const isBusiness = label === "Business";
+  const isFreelancer = label === "Freelancer";
   const Icon = isAgency || isBusiness ? Building2 : label === "Verified ID" ? ShieldCheck : Award;
 
   return (
@@ -88,10 +89,12 @@ function ProviderBadgePill({ label }: { label: string }) {
           ? "bg-purple-50 text-purple-700 ring-1 ring-purple-100"
           : isBusiness
             ? "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
-            : "bg-slate-100 text-slate-700"
+            : isFreelancer
+              ? "bg-violet-50 text-violet-700 ring-1 ring-violet-100"
+              : "bg-slate-100 text-slate-700"
       )}
     >
-      <Icon className={cn("h-3 w-3 shrink-0", isAgency ? "text-purple-600" : isBusiness ? "text-blue-600" : label === "Verified ID" ? "text-emerald-600" : "text-red-600")} />
+      <Icon className={cn("h-3 w-3 shrink-0", isAgency ? "text-purple-600" : isBusiness ? "text-blue-600" : isFreelancer ? "text-violet-600" : label === "Verified ID" ? "text-emerald-600" : "text-red-600")} />
       <span className="truncate">{label}</span>
     </span>
   );
@@ -191,14 +194,14 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
           <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center">
             <div className="min-w-0 flex-1">
               <p className="hidden text-sm font-semibold text-red-600 sm:block">Welcome back, {buyerName}</p>
-              <h1 className="sr-only mt-1 text-2xl font-bold tracking-tight sm:not-sr-only sm:text-3xl">Find a provider and book directly</h1>
+              <h1 className="sr-only mt-1 text-2xl font-bold tracking-tight sm:not-sr-only sm:text-3xl">Find a Jobber</h1>
             </div>
 
             <form
               className="flex w-full min-w-0 max-w-2xl rounded-lg border border-slate-300 bg-white shadow-sm focus-within:border-slate-900"
               onSubmit={(event) => event.preventDefault()}
             >
-              <label htmlFor="provider-search" className="sr-only">Search providers</label>
+              <label htmlFor="provider-search" className="sr-only">Search Jobbers</label>
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
@@ -258,7 +261,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
                 </span>
                 <div className="min-w-0">
                   <h2 className="font-bold text-slate-950">Skip the job post</h2>
-                  <p className="mt-1 text-sm text-slate-600">Search live profiles, compare providers, and open the profile you want.</p>
+                  <p className="mt-1 text-sm text-slate-600">Search live profiles, compare Jobbers, and open the profile you want.</p>
                 </div>
               </div>
               <button type="button" onClick={() => setFiltersOpen(true)} className="hidden rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-slate-50 sm:inline-flex">
@@ -272,7 +275,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
             <div className="mt-4 grid grid-cols-3 gap-3">
               <div>
                 <p className="text-2xl font-bold text-slate-950">{providers.length}</p>
-                <p className="text-xs text-slate-500">approved providers</p>
+                <p className="text-xs text-slate-500">approved Jobbers</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-950">{providers.filter((provider) => provider.badges.length > 0).length}</p>
@@ -291,7 +294,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
         <div className="mb-5 hidden items-center justify-between gap-3 sm:flex">
           <div>
             <h2 className="text-2xl font-bold text-slate-950">Top matches for your next booking</h2>
-            <p className="mt-1 text-sm text-slate-600">Browse provider profiles directly, just like services in a marketplace.</p>
+            <p className="mt-1 text-sm text-slate-600">Browse Jobber profiles and choose the right person for the work.</p>
           </div>
           <button type="button" className="hidden items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-900 hover:bg-slate-50 lg:inline-flex" onClick={() => setFiltersOpen((open) => !open)}>
             <SlidersHorizontal className="h-4 w-4" />
@@ -335,7 +338,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-lg font-bold text-slate-950">Advanced filters</h2>
-                    <p className="mt-0.5 text-xs text-slate-500">{filteredProviders.length} providers match</p>
+                    <p className="mt-0.5 text-xs text-slate-500">{filteredProviders.length} Jobbers match</p>
                   </div>
                   <button type="button" onClick={() => setFiltersOpen(false)} className="rounded-full p-2 text-slate-500 hover:bg-slate-100" aria-label="Close filters">
                     <X className="h-5 w-5" />
@@ -374,7 +377,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
                   onClick={() => setFiltersOpen(false)}
                   className="w-full rounded-lg bg-slate-950 px-4 py-3 text-sm font-bold text-white hover:bg-red-600"
                 >
-                  Show {filteredProviders.length} provider{filteredProviders.length === 1 ? "" : "s"}
+                  Show {filteredProviders.length} Jobber{filteredProviders.length === 1 ? "" : "s"}
                 </button>
               </div>
             </div>
@@ -415,7 +418,7 @@ export function BuyerProviderMarketplace({ providers, buyerName = "there" }: Buy
         <div className="min-w-0">
           <div className="mb-5 flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm font-semibold text-slate-700">
-              {filteredProviders.length} provider{filteredProviders.length === 1 ? "" : "s"} found
+              {filteredProviders.length} Jobber{filteredProviders.length === 1 ? "" : "s"} found
               {category !== "all" ? ` in ${categoryLabel(category)}` : ""}
             </p>
             <div className="flex items-center gap-2">
@@ -720,9 +723,9 @@ function ProviderGigCard({ provider, saved, onSave, compact = false }: { provide
               ) : provider.serviceAreas?.length ? (
                 <span className="mt-1 block truncate text-xs font-medium text-slate-500">Serves {provider.serviceAreas.length} preferred {provider.serviceAreas.length === 1 ? "area" : "areas"}</span>
               ) : null}
-              {provider.badges.some((item) => item === "Business" || item === "Agency") ? (
+              {provider.badges.some((item) => item === "Business" || item === "Agency" || item === "Freelancer") ? (
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {provider.badges.filter((item) => item === "Business" || item === "Agency").map((item) => (
+                  {provider.badges.filter((item) => item === "Business" || item === "Agency" || item === "Freelancer").map((item) => (
                     <ProviderBadgePill key={item} label={item} />
                   ))}
                 </div>

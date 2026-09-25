@@ -10,13 +10,22 @@ import { useMarketLocation } from "@/providers/market-location-provider";
 
 type Kind = "buyer" | "seller";
 type WorkMode = "freelance" | "shift" | "both";
+type WorkChoice = "one-off" | "projects" | "shift";
+type AccountType = "individual" | "business";
+
+const workChoiceLabels: Record<WorkChoice, string> = {
+  "one-off": "One-off jobs",
+  projects: "Quote for projects",
+  shift: "Shift work",
+};
 
 export default function RegisterScreen() {
   const router = useRouter();
   const { redirectTo } = useLocalSearchParams<{ redirectTo?: string }>();
   const [kind, setKind] = useState<Kind>("buyer");
   const [busy, setBusy] = useState(false);
-  const [workMode, setWorkMode] = useState<WorkMode>("freelance");
+  const [accountType, setAccountType] = useState<AccountType>("individual");
+  const [workChoices, setWorkChoices] = useState<WorkChoice[]>(["one-off", "projects", "shift"]);
   const [errorMessage, setErrorMessage] = useState("");
   const marketLocation = useMarketLocation();
   const [form, setForm] = useState({
@@ -29,11 +38,20 @@ export default function RegisterScreen() {
     city: "",
     postalCode: "",
     birthDate: "",
+    businessName: "",
     serviceCategory: "",
     shiftNiches: "",
     shiftRoles: "",
     hourlyRate: "25",
   });
+
+  const hasFreelanceWork = workChoices.includes("one-off") || workChoices.includes("projects");
+  const hasShiftWork = workChoices.includes("shift");
+  const workMode: WorkMode = hasFreelanceWork && hasShiftWork
+    ? "both"
+    : hasShiftWork
+      ? "shift"
+      : "freelance";
 
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -45,7 +63,7 @@ export default function RegisterScreen() {
       postalCode: marketLocation.location?.postalCode || "",
     }));
   }, [marketLocation.location]);
-  const needsShiftProfile = kind === "seller" && workMode !== "freelance";
+  const needsShiftProfile = kind === "seller" && hasShiftWork;
   const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
   const complete = Boolean(
     form.firstName &&
@@ -59,6 +77,8 @@ export default function RegisterScreen() {
         (form.phone &&
           form.birthDate &&
           form.serviceCategory &&
+          workChoices.length > 0 &&
+          (accountType === "individual" || form.businessName) &&
           (!needsShiftProfile ||
             (form.shiftNiches &&
               form.shiftRoles &&
@@ -82,7 +102,9 @@ export default function RegisterScreen() {
           : {
               ...form,
               locationToken: marketLocation.token,
+              accountType,
               workMode,
+              workChoices,
               termsAccepted: true,
               shiftNiches: form.shiftNiches
                 .split(",")
@@ -93,7 +115,7 @@ export default function RegisterScreen() {
                 .map((item) => item.trim())
                 .filter(Boolean),
               preferredHourlyRate: Number(form.hourlyRate),
-              openToFreelanceJobs: workMode !== "shift",
+              openToFreelanceJobs: hasFreelanceWork,
               openToUrgentShifts: true,
               openToRecurringShifts: true,
             };
@@ -186,19 +208,46 @@ export default function RegisterScreen() {
         <>
           <Field label="Date of birth (YYYY-MM-DD)" value={form.birthDate} onChangeText={set("birthDate")} />
           <Field label="Main service category" value={form.serviceCategory} onChangeText={set("serviceCategory")} />
-          <Text style={styles.label}>Work type</Text>
+          <Text style={styles.label}>Which best describes you?</Text>
           <View style={styles.segment}>
-            {(["freelance", "shift", "both"] as WorkMode[]).map((mode) => (
+            <Pressable
+              onPress={() => setAccountType("individual")}
+              style={[styles.segmentButton, accountType === "individual" && styles.active]}
+            >
+              <Text style={[styles.segmentText, accountType === "individual" && styles.activeText]}>
+                I’m an Individual Jobber
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setAccountType("business")}
+              style={[styles.segmentButton, accountType === "business" && styles.active]}
+            >
+              <Text style={[styles.segmentText, accountType === "business" && styles.activeText]}>
+                We’re a Business or Team
+              </Text>
+            </Pressable>
+          </View>
+          {accountType === "business" ? (
+            <Field label="Business or team name" value={form.businessName} onChangeText={set("businessName")} />
+          ) : null}
+          <Text style={styles.label}>How would you like to work?</Text>
+          <View style={styles.workChoiceList}>
+            {(["one-off", "projects", "shift"] as WorkChoice[]).map((choice) => {
+              const selected = workChoices.includes(choice);
+              return (
               <Pressable
-                key={mode}
-                onPress={() => setWorkMode(mode)}
-                style={[styles.segmentButton, workMode === mode && styles.active]}
+                key={choice}
+                onPress={() => setWorkChoices((current) => selected
+                  ? current.filter((item) => item !== choice)
+                  : [...current, choice])}
+                style={[styles.workChoiceButton, selected && styles.active]}
               >
-                <Text style={[styles.segmentText, workMode === mode && styles.activeText]}>
-                  {mode}
+                <Text style={[styles.segmentText, selected && styles.activeText]}>
+                  {workChoiceLabels[choice]}
                 </Text>
               </Pressable>
-            ))}
+              );
+            })}
           </View>
           {needsShiftProfile ? (
             <>
@@ -216,7 +265,7 @@ export default function RegisterScreen() {
         onChangeText={set("password")}
       />
       <Text style={styles.terms}>
-        By creating an account you accept AnyJob's terms and privacy policy.
+        By creating an account you accept AnyJob’s terms and privacy policy.
       </Text>
       {errorMessage ? (
         <Text accessibilityRole="alert" style={styles.error}>
@@ -224,7 +273,7 @@ export default function RegisterScreen() {
         </Text>
       ) : null}
       <Button
-        title={kind === "buyer" ? "Create buyer account" : "Create provider account"}
+        title={kind === "buyer" ? "Create customer account" : "Become a Jobber"}
         onPress={submit}
         loading={busy}
         disabled={!complete}
@@ -271,7 +320,18 @@ const styles = StyleSheet.create({
   segmentText: {
     color: colors.muted,
     fontWeight: "700",
-    textTransform: "capitalize",
+    textAlign: "center",
   },
   activeText: { color: colors.brand },
+  workChoiceList: { gap: 8 },
+  workChoiceButton: {
+    minHeight: 46,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.soft,
+    paddingHorizontal: 12,
+  },
 });

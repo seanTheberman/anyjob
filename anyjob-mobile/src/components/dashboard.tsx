@@ -6,6 +6,7 @@ import {
   Award,
   Baby,
   BadgeCheck,
+  BriefcaseBusiness,
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
@@ -26,11 +27,13 @@ import {
   Send,
   ShieldCheck,
   Star,
-  Snowflake,
+  Sparkles,
   SprayCan,
   Store,
   Truck,
+  Users,
   UsersRound,
+  Wrench,
   type LucideIcon,
 } from "lucide-react-native";
 import { useMemo, useState } from "react";
@@ -55,6 +58,7 @@ import { useAppTheme } from "@/providers/theme-provider";
 import { radius } from "@/theme/tokens";
 
 const categoryItems: Array<{
+  key: string;
   title: string;
   category: string;
   Icon: LucideIcon;
@@ -62,13 +66,15 @@ const categoryItems: Array<{
   soft: string;
 }> = [
   {
-    title: "Winter services",
-    category: "winter",
-    Icon: Snowflake,
+    key: "work_shifts",
+    title: "Work Shifts",
+    category: "work-shifts",
+    Icon: CalendarDays,
     tint: "#4389f7",
     soft: "#edf4ff",
   },
   {
+    key: "handyman",
     title: "Handyman",
     category: "handyman",
     Icon: Hammer,
@@ -76,6 +82,7 @@ const categoryItems: Array<{
     soft: "#fff5e6",
   },
   {
+    key: "gardening",
     title: "Gardening",
     category: "gardening",
     Icon: Leaf,
@@ -83,6 +90,7 @@ const categoryItems: Array<{
     soft: "#eaf8ef",
   },
   {
+    key: "moving",
     title: "Moving",
     category: "moving",
     Icon: Truck,
@@ -90,6 +98,7 @@ const categoryItems: Array<{
     soft: "#f1edff",
   },
   {
+    key: "cleaning",
     title: "Cleaning",
     category: "cleaning",
     Icon: SprayCan,
@@ -97,6 +106,7 @@ const categoryItems: Array<{
     soft: "#fff0f6",
   },
   {
+    key: "childcare",
     title: "Childcare",
     category: "childcare",
     Icon: Baby,
@@ -104,6 +114,7 @@ const categoryItems: Array<{
     soft: "#fff1e9",
   },
   {
+    key: "pet_care",
     title: "Pet care",
     category: "pet-care",
     Icon: PawPrint,
@@ -111,6 +122,7 @@ const categoryItems: Array<{
     soft: "#e9f8f7",
   },
   {
+    key: "it_support",
     title: "IT support",
     category: "it-support",
     Icon: MonitorCog,
@@ -118,6 +130,7 @@ const categoryItems: Array<{
     soft: "#eeeeff",
   },
   {
+    key: "home_help",
     title: "Home help",
     category: "home-help",
     Icon: HouseHeart,
@@ -125,6 +138,7 @@ const categoryItems: Array<{
     soft: "#fff0f1",
   },
   {
+    key: "tutoring",
     title: "Tutoring",
     category: "tutoring",
     Icon: GraduationCap,
@@ -132,6 +146,24 @@ const categoryItems: Array<{
     soft: "#eaf7fd",
   },
 ];
+
+const serviceIcons: Record<string, LucideIcon> = {
+  "calendar-days": CalendarDays,
+  briefcase: BriefcaseBusiness,
+  hammer: Hammer,
+  wrench: Wrench,
+  leaf: Leaf,
+  truck: Truck,
+  "spray-can": SprayCan,
+  baby: Baby,
+  "paw-print": PawPrint,
+  "monitor-cog": MonitorCog,
+  "house-heart": HouseHeart,
+  "graduation-cap": GraduationCap,
+  users: Users,
+  star: Star,
+  sparkles: Sparkles,
+};
 
 const discoveryServices = [
   {
@@ -155,19 +187,6 @@ const discoveryServices = [
     category: "painting",
   },
 ];
-
-const searchableServices = Array.from(
-  new Map(
-    [...categoryItems, ...discoveryServices].map((item) => [
-      item.title.toLowerCase(),
-      {
-        title: item.title,
-        category: item.category === "painting" ? "handyman" : item.category,
-        body: "body" in item ? item.body : `${item.title} services`,
-      },
-    ]),
-  ).values(),
-);
 
 function ServiceIcon({
   item,
@@ -352,15 +371,39 @@ export function Dashboard() {
   const [serviceSearch, setServiceSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const name = user?.displayName?.split(" ")[0] || "there";
+  const configuredCategoryItems = useMemo(
+    () => categoryItems.map((item) => ({
+      ...item,
+      title: copy(`home.services.${item.key}.name`, item.title),
+      Icon: serviceIcons[content[`home.services.${item.key}.icon`]] || item.Icon,
+    })),
+    [content, copy],
+  );
+  const searchableServices = useMemo(() => Array.from(
+    new Map(
+      [...configuredCategoryItems, ...discoveryServices].map((item) => [
+        item.title.toLowerCase(),
+        {
+          title: item.title,
+          category: item.category === "painting" ? "handyman" : item.category,
+          body: "body" in item ? item.body : `${item.title} services`,
+        },
+      ]),
+    ).values(),
+  ), [configuredCategoryItems]);
   const serviceSuggestions = useMemo(() => {
     const needle = serviceSearch.trim().toLowerCase();
     if (!needle) return searchableServices.slice(0, 6);
     return searchableServices
       .filter((item) => `${item.title} ${item.body} ${item.category}`.toLowerCase().includes(needle))
       .slice(0, 6);
-  }, [serviceSearch]);
+  }, [searchableServices, serviceSearch]);
   const openServiceRequest = (category: string, customQuery = "") => {
     setSearchFocused(false);
+    if (category === "work-shifts") {
+      router.push("/shifts");
+      return;
+    }
     router.push({
       pathname: "/request/new",
       params: {
@@ -822,22 +865,50 @@ export function Dashboard() {
         onPress={() => router.push("/(app)/explore")}
       />
       <View style={styles.serviceGrid}>
-        {categoryItems.map((item) => (
+        {configuredCategoryItems.map((item) => (
           <ServiceIcon
-            key={item.title}
+            key={item.key}
             item={item}
-            onPress={() =>
+            onPress={() => {
+              if (item.category === "work-shifts") {
+                router.push("/shifts");
+                return;
+              }
               router.push({
                 pathname: "/request/new",
                 params: {
                   category: item.category,
                   requestKey: String(Date.now()),
                 },
-              })
-            }
+              });
+            }}
           />
         ))}
       </View>
+      <HomeSectionHeader
+        title={copy("home.shifts.title", "Work shifts")}
+        action="View shifts"
+        onPress={() => router.push("/shifts")}
+      />
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Open work shifts"
+        onPress={() => router.push("/shifts")}
+        style={({ pressed }) => [
+          styles.startBand,
+          { backgroundColor: colors.ink },
+          pressed && styles.pressed,
+        ]}
+      >
+        <View style={[styles.tasksIcon, { backgroundColor: "rgba(255,255,255,.12)" }] }>
+          <BriefcaseBusiness color="white" size={22} />
+        </View>
+        <View style={styles.startCopy}>
+          <Text style={styles.startTitle}>Need extra people for a shift?</Text>
+          <Text style={styles.shiftSectionBody}>Post hourly, daily, temporary, or recurring work.</Text>
+        </View>
+        <ArrowRight color="white" size={18} />
+      </Pressable>
       <HomeSectionHeader
         title={copy("home.nearby.title", "Popular near you")}
         action="Explore"
@@ -1002,7 +1073,7 @@ export function Dashboard() {
         </Pressable>
       )}
       <HomeSectionHeader
-        title={copy("home.providers.title", "Recommended taskers")}
+        title={copy("home.providers.title", "Recommended Jobbers")}
         action="See all"
         onPress={() => router.push("/(app)/explore")}
       />
@@ -1023,7 +1094,7 @@ export function Dashboard() {
         </ScrollView>
       ) : (
         <Text style={[styles.pageBody, { color: colors.muted }]}>
-          Loading trusted local providers…
+          Loading trusted local Jobbers…
         </Text>
       )}
       <HomeSectionHeader
@@ -1316,6 +1387,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "900",
   },
+  shiftSectionBody: { color: "rgba(255,255,255,.72)", fontSize: 11.5, lineHeight: 16 },
   startBody: { color: "#c9cdd1", fontSize: 10.5, lineHeight: 15 },
   startButton: {
     width: 42,

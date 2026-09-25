@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ArrowRight, BriefcaseBusiness, Star } from "lucide-react";
+import { ArrowRight, BadgeCheck, BriefcaseBusiness, Star } from "lucide-react";
 import Link from "next/link";
 
 // Define the props for the ProviderCard component
@@ -29,12 +29,12 @@ const ProviderCard = React.forwardRef<HTMLDivElement, ProviderCardProps>(
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
       .join("");
+    const accountBadge = provider.tags.find((tag) => ["Freelancer", "Business", "Agency"].includes(tag));
     
     return (
       <div
         ref={ref}
         style={{
-          // @ts-ignore - CSS custom properties are valid
           "--theme-color": themeColor,
         } as React.CSSProperties}
         className={cn("group w-full h-full", className)}
@@ -77,6 +77,12 @@ const ProviderCard = React.forwardRef<HTMLDivElement, ProviderCardProps>(
               <span className="absolute left-4 top-4 inline-flex items-center gap-1 rounded bg-emerald-600/95 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
                 <BriefcaseBusiness className="h-3.5 w-3.5" />
                 Available for work shifts
+              </span>
+            ) : null}
+            {accountBadge ? (
+              <span className={`absolute right-4 top-4 inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-bold text-white shadow-sm ${accountBadge === "Freelancer" ? "bg-violet-600/95" : "bg-blue-600/95"}`}>
+                <BadgeCheck className="h-3.5 w-3.5" />
+                {accountBadge}
               </span>
             ) : null}
             {/* Name and Rate Row */}

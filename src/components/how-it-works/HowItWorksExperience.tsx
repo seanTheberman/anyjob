@@ -18,7 +18,6 @@ import {
     Handshake,
     MessageCircle,
     Search,
-    ShieldCheck,
     Sparkles,
     Star,
     UserCheck,
@@ -105,15 +104,15 @@ const AUDIENCES: Audience[] = [
     },
     {
         key: "provider",
-        title: "Service providers",
+        title: "Jobbers",
         shortTitle: "Provide",
-        headline: "Turn your skills into booked client work and stronger reviews.",
+        headline: "Offer your skills, quote for work, and build your reputation.",
         intro:
             "Build a verified profile, receive requests, send total bids, unlock chat after confirmation, and grow your reputation.",
         image: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?q=80&w=1200&auto=format&fit=crop",
         imageAlt: "Service provider working with tools",
         href: "/seller-register?mode=freelance",
-        cta: "Become a provider",
+        cta: "Become a Jobber",
         icon: BadgeCheck,
         accent: "from-emerald-600 to-teal-500",
         chip: "bg-emerald-50 text-emerald-700 border-emerald-100",
@@ -151,7 +150,7 @@ const AUDIENCES: Audience[] = [
     },
     {
         key: "worker",
-        title: "Freelance workers",
+        title: "Shift workers",
         shortTitle: "Work",
         headline: "Find flexible paid work that fits your niche and availability.",
         intro:
@@ -197,15 +196,15 @@ const AUDIENCES: Audience[] = [
     },
     {
         key: "customer",
-        title: "Customers",
+        title: "I need a job done",
         shortTitle: "Book",
-        headline: "Book trusted local help without guessing who to call.",
+        headline: "Post what you need and choose the right local Jobber.",
         intro:
-            "Search a category, compare providers, accept the total bid, unlock chat, and review the finished job.",
+            "Search a category, compare Jobbers, accept the total quote, unlock chat, and review the finished job.",
         image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=1200&auto=format&fit=crop",
         imageAlt: "Home service provider cleaning a bright room",
         href: "/search",
-        cta: "Find a provider",
+        cta: "Find a Jobber",
         icon: Search,
         accent: "from-amber-500 to-orange-500",
         chip: "bg-amber-50 text-amber-800 border-amber-100",
@@ -221,7 +220,7 @@ const AUDIENCES: Audience[] = [
                 icon: Search,
             },
             {
-                title: "Compare providers",
+                title: "Compare Jobbers",
                 text: "Review profile quality, ratings, location, and total bid.",
                 icon: Star,
             },
@@ -232,11 +231,11 @@ const AUDIENCES: Audience[] = [
             },
             {
                 title: "Review the work",
-                text: "Share feedback so the best providers become easier to spot.",
+                text: "Share feedback so the best Jobbers become easier to spot.",
                 icon: CheckCircle2,
             },
         ],
-        highlights: ["Local providers", "Clear total bid", "Unlocked chat", "Ratings"],
+        highlights: ["Local Jobbers", "Clear total quote", "Unlocked chat", "Ratings"],
         demoTitle: "Deep clean request",
         demoMeta: "Friday · 3 bedrooms · Bordeaux",
         demoPay: "Total bid €120",
@@ -245,19 +244,19 @@ const AUDIENCES: Audience[] = [
 
 const FEATURE_CARDS = [
     {
-        title: "Clear before commitment",
-        text: "Every path pushes users toward the right details before anyone confirms work.",
+        title: "1. Post a job",
+        text: "Tell us what you need, where the work is, and when you need it.",
         icon: ClipboardList,
     },
     {
-        title: "Built-in trust signals",
-        text: "Verification, reviews, badges, job history, and admin oversight support safer decisions.",
-        icon: ShieldCheck,
+        title: "2. Find the right person",
+        text: "Compare Jobber profiles, badges, prices, availability, and genuine reviews.",
+        icon: Search,
     },
     {
-        title: "One flow, many work types",
-        text: "Customers, businesses, providers, and workers each get a workflow designed for their role.",
-        icon: Sparkles,
+        title: "3. Get it done",
+        text: "Agree on the work, confirm the Jobber, and leave a review when it is complete.",
+        icon: CheckCircle2,
     },
 ];
 
@@ -266,7 +265,7 @@ function getAudience(key: AudienceKey) {
 }
 
 export function HowItWorksExperience() {
-    const [activeKey, setActiveKey] = useState<AudienceKey>("business");
+    const [activeKey, setActiveKey] = useState<AudienceKey>("customer");
     const active = useMemo(() => getAudience(activeKey), [activeKey]);
     const ActiveIcon = active.icon;
 
@@ -284,10 +283,10 @@ export function HowItWorksExperience() {
                             How AnyJob works
                         </span>
                         <h1 className="mt-5 max-w-3xl text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">
-                            The fast way to match real work with real people.
+                            Post a job. Find the right person. Get it done.
                         </h1>
                         <p className="mt-5 max-w-2xl text-lg leading-8 text-gray-600 dark:text-gray-300">
-                            AnyJob turns service bookings, business staffing, provider bids, and freelance work into guided flows that feel simple from the first click.
+                            Whether you need a plumber, cleaner, tradesperson, or extra staff, tell AnyJob what you need and choose the person who fits.
                         </p>
 
                         <div className="mt-7 grid gap-3 sm:grid-cols-2">
@@ -333,7 +332,7 @@ export function HowItWorksExperience() {
                             animate={{ opacity: 1, y: 0, rotate: -2 }}
                             transition={{ delay: 0.25, duration: 0.45 }}
                         >
-                            Match in minutes
+                            Start in minutes
                         </motion.div>
                         <div className="relative min-h-[520px] rounded-lg bg-gray-100 p-3 shadow-xl shadow-gray-950/10 dark:bg-gray-900">
                             <AnimatePresence mode="wait">
@@ -568,7 +567,7 @@ export function HowItWorksExperience() {
                         Start where you are. AnyJob guides the rest.
                     </h2>
                     <p className="mt-4 text-base leading-7 text-gray-600 dark:text-gray-300">
-                        Book a provider, register your business, offer services, or find flexible paid work.
+                        Post a job, register a business, offer your skills, or find flexible shift work.
                     </p>
                     <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
                         <Link href="/search">

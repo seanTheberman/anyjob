@@ -28,8 +28,8 @@ export default async function AdminMobileContentPage() {
   const savedEntries = await getSavedEntries();
   return (
     <AdminShell
-      title="App content"
-      description="Publish buyer-facing mobile headings, banner copy, imagery, request steps, and core screen text without submitting a new native build."
+      title="Web & mobile content"
+      description="Publish shared category names and icons, buyer-facing headings, banner copy, imagery, request steps, and core screen text without submitting a new native build."
       actions={
         <AdminButtonLink href="/admin/history">
           <History className="h-4 w-4" />

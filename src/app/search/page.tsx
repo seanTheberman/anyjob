@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { ArrowRight, ShieldCheck, ThumbsUp, Users } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, MapPin, Search, ShieldCheck, ThumbsUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmergencyJobsSection } from "@/components/shared/EmergencyJobsSection";
 import { RealProvidersSection } from "@/components/shared/RealProvidersSection";
@@ -134,10 +134,104 @@ export default async function CataloguePage() {
         (provider) => countryCodeFromName(provider.country) === marketCountry,
     );
 
-    return <OriginalFindProviderPage providers={await withServiceAreas(providers, viewerLocation)} />;
+    return <FocusedFindJobberPage providers={await withServiceAreas(providers, viewerLocation)} />;
 }
 
-function OriginalFindProviderPage({ providers }: { providers: ProviderCardData[] }) {
+const POPULAR_JOBBER_CATEGORIES = [
+    { label: "Plumbing", href: "/questionnaire?category=bricolage&custom_query=Plumbing", image: "https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?q=80&w=800&auto=format&fit=crop" },
+    { label: "Cleaning", href: "/questionnaire?category=menage", image: "https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=800&auto=format&fit=crop" },
+    { label: "Electrical", href: "/questionnaire?category=bricolage&custom_query=Electrical", image: "https://images.unsplash.com/photo-1621905252507-b35492cc74b4?q=80&w=800&auto=format&fit=crop" },
+    { label: "Moving", href: "/questionnaire?category=demenagement", image: "https://images.unsplash.com/photo-1600566753086-00f18efc2253?q=80&w=800&auto=format&fit=crop" },
+];
+
+function FocusedFindJobberPage({ providers }: { providers: ProviderCardData[] }) {
+    return (
+        <main className="min-h-screen bg-white pb-20 pt-20 text-slate-950">
+            <section className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-14 sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-5xl text-center">
+                    <p className="text-xs font-bold uppercase tracking-[0.16em] text-red-600">Find a Jobber</p>
+                    <h1 className="mt-3 text-4xl font-extrabold tracking-tight sm:text-5xl">What do you need done?</h1>
+                    <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                        Search for the job, add your location, and compare local Jobbers with clear profiles and genuine reviews.
+                    </p>
+
+                    <form action="/questionnaire" className="mx-auto mt-8 grid max-w-4xl gap-3 rounded-2xl border border-slate-200 bg-white p-3 text-left shadow-xl sm:grid-cols-[1fr_0.75fr_auto]">
+                        <input type="hidden" name="category" value="custom" />
+                        <label className="relative block">
+                            <span className="sr-only">What job do you need done?</span>
+                            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                            <input
+                                name="custom_query"
+                                required
+                                placeholder="What job do you need done?"
+                                className="h-12 w-full rounded-xl border border-slate-200 pl-12 pr-4 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                            />
+                        </label>
+                        <label className="relative block">
+                            <span className="sr-only">Town or postcode</span>
+                            <MapPin className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                            <input
+                                name="location"
+                                placeholder="Town or postcode"
+                                className="h-12 w-full rounded-xl border border-slate-200 pl-12 pr-4 text-sm outline-none focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                            />
+                        </label>
+                        <button className="inline-flex h-12 items-center justify-center rounded-xl bg-red-600 px-6 text-sm font-bold text-white transition hover:bg-red-700">
+                            Find a Jobber
+                        </button>
+                    </form>
+                    <p className="mt-3 text-sm text-slate-500">Or describe your job and receive quotes from interested Jobbers.</p>
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 lg:px-8">
+                <div className="flex items-end justify-between gap-4">
+                    <div>
+                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-600">Popular categories</p>
+                        <h2 className="mt-2 text-3xl font-extrabold">Start with the job</h2>
+                    </div>
+                    <Link href="/questionnaire?category=custom" className="hidden items-center text-sm font-bold text-red-600 sm:inline-flex">
+                        Post another job <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </div>
+                <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    {POPULAR_JOBBER_CATEGORIES.map((category) => (
+                        <Link key={category.label} href={category.href} className="group overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-lg">
+                            <div className="relative h-36">
+                                <Image src={category.image} alt="" fill className="object-cover transition duration-500 group-hover:scale-105" sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw" />
+                            </div>
+                            <div className="flex items-center justify-between p-4">
+                                <span className="font-bold">{category.label}</span>
+                                <ArrowRight className="h-4 w-4 text-red-600" />
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-6xl px-4 pb-14 sm:px-6 lg:px-8">
+                <RealProvidersSection title="Local Jobbers" providers={providers} />
+            </section>
+
+            <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+                <div className="flex flex-col gap-5 rounded-2xl bg-slate-950 p-7 text-white sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-start gap-4">
+                        <BriefcaseBusiness className="mt-1 h-6 w-6 shrink-0 text-red-300" />
+                        <div>
+                            <h2 className="text-xl font-bold">Need someone urgently or for a work shift?</h2>
+                            <p className="mt-2 text-sm leading-6 text-slate-300">Use the dedicated shift flow so temporary staffing stays separate from one-off jobs.</p>
+                        </div>
+                    </div>
+                    <Link href="/register-business" className="inline-flex shrink-0 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-bold text-slate-950">
+                        Hire for shifts
+                    </Link>
+                </div>
+            </section>
+        </main>
+    );
+}
+
+export function OriginalFindProviderPage({ providers }: { providers: ProviderCardData[] }) {
     return (
         <div className="pt-20 pb-20 min-h-screen bg-white dark:bg-gray-950">
             {/* Hero Container - Wider than the rest, but constrained */}

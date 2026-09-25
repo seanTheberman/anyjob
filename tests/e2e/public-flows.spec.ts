@@ -35,7 +35,7 @@ test.describe("public flows", () => {
     await gotoApp(page, "/");
 
     await expect(page.getByRole("banner").getByRole("link", { name: "AnyJob" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Request custom service" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /What do you need help with/i })).toBeVisible();
 
     const searchInput = page.getByRole("textbox", { name: "Search services" });
     await expect(searchInput).toBeVisible();
@@ -55,8 +55,8 @@ test.describe("public flows", () => {
     await page.getByRole("button", { name: /Cleaning/i }).first().click();
 
     await expect(page).toHaveURL(/\/questionnaire\?category=menage/);
-    await expect(page.getByRole("heading", { name: /What service are you looking for/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Cleaning" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Specify your need" })).toBeVisible();
+    await expect(page.getByText("Cleaning", { exact: true }).first()).toBeVisible();
   });
 
   test("search catalogue and login pages are reachable from navigation", async ({ page }) => {
@@ -65,12 +65,12 @@ test.describe("public flows", () => {
     const isMobile = (page.viewportSize()?.width || 0) < 1024;
     if (isMobile) {
       await page.getByRole("button", { name: /menu/i }).click();
-      await page.getByRole("dialog").getByRole("link", { name: "Find a Provider" }).click();
+      await page.getByRole("dialog").getByRole("link", { name: "Find a Jobber" }).click();
     } else {
-      await page.getByRole("banner").getByRole("link", { name: "Find a Provider" }).click();
+      await page.getByRole("banner").getByRole("link", { name: "Find a Jobber" }).click();
     }
     await expect(page).toHaveURL(/\/search$/);
-    await expect(page.getByText(/More comfort, more freedom/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What do you need done?" })).toBeVisible();
 
     await gotoApp(page, "/");
     if (isMobile) {
@@ -88,8 +88,8 @@ test.describe("public flows", () => {
   test("hero job mode options are side-by-side on mobile without overlapping", async ({ page }) => {
     await gotoApp(page, "/");
 
-    const dayToDayLabel = page.locator("label", { hasText: "Day to day jobs" });
-    const workShiftsLabel = page.locator("label", { hasText: "Work shifts" });
+    const dayToDayLabel = page.locator("label", { hasText: "Find a Jobber" });
+    const workShiftsLabel = page.locator("label", { hasText: "Hire for Shifts" });
 
     await expect(dayToDayLabel).toBeVisible();
     await expect(workShiftsLabel).toBeVisible();
@@ -112,5 +112,28 @@ test.describe("public flows", () => {
       const overlap = Math.max(0, Math.min(dayRight, shiftRight) - Math.max(dayBox.x, shiftBox.x));
       expect(overlap).toBe(0);
     }
+  });
+
+  test("client-requested public copy and work-shift flow are present", async ({ page }) => {
+    await gotoApp(page, "/");
+
+    await expect(page.getByRole("heading", { name: /What do you need help with/i })).toBeVisible();
+    await expect(page.getByText("388,000+ qualified providers")).toHaveCount(0);
+    await expect(page.getByText("Work shifts", { exact: true }).first()).toBeVisible();
+
+    await page.locator("label", { hasText: "Hire for Shifts" }).click();
+    await expect(page.getByPlaceholder("What shift do you need to fill?")).toBeVisible();
+  });
+
+  test("how-it-works and Jobber onboarding use the requested structure", async ({ page }) => {
+    await gotoApp(page, "/how-it-works");
+    await expect(page.getByRole("heading", { name: "Post a job. Find the right person. Get it done." })).toBeVisible();
+
+    await gotoApp(page, "/become-provider");
+    await expect(page.getByRole("heading", { name: "See what you could earn on AnyJob" })).toBeVisible();
+    await expect(page.getByText("Example hourly rate")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Individual Jobber/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Business or Team/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Quote for projects/i })).toBeVisible();
   });
 });

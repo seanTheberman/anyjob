@@ -12,6 +12,7 @@ import {
     BrushCleaning,
     Calculator,
     CalendarCheck,
+    CalendarDays,
     ChefHat,
     CheckCircle,
     CloudSnow,
@@ -49,7 +50,9 @@ import {
     Shovel,
     Sofa,
     SprayCan,
+    Sparkles,
     Sprout,
+    Star,
     SquareRadical,
     TreePine,
     Trees,
@@ -57,6 +60,7 @@ import {
     Tv,
     Umbrella,
     Utensils,
+    Users,
     Wrench,
     type LucideIcon,
 } from "lucide-react";
@@ -72,6 +76,24 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
     informatique: MonitorCog,
     "aide-domicile": HouseHeart,
     "cours-particuliers": GraduationCap,
+};
+
+const ADMIN_CATEGORY_ICONS: Record<string, LucideIcon> = {
+    "calendar-days": CalendarDays,
+    briefcase: BriefcaseBusiness,
+    hammer: Hammer,
+    wrench: Wrench,
+    leaf: Leaf,
+    truck: Truck,
+    "spray-can": SprayCan,
+    baby: Baby,
+    "paw-print": PawPrint,
+    "monitor-cog": MonitorCog,
+    "house-heart": HouseHeart,
+    "graduation-cap": GraduationCap,
+    users: Users,
+    star: Star,
+    sparkles: Sparkles,
 };
 
 const SUBCATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -169,12 +191,14 @@ const SUBCATEGORY_ICONS: Record<string, LucideIcon> = {
 
 export function CategoryIcon({
     slug,
+    iconName,
     className,
 }: {
     slug: string;
+    iconName?: string;
     className?: string;
 }) {
-    const Icon = CATEGORY_ICONS[slug] ?? Hammer;
+    const Icon = (iconName ? ADMIN_CATEGORY_ICONS[iconName] : undefined) ?? CATEGORY_ICONS[slug] ?? Hammer;
     return <Icon className={className ?? "w-6 h-6"} />;
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, Briefcase, Globe, ArrowRight, PlusCircle } from "lucide-react";
 import { SUPPORTED_LANGUAGES } from "@/lib/categories";
@@ -13,7 +14,7 @@ type SearchResult = {
     categorySlug?: string;
 };
 
-type JobMode = "Day to day jobs" | "Work shifts";
+type JobMode = "Find a Jobber" | "Hire for Shifts";
 
 const DEFAULT_SEARCH_RESULTS: SearchResult[] = [{
     type: "category",
@@ -29,7 +30,7 @@ export function SearchBar() {
     const [showDropdown, setShowDropdown] = useState(false);
     const [selectedIndex, setSelectedIndex] = useState(-1);
     const [selectedLanguage, setSelectedLanguage] = useState("en");
-    const [selectedJobMode, setSelectedJobMode] = useState<JobMode>("Day to day jobs");
+    const [selectedJobMode, setSelectedJobMode] = useState<JobMode>("Find a Jobber");
     const [showLanguageSelector, setShowLanguageSelector] = useState(false);
     const searchRef = useRef<HTMLDivElement>(null);
     const searchBoxRef = useRef<HTMLDivElement>(null);
@@ -38,13 +39,13 @@ export function SearchBar() {
     // Detect language from the browser, while launch geography stays Ireland-only.
     useEffect(() => {
         const savedMode = localStorage.getItem("home_job_mode");
-        if (savedMode === "Day to day jobs" || savedMode === "Work shifts") {
+        if (savedMode === "Find a Jobber" || savedMode === "Hire for Shifts") {
             setSelectedJobMode(savedMode);
         }
 
         const handleJobModeChange = (event: Event) => {
             const mode = (event as CustomEvent<{ mode?: string }>).detail?.mode;
-            if (mode === "Day to day jobs" || mode === "Work shifts") {
+            if (mode === "Find a Jobber" || mode === "Hire for Shifts") {
                 setSelectedJobMode(mode);
             }
         };
@@ -110,7 +111,7 @@ export function SearchBar() {
     }
 
     function getResultHref(result: SearchResult) {
-        if (selectedJobMode === "Work shifts") {
+        if (selectedJobMode === "Hire for Shifts") {
             const params = new URLSearchParams({ work_type: "shifts" });
             params.set("shift_query", result.name);
             if (result.categorySlug || result.slug) params.set("source_category", result.categorySlug || result.slug);
@@ -124,7 +125,7 @@ export function SearchBar() {
 
     function handleCustomService() {
         const query = searchQuery.trim();
-        if (selectedJobMode === "Work shifts") {
+        if (selectedJobMode === "Hire for Shifts") {
             const params = new URLSearchParams({ work_type: "shifts" });
             if (query) params.set("shift_query", query);
             router.push(`/questionnaire?${params.toString()}`);
@@ -252,7 +253,7 @@ export function SearchBar() {
     const getLocalizedPlaceholder = () => {
         const placeholders: Record<string, string> = {
             fr: "Femme de ménage, bricoleur...",
-            en: "Post a job",
+            en: selectedJobMode === "Hire for Shifts" ? "What shift do you need to fill?" : "Describe the job you need done",
             es: "Limpieza, fontanería...",
             de: "Reinigung, Handwerker...",
             it: "Pulizie, fai da te...",
@@ -287,7 +288,7 @@ export function SearchBar() {
 
     return (
         <>
-        <div className="absolute left-1/2 top-[58%] z-[100000] w-full max-w-2xl -translate-x-1/2 px-4 sm:top-1/2 sm:translate-y-30" ref={searchRef}>
+        <div className="absolute left-1/2 top-[62%] z-[100000] w-full max-w-2xl -translate-x-1/2 px-4 sm:top-1/2 sm:translate-y-30" ref={searchRef}>
             <div ref={searchBoxRef} className="relative z-[100000] flex min-h-16 items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-gray-800 dark:bg-gray-900 sm:min-h-0 sm:gap-0 sm:p-0">
                 <Search className="ml-2 h-5 w-5 shrink-0 text-gray-400 sm:ml-5" />
                 <input
@@ -321,7 +322,7 @@ export function SearchBar() {
                     aria-label="Search"
                 >
                     <Search className="h-5 w-5 sm:hidden" />
-                    <span className="hidden sm:inline">Search</span>
+                    <span className="hidden sm:inline">{selectedJobMode === "Hire for Shifts" ? "Find workers" : "Find a Jobber"}</span>
                 </button>
 
                 {/* Language Selector Dropdown */}
@@ -374,7 +375,7 @@ export function SearchBar() {
                                     Suggestions
                                 </div>
                                 {filteredCategories.slice(0, 10).map((category, index) => (
-                                    <a
+                                    <Link
                                         role="button"
                                         href={getResultHref(category)}
                                         key={`${category.type}-${category.slug}-${index}`}
@@ -409,7 +410,7 @@ export function SearchBar() {
                                             )}
                                         </div>
                                         <ArrowRight className={`w-4 h-4 transition-transform duration-300 ${index === selectedIndex ? "translate-x-1 opacity-100" : "opacity-0"}`} />
-                                    </a>
+                                    </Link>
                                 ))}
                             </div>
                             {filteredCategories.length > 10 && (

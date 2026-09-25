@@ -25,7 +25,7 @@ export function RealProvidersSection({ title, providers }: RealProvidersSectionP
       ) : (
         <div className="rounded-2xl border border-gray-200 bg-gray-50 px-6 py-10 text-center dark:border-gray-800 dark:bg-gray-900">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-            No approved real providers are available here yet.
+            No approved Jobbers are available here yet.
           </p>
         </div>
       )}

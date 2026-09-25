@@ -349,7 +349,7 @@ function providerAccountBadges(provider: SellerRow) {
   const kind = providerAccountKind(provider);
   if (kind === "agency") return ["Agency"];
   if (kind === "business") return ["Business"];
-  return [];
+  return ["Freelancer"];
 }
 
 function providerLevelFromBadges(badges: string[]) {
