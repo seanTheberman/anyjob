@@ -331,6 +331,32 @@ export function Header() {
                                     aria-label="Categories"
                                     className="fixed left-1/2 top-20 z-[100002] max-h-[72vh] w-[min(calc(100vw-2rem),72rem)] -translate-x-1/2 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-5 text-gray-900 shadow-2xl shadow-black/15 dark:border-gray-800 dark:bg-gray-950 dark:text-white"
                                 >
+                                    <section className="mb-5 flex flex-col gap-4 rounded-xl border border-red-100 bg-red-50/70 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-red-950/70 dark:bg-red-950/20">
+                                        <div>
+                                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-600">Work Shifts</p>
+                                            <h2 className="mt-1 text-base font-bold text-gray-950 dark:text-white">Flexible staffing for businesses and Jobbers</h2>
+                                            <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300">Hourly, daily, temporary, and recurring work lives in its own flow.</p>
+                                        </div>
+                                        <div className="flex shrink-0 flex-wrap gap-2">
+                                            <Link
+                                                role="menuitem"
+                                                href="/register-business"
+                                                onClick={() => setCategoriesMenuOpen(false)}
+                                                className="rounded-lg bg-red-600 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-red-700"
+                                            >
+                                                Hire for shifts
+                                            </Link>
+                                            <Link
+                                                role="menuitem"
+                                                href="/seller-register?mode=shift&workChoices=shift"
+                                                onClick={() => setCategoriesMenuOpen(false)}
+                                                className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 transition-colors hover:border-red-300 hover:bg-red-50 dark:border-red-900 dark:bg-gray-950 dark:text-red-300"
+                                            >
+                                                Find shift work
+                                            </Link>
+                                        </div>
+                                    </section>
+                                    <p className="mb-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Service categories</p>
                                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
                                         {TASKRABBIT_CATEGORIES.map((category) => (
                                             <div key={category.slug} className="min-w-0">
@@ -493,6 +519,33 @@ export function Header() {
                             ) : null}
                             {!isAuthPending && !isProviderAccount && mobileCategoriesOpen && (
                                 <div className="mb-2 max-h-96 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50 p-3 dark:border-gray-800 dark:bg-gray-900">
+                                    <section className="mb-3 rounded-lg border border-red-100 bg-red-50 p-3 dark:border-red-950/70 dark:bg-red-950/20">
+                                        <p className="text-xs font-bold uppercase tracking-[0.14em] text-red-600">Work Shifts</p>
+                                        <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-300">Flexible staffing is separate from normal service jobs.</p>
+                                        <div className="mt-3 grid grid-cols-2 gap-2">
+                                            <Link
+                                                href="/register-business"
+                                                onClick={() => {
+                                                    setMobileMenuOpen(false);
+                                                    setMobileCategoriesOpen(false);
+                                                }}
+                                                className="rounded-md bg-red-600 px-2 py-2 text-center text-xs font-bold text-white"
+                                            >
+                                                Hire for shifts
+                                            </Link>
+                                            <Link
+                                                href="/seller-register?mode=shift&workChoices=shift"
+                                                onClick={() => {
+                                                    setMobileMenuOpen(false);
+                                                    setMobileCategoriesOpen(false);
+                                                }}
+                                                className="rounded-md border border-red-200 bg-white px-2 py-2 text-center text-xs font-bold text-red-700 dark:border-red-900 dark:bg-gray-950 dark:text-red-300"
+                                            >
+                                                Find shift work
+                                            </Link>
+                                        </div>
+                                    </section>
+                                    <p className="mb-2 px-3 text-xs font-bold uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">Service categories</p>
                                     {TASKRABBIT_CATEGORIES.map((category) => (
                                         <details key={category.slug} className="group rounded-lg">
                                             <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold text-gray-900 hover:bg-white dark:text-white dark:hover:bg-gray-800">

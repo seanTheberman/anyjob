@@ -136,4 +136,21 @@ test.describe("public flows", () => {
     await expect(page.getByRole("button", { name: /Business or Team/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Quote for projects/i })).toBeVisible();
   });
+
+  test("categories keep Work Shifts separate from service categories", async ({ page }) => {
+    await gotoApp(page, "/");
+
+    const isMobile = (page.viewportSize()?.width || 0) < 1024;
+    if (isMobile) {
+      await page.getByRole("button", { name: /menu/i }).click();
+      await page.getByRole("button", { name: "Categories" }).click();
+    } else {
+      await page.getByRole("button", { name: "Categories" }).click();
+    }
+
+    await expect(page.getByText("Work Shifts", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Service categories", { exact: true })).toBeVisible();
+    await expect(page.getByText("Hire for shifts", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Find shift work", { exact: true }).first()).toBeVisible();
+  });
 });
