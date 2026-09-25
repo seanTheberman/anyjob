@@ -253,7 +253,7 @@ export function SearchBar() {
     const getLocalizedPlaceholder = () => {
         const placeholders: Record<string, string> = {
             fr: "Femme de ménage, bricoleur...",
-            en: selectedJobMode === "Hire for Shifts" ? "What shift do you need to fill?" : "Describe the job you need done",
+            en: selectedJobMode === "Hire for Shifts" ? "What shift do you need to fill?" : "What do you need help with?",
             es: "Limpieza, fontanería...",
             de: "Reinigung, Handwerker...",
             it: "Pulizie, fai da te...",
@@ -288,7 +288,7 @@ export function SearchBar() {
 
     return (
         <>
-        <div className="absolute left-1/2 top-[62%] z-[100000] w-full max-w-2xl -translate-x-1/2 px-4 sm:top-1/2 sm:translate-y-30" ref={searchRef}>
+        <div className="absolute left-1/2 top-[62%] z-[100000] w-full max-w-2xl -translate-x-1/2 px-4 sm:top-1/2 sm:translate-y-[9rem]" ref={searchRef}>
             <div ref={searchBoxRef} className="relative z-[100000] flex min-h-16 items-center gap-2 rounded-2xl border border-gray-100 bg-white p-2 shadow-2xl dark:border-gray-800 dark:bg-gray-900 sm:min-h-0 sm:gap-0 sm:p-0">
                 <Search className="ml-2 h-5 w-5 shrink-0 text-gray-400 sm:ml-5" />
                 <input
@@ -322,7 +322,7 @@ export function SearchBar() {
                     aria-label="Search"
                 >
                     <Search className="h-5 w-5 sm:hidden" />
-                    <span className="hidden sm:inline">{selectedJobMode === "Hire for Shifts" ? "Find workers" : "Find a Jobber"}</span>
+                    <span className="hidden sm:inline">{selectedJobMode === "Hire for Shifts" ? "Find workers" : "Post a job"}</span>
                 </button>
 
                 {/* Language Selector Dropdown */}
