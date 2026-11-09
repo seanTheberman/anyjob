@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
 
 export async function GET() {
   const auth = await createServerSupabaseClient();
@@ -35,9 +36,10 @@ export async function GET() {
       .order("created_at", { ascending: false }),
   ]);
   const row = seller.data || buyer.data || {};
+  const buyerApproval = seller.data ? null : await getBuyerKycStatus(admin, user.id);
   const approved = seller.data
     ? row.status === "approved"
-    : row.kyc_status === "approved";
+    : Boolean(buyerApproval?.adminOverride);
   const identityFiles =
     files.data?.filter((file: any) => file.image_type === "id_document") || [];
   const frontFile =
@@ -55,7 +57,7 @@ export async function GET() {
   return NextResponse.json({
     verification: {
       approved,
-      status: seller.data ? row.status : row.kyc_status,
+      status: seller.data ? row.status : buyerApproval?.status || row.kyc_status,
       emailVerified: Boolean(row.email_verified || user.email_confirmed_at),
       phoneVerified: Boolean(row.phone_verified),
       idUploaded: Boolean(row.id_document_url || identityFiles.length),

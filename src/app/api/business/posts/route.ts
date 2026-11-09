@@ -1,5 +1,6 @@
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { permitsOwnerDocumentWaiver } from "@/lib/auth/business-approval-policy";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { SHIFT_NICHES, WORK_TYPES } from "@/lib/shift-work";
 import { NextRequest, NextResponse } from "next/server";
@@ -105,10 +106,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (!business.registration_number || !business.document_url) {
-      return NextResponse.json(
-        { error: "Business registration number and document are required before posting" },
-        { status: 403 }
-      );
+      // An explicit, scoped owner waiver is separate from documentary verification.
+      // Fetch fresh administrator-managed metadata so users cannot self-grant and
+      // revoked waivers do not survive in an older access token.
+      const { data, error } = await createAdminSupabaseClient().auth.admin.getUserById(user.id);
+      const waived = !error && permitsOwnerDocumentWaiver(data.user?.app_metadata, user.id, {
+        id: business.id, owner_user_id: business.owner_user_id,
+        status: business.status, reviewed_by: business.reviewed_by,
+      });
+      if (!waived) return NextResponse.json(
+          { error: "Business registration number and document are required before posting" },
+          { status: 403 }
+        );
     }
 
     const body = await request.json();
@@ -170,6 +179,8 @@ export async function POST(request: NextRequest) {
         location_name: nullableText(body.locationName),
         address,
         city,
+        country_code: business.country_code,
+        region: business.region || null,
         postal_code: nullableText(body.postalCode),
         starts_at: startsAt,
         ends_at: endsAt,

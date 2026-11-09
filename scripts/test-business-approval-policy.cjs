@@ -1,0 +1,20 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const { permitsOwnerDocumentWaiver: permits } = require('../src/lib/auth/business-approval-policy.ts');
+const now = Date.parse('2026-11-10T00:00:00Z');
+const business = { id: 'business-1', owner_user_id: 'owner-1', status: 'approved', reviewed_by: 'admin-1' };
+const grant = { status: 'active', capability: 'business_post_without_documents', userId: 'owner-1', businessId: 'business-1', grantedBy: 'admin-1', auditId: 'audit-1', grantedAt: '2026-11-09T00:00:00Z', reason: 'Owner-authorised manual approval' };
+const metadata = g => ({ business_document_waiver: { ...grant, ...g } });
+test('accepts an explicit owner grant for its approved business', () => assert.equal(permits(metadata(), 'owner-1', business, now), true));
+test('does not change ordinary account requirements', () => assert.equal(permits({}, 'owner-1', business, now), false));
+test('does not waive business approval', () => assert.equal(permits(metadata(), 'owner-1', { ...business, status: 'pending' }, now), false));
+test('cannot be reused by another account', () => assert.equal(permits(metadata(), 'other-owner', business, now), false));
+test('cannot be reused for another business', () => assert.equal(permits(metadata(), 'owner-1', { ...business, id: 'business-2' }, now), false));
+test('must be granted by the recorded approver', () => assert.equal(permits(metadata({ grantedBy: 'someone-else' }), 'owner-1', business, now), false));
+test('revocation takes effect', () => assert.equal(permits(metadata({ status: 'revoked' }), 'owner-1', business, now), false));
+test('expired grants fail closed', () => assert.equal(permits(metadata({ expiresAt: '2026-11-09T23:59:59Z' }), 'owner-1', business, now), false));
+test('invalid dates and missing audit fail closed', () => {
+  assert.equal(permits(metadata({ grantedAt: 'not-a-date' }), 'owner-1', business, now), false);
+  assert.equal(permits(metadata({ expiresAt: 'not-a-date' }), 'owner-1', business, now), false);
+  assert.equal(permits(metadata({ auditId: '' }), 'owner-1', business, now), false);
+});
