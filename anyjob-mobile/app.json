@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/anyjob-icon-v2.png",
       "bundleIdentifier": "ie.anyjob.ios",
-      "buildNumber": "1",
+      "buildNumber": "7",
       "associatedDomains": [
         "applinks:anyjob-mu.vercel.app"
       ],

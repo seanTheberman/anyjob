@@ -1,7 +1,7 @@
 {
   "cli": {
     "version": ">= 16.0.0",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -15,8 +15,8 @@
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true,
-      "credentialsSource": "local",
+      "autoIncrement": false,
+      "credentialsSource": "remote",
       "ios": {
         "distribution": "store"
       }
@@ -25,10 +25,7 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "6824039305",
-        "ascApiKeyPath": "$ANYJOB_ASC_KEY_PATH",
-        "ascApiKeyId": "66935F4CZ7",
-        "ascApiKeyIssuerId": "c8f7799d-e7d6-47ae-a774-44c129f454fa"
+        "ascAppId": "6824039305"
       }
     }
   }
