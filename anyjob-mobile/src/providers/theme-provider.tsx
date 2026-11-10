@@ -31,7 +31,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const resolved: ColorSchemeName =
     preference === "system"
-      ? systemScheme || Appearance.getColorScheme()
+      ? systemScheme || Appearance.getColorScheme() || "light"
       : preference;
   const isDark = resolved === "dark";
   const setPreference = (value: ThemePreference) => {

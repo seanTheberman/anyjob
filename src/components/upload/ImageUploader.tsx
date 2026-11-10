@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Upload, X, Loader2, ImagePlus, FileText, Video, Camera } from "lucide-react";
+import { optimizeBrowserImage } from "@/lib/uploads/optimize-browser-image";
 
 interface UploadedImage {
   id: string;
@@ -19,6 +20,83 @@ type NavigatorWithUserAgentData = Navigator & {
     mobile?: boolean;
   };
 };
+
+type DirectUploadAuthorization = {
+  uploadUrl: string;
+  fields: {
+    apiKey: string;
+    timestamp: number;
+    signature: string;
+    folder: string;
+    transformation: string | null;
+  };
+  maxBytes: number;
+};
+
+async function responsePayload(response: Response) {
+  return response.json().catch(() => ({})) as Promise<Record<string, unknown>>;
+}
+
+async function uploadDirectly(
+  file: File,
+  imageType: UploadImageType,
+  metadata: { title?: string; description?: string; inquiryId?: string },
+) {
+  const preparedFile = await optimizeBrowserImage(file);
+  const authorizationResponse = await fetch("/api/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "sign", imageType }),
+  });
+  const authorizationPayload = await responsePayload(authorizationResponse);
+  if (!authorizationResponse.ok) {
+    throw new Error(String(authorizationPayload.error || "Could not authorize upload"));
+  }
+
+  const authorization = authorizationPayload as unknown as DirectUploadAuthorization;
+  if (preparedFile.size > authorization.maxBytes) {
+    throw new Error(`File too large. Max ${Math.round(authorization.maxBytes / 1024 / 1024)}MB`);
+  }
+
+  const uploadData = new FormData();
+  uploadData.append("file", preparedFile);
+  uploadData.append("api_key", authorization.fields.apiKey);
+  uploadData.append("timestamp", String(authorization.fields.timestamp));
+  uploadData.append("signature", authorization.fields.signature);
+  uploadData.append("folder", authorization.fields.folder);
+  if (authorization.fields.transformation) {
+    uploadData.append("transformation", authorization.fields.transformation);
+  }
+
+  const cloudResponse = await fetch(authorization.uploadUrl, { method: "POST", body: uploadData });
+  const cloudPayload = await responsePayload(cloudResponse);
+  if (!cloudResponse.ok) {
+    const cloudError = cloudPayload.error as { message?: string } | undefined;
+    throw new Error(cloudError?.message || `Cloud upload failed (${cloudResponse.status})`);
+  }
+
+  const completeResponse = await fetch("/api/upload", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      mode: "complete",
+      imageType,
+      ...metadata,
+      upload: {
+        public_id: cloudPayload.public_id,
+        version: cloudPayload.version,
+        signature: cloudPayload.signature,
+        resource_type: cloudPayload.resource_type,
+      },
+    }),
+  });
+  const completePayload = await responsePayload(completeResponse);
+  if (!completeResponse.ok) {
+    throw new Error(String(completePayload.error || "Could not save uploaded file"));
+  }
+
+  return completePayload.image as UploadedImage;
+}
 
 function isMobileCameraDevice() {
   if (typeof window === "undefined") return false;
@@ -132,8 +210,8 @@ export function ImageUploader({
   const acceptTypes = isVideoUpload
     ? "video/mp4,video/webm,video/quicktime"
     : isDocumentUpload
-      ? "image/jpeg,image/png,image/webp,image/gif,application/pdf"
-      : "image/jpeg,image/png,image/webp,image/gif";
+      ? "image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,application/pdf"
+      : "image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif";
   const uploadHelp = isVideoUpload
     ? "MP4, WebM, MOV • Max 100MB"
     : isDocumentUpload
@@ -174,24 +252,11 @@ export function ImageUploader({
 
     for (const file of Array.from(files)) {
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("image_type", imageType);
-        if (uploadTitle) formData.append("title", uploadTitle);
-        if (uploadDescription) formData.append("description", uploadDescription);
-        if (inquiryId) formData.append("inquiry_id", inquiryId);
-
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
+        const image = await uploadDirectly(file, imageType, {
+          title: uploadTitle,
+          description: uploadDescription,
+          inquiryId,
         });
-
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || "Upload failed");
-        }
-
-        const { image } = await response.json();
         setImages((prev) => [...prev, image]);
         onUploadComplete?.(image);
       } catch (err) {

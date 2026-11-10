@@ -19,6 +19,8 @@ import {
   TextInputProps,
   View,
   ViewStyle,
+  type ScrollViewInstance,
+  type TextInputInstance,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronLeft, ChevronRight, Inbox, Star } from "lucide-react-native";
@@ -26,7 +28,7 @@ import { useRouter } from "expo-router";
 import { shadow, type AppColors } from "@/theme/tokens";
 import { useAppTheme } from "@/providers/theme-provider";
 
-const KeyboardScrollContext = createContext<(input: TextInput | null) => void>(
+const KeyboardScrollContext = createContext<(input: TextInputInstance | null) => void>(
   () => undefined,
 );
 
@@ -47,8 +49,8 @@ export function Screen({
   edgeToEdge?: boolean;
 }) {
   const { colors, styles } = useStyles();
-  const scrollRef = useRef<ScrollView>(null);
-  const scrollToInput = useCallback((input: TextInput | null) => {
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollToInput = useCallback((input: TextInputInstance | null) => {
     const handle = input ? findNodeHandle(input) : null;
     if (!handle) return;
 
@@ -230,7 +232,7 @@ export function Field({
   ...props
 }: TextInputProps & { label: string; error?: string }) {
   const { styles } = useStyles();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const scrollToInput = useContext(KeyboardScrollContext);
   const onFocus = props.onFocus;
   return (

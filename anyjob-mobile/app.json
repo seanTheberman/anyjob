@@ -2,14 +2,14 @@
   "expo": {
     "name": "AnyJob",
     "slug": "anyjob-mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/anyjob-icon-v2.png",
     "scheme": "anyjob",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png",
-      "bundleIdentifier": "ie.anyjob.mobile",
+      "icon": "./assets/images/anyjob-icon-v2.png",
+      "bundleIdentifier": "ie.anyjob.ios",
       "buildNumber": "1",
       "associatedDomains": [
         "applinks:anyjob-mu.vercel.app"
@@ -65,7 +65,9 @@
         }
       ],
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -28,6 +28,7 @@ import { SHIFT_NICHES, WORK_TYPES } from "@/lib/shift-work";
 import { useMobileCameraCapture } from "@/hooks/useMobileCameraCapture";
 import { VerifiedLocationFields } from "@/components/location/VerifiedLocationFields";
 import { useVerifiedMarketLocation } from "@/hooks/useVerifiedMarketLocation";
+import { optimizeBrowserImage } from "@/lib/uploads/optimize-browser-image";
 
 type BusinessProfile = {
   id: string;
@@ -345,8 +346,8 @@ export default function RegisterBusinessPage() {
     const file = event.target.files?.[0];
     const input = event.currentTarget;
     if (!file) return;
-    if (!["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setError("Upload a PDF, JPG, PNG, or WebP business document.");
+    if (!["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"].includes(file.type)) {
+      setError("Upload a PDF, JPG, PNG, WebP, HEIC, or HEIF business document.");
       return;
     }
 
@@ -355,13 +356,41 @@ export default function RegisterBusinessPage() {
     setMessage(null);
 
     try {
+      const preparedFile = await optimizeBrowserImage(file);
+      const signResponse = await fetch("/api/upload/document", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "sign", folder: "anyjob/business-documents" }),
+      });
+      const authorization = await signResponse.json().catch(() => ({}));
+      if (!signResponse.ok) throw new Error(authorization.error || "Business document upload failed.");
+      if (preparedFile.size > authorization.maxBytes) throw new Error("Document must be under 25MB.");
+
       const uploadData = new FormData();
-      uploadData.append("file", file);
-      uploadData.append("folder", "anyjob/business-documents");
+      uploadData.append("file", preparedFile);
+      uploadData.append("api_key", authorization.fields.apiKey);
+      uploadData.append("timestamp", String(authorization.fields.timestamp));
+      uploadData.append("signature", authorization.fields.signature);
+      uploadData.append("folder", authorization.fields.folder);
+      const cloudResponse = await fetch(authorization.uploadUrl, { method: "POST", body: uploadData });
+      const cloudPayload = await cloudResponse.json().catch(() => ({}));
+      if (!cloudResponse.ok) throw new Error(cloudPayload.error?.message || "Cloud upload failed.");
 
       const response = await fetch("/api/upload/document", {
         method: "POST",
-        body: uploadData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "complete",
+          folder: "anyjob/business-documents",
+          fileName: preparedFile.name,
+          contentType: preparedFile.type,
+          upload: {
+            public_id: cloudPayload.public_id,
+            version: cloudPayload.version,
+            signature: cloudPayload.signature,
+            resource_type: cloudPayload.resource_type,
+          },
+        }),
       });
       const payload = await response.json().catch(() => ({}));
 

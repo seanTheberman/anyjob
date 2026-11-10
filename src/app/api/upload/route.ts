@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
+import { timingSafeEqual } from "node:crypto";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 cloudinary.config({
@@ -11,7 +12,7 @@ cloudinary.config({
 const UPLOAD_TYPES = ["profile", "portfolio", "portfolio_video", "work_image", "id_document", "selfie_video", "gig_image", "gig_video"] as const;
 type UploadType = (typeof UPLOAD_TYPES)[number];
 
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"];
 const DOCUMENT_TYPES = [...IMAGE_TYPES, "application/pdf"];
 const VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"];
 
@@ -91,6 +92,181 @@ function resourceTypeForDelete(imageType: UploadType | string) {
   return imageType === "selfie_video" || imageType === "portfolio_video" || imageType === "gig_video" ? "video" as const : "image" as const;
 }
 
+function isUploadType(value: unknown): value is UploadType {
+  return typeof value === "string" && UPLOAD_TYPES.includes(value as UploadType);
+}
+
+function uploadFolder(imageType: UploadType, userId: string) {
+  return `anyjob/${imageType}s/${userId}`;
+}
+
+function uploadTransformation(imageType: UploadType) {
+  if (imageType === "profile") return "c_fill,g_face,h_400,w_400";
+  const rules = getUploadRules(imageType);
+  return rules.resourceType === "image" ? "c_limit,h_900,w_1200" : null;
+}
+
+async function validateMarketplaceUploadLimit(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  userId: string,
+  imageType: UploadType,
+) {
+  const uploadLimit = marketplaceUploadLimit(imageType);
+  if (uploadLimit === null) return null;
+
+  const { count, error } = await supabase
+    .from("user_images")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("image_type", imageType);
+
+  if (error) return NextResponse.json({ error: "Could not validate upload limit" }, { status: 500 });
+  if ((count || 0) < uploadLimit) return null;
+
+  const noun = imageType === "portfolio_video" ? "portfolio video" : "portfolio images";
+  return NextResponse.json({ error: `Maximum ${uploadLimit} ${noun} allowed` }, { status: 400 });
+}
+
+function signaturesMatch(actual: string, expected: string) {
+  const actualBuffer = Buffer.from(actual);
+  const expectedBuffer = Buffer.from(expected);
+  return actualBuffer.length === expectedBuffer.length && timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+type DirectUploadBody = {
+  mode?: unknown;
+  imageType?: unknown;
+  title?: unknown;
+  description?: unknown;
+  inquiryId?: unknown;
+  upload?: {
+    public_id?: unknown;
+    version?: unknown;
+    signature?: unknown;
+    resource_type?: unknown;
+  };
+};
+
+async function handleDirectUpload(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  userId: string,
+  body: DirectUploadBody,
+) {
+  if (!isUploadType(body.imageType)) {
+    return NextResponse.json({ error: "Invalid upload type" }, { status: 400 });
+  }
+
+  const imageType = body.imageType;
+  const limitError = await validateMarketplaceUploadLimit(supabase, userId, imageType);
+  if (limitError) return limitError;
+
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  const cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+  if (!apiKey || !apiSecret || !cloudName) {
+    return NextResponse.json({ error: "Upload service is not configured" }, { status: 503 });
+  }
+
+  const rules = getUploadRules(imageType);
+  const folder = uploadFolder(imageType, userId);
+  const transformation = uploadTransformation(imageType);
+
+  if (body.mode === "sign") {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signedFields: Record<string, string | number> = { folder, timestamp };
+    if (transformation) signedFields.transformation = transformation;
+
+    return NextResponse.json({
+      uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/${rules.resourceType}/upload`,
+      fields: {
+        apiKey,
+        timestamp,
+        signature: cloudinary.utils.api_sign_request(signedFields, apiSecret),
+        folder,
+        transformation,
+      },
+      maxBytes: rules.maxSize,
+    });
+  }
+
+  if (body.mode !== "complete") {
+    return NextResponse.json({ error: "Invalid upload action" }, { status: 400 });
+  }
+
+  const upload = body.upload;
+  const publicId = typeof upload?.public_id === "string" ? upload.public_id : "";
+  const version = typeof upload?.version === "number" || typeof upload?.version === "string" ? upload.version : "";
+  const responseSignature = typeof upload?.signature === "string" ? upload.signature : "";
+  const resourceType = upload?.resource_type === "video" || upload?.resource_type === "raw" || upload?.resource_type === "image"
+    ? upload.resource_type
+    : "";
+  const expectedPrefix = `${folder}/`;
+
+  if (!publicId.startsWith(expectedPrefix) || !version || !responseSignature || !resourceType) {
+    return NextResponse.json({ error: "Invalid upload response" }, { status: 400 });
+  }
+
+  const expectedResourceTypes = rules.resourceType === "auto" ? ["image", "raw"] : [rules.resourceType];
+  if (!expectedResourceTypes.includes(resourceType)) {
+    return NextResponse.json({ error: "Unexpected uploaded file type" }, { status: 400 });
+  }
+
+  const expectedSignature = cloudinary.utils.api_sign_request({ public_id: publicId, version }, apiSecret);
+  if (!signaturesMatch(responseSignature, expectedSignature)) {
+    return NextResponse.json({ error: "Upload verification failed" }, { status: 400 });
+  }
+
+  const existing = await supabase
+    .from("user_images")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("public_id", publicId)
+    .maybeSingle();
+  if (existing.data) return NextResponse.json({ image: existing.data }, { status: 200 });
+
+  let resource: { secure_url?: string; bytes?: number };
+  try {
+    resource = await cloudinary.api.resource(publicId, { resource_type: resourceType });
+  } catch (error) {
+    console.error("Cloudinary upload verification error:", error);
+    return NextResponse.json({ error: "Uploaded file could not be verified" }, { status: 400 });
+  }
+
+  if (!resource.secure_url || typeof resource.bytes !== "number" || resource.bytes > rules.maxSize) {
+    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType }).catch(() => undefined);
+    return NextResponse.json({ error: `File too large. Max ${Math.round(rules.maxSize / 1024 / 1024)}MB` }, { status: 400 });
+  }
+
+  const { data: image, error: dbError } = await supabase
+    .from("user_images")
+    .insert({
+      user_id: userId,
+      image_url: resource.secure_url,
+      public_id: publicId,
+      image_type: imageType,
+      title: typeof body.title === "string" && body.title.trim() ? body.title.trim() : null,
+      description: typeof body.description === "string" && body.description.trim() ? body.description.trim() : null,
+      inquiry_id: typeof body.inquiryId === "string" && body.inquiryId ? body.inquiryId : null,
+    })
+    .select()
+    .single();
+
+  if (dbError || !image) {
+    await cloudinary.uploader.destroy(publicId, { resource_type: resourceType }).catch(() => undefined);
+    return NextResponse.json({ error: "Failed to save image record" }, { status: 500 });
+  }
+
+  if (imageType === "profile") {
+    await Promise.all([
+      supabase.from("sellers").update({ profile_image_url: resource.secure_url }).eq("id", userId),
+      supabase.from("buyers").update({ profile_image_url: resource.secure_url }).eq("id", userId),
+    ]);
+  }
+
+  await syncKycUpload(supabase, userId, imageType, resource.secure_url);
+  return NextResponse.json({ image }, { status: 201 });
+}
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerSupabaseClient();
@@ -98,6 +274,11 @@ export async function POST(request: NextRequest) {
 
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (request.headers.get("content-type")?.includes("application/json")) {
+      const body = await request.json().catch(() => ({})) as DirectUploadBody;
+      return handleDirectUpload(supabase, user.id, body);
     }
 
     const formData = (await request.formData()) as unknown as globalThis.FormData;
@@ -124,23 +305,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `File too large. Max ${Math.round(rules.maxSize / 1024 / 1024)}MB` }, { status: 400 });
     }
 
-    const uploadLimit = marketplaceUploadLimit(imageType);
-    if (uploadLimit !== null) {
-      const { count, error: countError } = await supabase
-        .from("user_images")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("image_type", imageType);
-
-      if (countError) {
-        return NextResponse.json({ error: "Could not validate upload limit" }, { status: 500 });
-      }
-
-      if ((count || 0) >= uploadLimit) {
-        const noun = imageType === "portfolio_video" ? "portfolio video" : "portfolio images";
-        return NextResponse.json({ error: `Maximum ${uploadLimit} ${noun} allowed` }, { status: 400 });
-      }
-    }
+    const limitError = await validateMarketplaceUploadLimit(supabase, user.id, imageType);
+    if (limitError) return limitError;
 
     // Convert file to buffer for Cloudinary upload
     const bytes = await file.arrayBuffer();

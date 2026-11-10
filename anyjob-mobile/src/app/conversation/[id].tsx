@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { Send } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ScrollViewInstance } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { api, jsonBody } from "@/lib/api";
 import { ErrorState, Header, LoadingState } from "@/components/ui";
@@ -10,7 +10,7 @@ import { useAuth } from "@/providers/auth-provider";
 import { colors } from "@/theme/tokens";
 
 export default function ConversationScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>(); const { user } = useAuth(); const client = useQueryClient(); const [message, setMessage] = useState(""); const scroll = useRef<ScrollView>(null);
+  const { id } = useLocalSearchParams<{ id: string }>(); const { user } = useAuth(); const client = useQueryClient(); const [message, setMessage] = useState(""); const scroll = useRef<ScrollViewInstance>(null);
   const query = useQuery({ queryKey: ["messages", id], queryFn: () => api<any>(`/api/chat?action=messages&conversation_id=${id}`), refetchInterval: 5000 });
   const send = useMutation({ mutationFn: () => api("/api/chat", { method: "POST", ...jsonBody({ conversation_id: id, content: message }) }), onSuccess: () => { setMessage(""); void client.invalidateQueries({ queryKey: ["messages", id] }); void client.invalidateQueries({ queryKey: ["conversations"] }); } });
   useEffect(() => { const timer = setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 80); return () => clearTimeout(timer); }, [query.data?.messages?.length]);
