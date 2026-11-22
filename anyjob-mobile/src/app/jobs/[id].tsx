@@ -171,6 +171,11 @@ export default function JobDetailScreen() {
   const query = useQuery({
     queryKey: ["job", id],
     queryFn: () => api<any>(`/api/jobs/${id}`),
+    placeholderData: () => {
+      const cached = client.getQueryData<{ jobs?: JobDetails[] }>(["jobs"]);
+      const job = cached?.jobs?.find((row) => String(row.id) === String(id));
+      return job ? { job } : undefined;
+    },
   });
 
   const job: JobDetails | undefined =

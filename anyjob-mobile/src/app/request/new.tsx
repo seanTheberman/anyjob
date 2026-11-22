@@ -575,6 +575,14 @@ export default function NewRequestScreen() {
     setStep((current) => Math.min(TOTAL_STEPS, current + 1));
   };
 
+  const goBack = () => {
+    if (step > 1) {
+      setStep((current) => current - 1);
+      return;
+    }
+    router.replace("/(app)");
+  };
+
   const discardDraft = async () => {
     setDiscardConfirmVisible(false);
     setForm(initialForm);
@@ -1354,15 +1362,13 @@ export default function NewRequestScreen() {
       ) : null}
       {renderStep()}
       <View style={styles.actions}>
-        {step > 1 ? (
-          <View style={styles.actionColumn}>
-            <Button
-              title={copy("request.action.back", "Back")}
-              variant="secondary"
-              onPress={() => setStep((current) => Math.max(1, current - 1))}
-            />
-          </View>
-        ) : null}
+        <View style={styles.actionColumn}>
+          <Button
+            title={step === 1 ? "Back to home" : copy("request.action.back", "Back")}
+            variant="secondary"
+            onPress={goBack}
+          />
+        </View>
         <View style={styles.actionColumn}>
           <Button
             title={

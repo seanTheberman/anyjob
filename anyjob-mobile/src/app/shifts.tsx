@@ -64,7 +64,7 @@ export default function ShiftsScreen() {
   const query = useQuery({
     queryKey: ["shifts"],
     queryFn: () => api<any>("/api/shifts"),
-    staleTime: 45_000,
+    staleTime: 90_000,
   });
 
   const apply = useMutation({

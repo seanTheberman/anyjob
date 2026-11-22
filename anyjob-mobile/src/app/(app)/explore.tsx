@@ -127,13 +127,13 @@ export default function ExploreScreen() {
   const query = useQuery({
     queryKey: [provider ? "jobs" : "providers"],
     queryFn: () => api<any>(provider ? "/api/jobs" : "/api/providers"),
-    staleTime: provider ? 45_000 : 300_000,
+    staleTime: provider ? 90_000 : 300_000,
   });
   const shifts = useQuery({
     queryKey: ["shifts"],
     queryFn: () => api<any>("/api/shifts"),
     enabled: provider,
-    staleTime: 45_000,
+    staleTime: 90_000,
   });
   const applyShift = useMutation({
     mutationFn: (job: any) =>

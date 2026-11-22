@@ -151,6 +151,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           email: email.trim().toLowerCase(),
           password,
         }),
+      }, {
+        timeoutMs: 12_000,
+        retries: 1,
+        retryDelayMs: 450,
       });
       const payload = (await response.json().catch(() => ({}))) as LoginResponse;
       if (!response.ok) {

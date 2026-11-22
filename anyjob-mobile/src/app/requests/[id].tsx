@@ -51,6 +51,12 @@ export default function RequestDetailScreen() {
   const detail = useQuery({
     queryKey: ["request", id],
     queryFn: () => api<any>(`/api/dashboard/requests/${id}`),
+    placeholderData: () => {
+      const cached = client.getQueryData<any>(["requests"]);
+      const rows = cached?.requests || cached?.inquiries || [];
+      const inquiry = rows.find((row: LooseRow) => String(row.id) === String(id));
+      return inquiry ? { inquiry } : undefined;
+    },
   });
   const bids = useQuery({
     queryKey: ["bids", id],

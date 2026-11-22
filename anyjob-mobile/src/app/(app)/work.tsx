@@ -393,7 +393,7 @@ export default function WorkScreen() {
     queryKey: ["provider-bids"],
     queryFn: () => api<any>("/api/bids?role=provider"),
     enabled: provider,
-    staleTime: 45_000,
+    staleTime: 90_000,
   });
   const publicTasksQuery = useQuery({
     queryKey: ["public-tasks", publicSearch],
@@ -403,7 +403,7 @@ export default function WorkScreen() {
       return api<any>(`/api/tasks?${params.toString()}`);
     },
     enabled: !user,
-    staleTime: 45_000,
+    staleTime: 90_000,
   });
   const query = provider ? providerQuery : buyerQuery;
   const allRows = useMemo(

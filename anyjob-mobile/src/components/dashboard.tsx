@@ -432,7 +432,7 @@ export function Dashboard() {
     queryKey: ["jobs"],
     queryFn: () => api<any>("/api/jobs"),
     enabled: provider,
-    staleTime: 45_000,
+    staleTime: 90_000,
   });
   const requests = useQuery({
     queryKey: ["requests"],

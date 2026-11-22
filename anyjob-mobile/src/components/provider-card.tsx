@@ -85,16 +85,39 @@ export function ProviderCard({
             <Text style={styles.levelText}>{provider.level}</Text>
           </View>
         ) : null}
-        {accountBadge && !compact ? (
-          <View style={[styles.accountBadge, { backgroundColor: accountBadge === "Freelancer" ? "#7c3aed" : "#2563eb" }] }>
-            <BadgeCheck color="white" size={11} />
-            <Text style={styles.accountBadgeText}>{accountBadge}</Text>
+        {!compact && (accountBadge || provider.availableForShifts) ? (
+          <View style={styles.badgeRow}>
+            {accountBadge ? (
+              <View style={[styles.accountBadge, { backgroundColor: accountBadge === "Freelancer" ? "#7c3aed" : "#2563eb" }] }>
+                <BadgeCheck color="white" size={11} />
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  style={styles.accountBadgeText}
+                >
+                  {accountBadge}
+                </Text>
+              </View>
+            ) : null}
+            {provider.availableForShifts ? (
+              <View style={styles.shiftBadge}>
+                <BriefcaseBusiness color="white" size={12} />
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                  style={styles.shiftBadgeText}
+                >
+                  Work shifts
+                </Text>
+              </View>
+            ) : null}
           </View>
         ) : null}
-        {provider.availableForShifts ? (
-          <View style={[styles.shiftBadge, compact && styles.compactShiftBadge]}>
-            <BriefcaseBusiness color="white" size={compact ? 10 : 12} />
-            {!compact ? <Text style={styles.shiftBadgeText}>Work shifts</Text> : null}
+        {compact && provider.availableForShifts ? (
+          <View style={[styles.shiftBadge, styles.compactShiftBadge]}>
+            <BriefcaseBusiness color="white" size={10} />
           </View>
         ) : null}
       </View>
@@ -229,31 +252,41 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   levelText: { color: "white", fontSize: 11, fontWeight: "900" },
-  accountBadge: {
+  badgeRow: {
     position: "absolute",
-    right: 10,
-    bottom: 10,
+    left: 8,
+    right: 8,
+    bottom: 8,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+  },
+  accountBadge: {
     minHeight: 25,
     borderRadius: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: "100%",
   },
-  accountBadgeText: { color: "white", fontSize: 9.5, fontWeight: "900" },
+  accountBadgeText: { color: "white", flexShrink: 1, fontSize: 9.5, fontWeight: "900" },
   shiftBadge: {
-    position: "absolute",
-    left: 10,
-    bottom: 10,
     minHeight: 25,
     borderRadius: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
     backgroundColor: "rgba(5,150,105,.96)",
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: "100%",
   },
   compactShiftBadge: {
+    position: "absolute",
     left: 6,
     bottom: 6,
     width: 22,
@@ -261,7 +294,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
     justifyContent: "center",
   },
-  shiftBadgeText: { color: "white", fontSize: 9.5, fontWeight: "900" },
+  shiftBadgeText: { color: "white", flexShrink: 1, fontSize: 9.5, fontWeight: "900" },
   body: { padding: 12, gap: 8 },
   gridBody: { padding: 10 },
   compactBody: { padding: 7, gap: 5 },
