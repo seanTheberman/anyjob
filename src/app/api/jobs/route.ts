@@ -2,7 +2,6 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { isAnyJobSelectInquiry } from "@/lib/anyjob-select";
 import { getBuyerTrustForUsers } from "@/lib/badges/buyer-trust";
-import { getBuyerKycStatus } from "@/lib/kyc/buyer-kyc";
 import { viewerCountryCode } from "@/lib/location/market-location";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -56,7 +55,8 @@ export async function GET(request: NextRequest) {
       .eq("request_visibility", "public")
       .eq("country_code", marketCountry)
       .neq("user_id", user.id)
-      .order("submitted_at", { ascending: false });
+      .order("submitted_at", { ascending: false })
+      .limit(100);
 
     let privateQuery = admin
       .from("service_inquiries")
@@ -65,7 +65,8 @@ export async function GET(request: NextRequest) {
       .eq("target_provider_id", user.id)
       .in("provider_decision_status", ["pending", "accepted"])
       .eq("country_code", marketCountry)
-      .order("submitted_at", { ascending: false });
+      .order("submitted_at", { ascending: false })
+      .limit(100);
 
     if (category) {
       publicQuery = publicQuery.eq("category_slug", category);
@@ -88,29 +89,40 @@ export async function GET(request: NextRequest) {
       .maybeSingle();
 
     const buyerIds = Array.from(new Set((jobs || []).map((job) => String(job.user_id || "")).filter(Boolean)));
-    const buyerKycByUser = new Map(
-      await Promise.all(
-        buyerIds.map(async (buyerId) => {
-          const status = await getBuyerKycStatus(admin, buyerId);
-          return [buyerId, status] as const;
-        })
-      )
-    );
+    const buyerTrustByUser = await getBuyerTrustForUsers(admin, buyerIds);
     const visibleJobs = (jobs || []).filter((job) => {
       if (job.request_visibility === "private") return true;
       if (isAnyJobSelectInquiry(job)) return true;
-      return buyerKycByUser.get(String(job.user_id || ""))?.isComplete;
+      return buyerTrustByUser.get(String(job.user_id || ""))?.kycVerified;
     });
-    const buyerTrustByUser = await getBuyerTrustForUsers(admin, buyerIds);
-    const buyerRatingsResult = buyerIds.length
-      ? await admin
-          .from("eloo_reviews")
-          .select("reviewee_id,rating")
-          .in("reviewee_id", buyerIds)
-          .eq("review_type", "seller_to_buyer")
-          .eq("is_public", true)
-      : { data: [], error: null };
+    const jobIds = visibleJobs.map((job) => String(job.id));
+    const [buyerRatingsResult, bidsResult, workImagesResult] = await Promise.all([
+      buyerIds.length
+        ? admin
+            .from("eloo_reviews")
+            .select("reviewee_id,rating")
+            .in("reviewee_id", buyerIds)
+            .eq("review_type", "seller_to_buyer")
+            .eq("is_public", true)
+        : Promise.resolve({ data: [], error: null }),
+      jobIds.length
+        ? admin
+            .from("bids")
+            .select("id,inquiry_id,provider_id,amount,status")
+            .in("inquiry_id", jobIds)
+        : Promise.resolve({ data: [], error: null }),
+      jobIds.length
+        ? admin
+            .from("user_images")
+            .select("id,inquiry_id,image_url,created_at")
+            .in("inquiry_id", jobIds)
+            .eq("image_type", "work_image")
+            .order("created_at", { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
     const buyerRatingRows = buyerRatingsResult.error ? [] : buyerRatingsResult.data || [];
+    const bidRows = bidsResult.error ? [] : bidsResult.data || [];
+    const workImageRows = workImagesResult.error ? [] : workImagesResult.data || [];
     const buyerRatingsByUser = new Map<string, { rating: number; reviewCount: number }>();
     for (const buyerId of buyerIds) {
       const rows = ((buyerRatingRows || []) as Array<{ reviewee_id?: string | null; rating?: number | null }>)
@@ -121,43 +133,36 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // For each job, get the bid count and whether current provider already bid
-    const jobsWithBidInfo = await Promise.all(
-      visibleJobs.map(async (job) => {
-        const { count: bidCount } = await admin
-          .from("bids")
-          .select("*", { count: "exact", head: true })
-          .eq("inquiry_id", job.id);
+    const bidsByJob = new Map<string, Array<Record<string, any>>>();
+    for (const bid of bidRows as Array<Record<string, any>>) {
+      const inquiryId = String(bid.inquiry_id || "");
+      bidsByJob.set(inquiryId, [...(bidsByJob.get(inquiryId) || []), bid]);
+    }
 
-        const { data: myBid } = await supabase
-          .from("bids")
-          .select("id, amount, status")
-          .eq("inquiry_id", job.id)
-          .eq("provider_id", user.id)
-          .single();
+    const imagesByJob = new Map<string, Array<Record<string, any>>>();
+    for (const image of workImageRows as Array<Record<string, any>>) {
+      const inquiryId = String(image.inquiry_id || "");
+      imagesByJob.set(inquiryId, [...(imagesByJob.get(inquiryId) || []), image]);
+    }
 
-        // Use the admin client here because providers are allowed to inspect
-        // job photos even when storage rows are hidden by owner-only RLS.
-        const { data: workImages } = await admin
-          .from("user_images")
-          .select("id, image_url, created_at")
-          .eq("inquiry_id", job.id)
-          .eq("image_type", "work_image")
-          .order("created_at", { ascending: true });
+    const jobsWithBidInfo = visibleJobs.map((job) => {
+      const jobBids = bidsByJob.get(String(job.id)) || [];
+      const myBid = jobBids.find((bid) => String(bid.provider_id || "") === user.id) || null;
+      const workImages = imagesByJob.get(String(job.id)) || [];
 
-        const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(", ");
-        const safeJob = { ...job };
-        delete safeJob.address;
-        delete safeJob.latitude;
-        delete safeJob.longitude;
-        delete safeJob.postal_code;
-        delete safeJob.user_id;
-        delete safeJob.select_quote_recipient_email;
-        delete safeJob.select_quote_recipient_name;
-        delete safeJob.select_quote_note;
-        delete safeJob.admin_posted_by;
-        const buyerRating = buyerRatingsByUser.get(String(job.user_id || ""));
-        const isAnyJobSelect = isAnyJobSelectInquiry(job);
+      const coarseLabel = job.coarse_location_label || [job.city, coarsePostalCode(job.postal_code)].filter(Boolean).join(", ");
+      const safeJob = { ...job };
+      delete safeJob.address;
+      delete safeJob.latitude;
+      delete safeJob.longitude;
+      delete safeJob.postal_code;
+      delete safeJob.user_id;
+      delete safeJob.select_quote_recipient_email;
+      delete safeJob.select_quote_recipient_name;
+      delete safeJob.select_quote_note;
+      delete safeJob.admin_posted_by;
+      const buyerRating = buyerRatingsByUser.get(String(job.user_id || ""));
+      const isAnyJobSelect = isAnyJobSelectInquiry(job);
 
         return {
           ...safeJob,
@@ -174,12 +179,14 @@ export async function GET(request: NextRequest) {
             job.coarse_latitude ? Number(job.coarse_latitude) : null,
             job.coarse_longitude ? Number(job.coarse_longitude) : null
           ),
-          bid_count: bidCount || 0,
-          my_bid: myBid || null,
-          work_image_count: workImages?.length || 0,
-          work_images: (workImages || []).map((image: { id: string; image_url: string }) => ({
-            id: image.id,
-            image_url: image.image_url,
+          bid_count: jobBids.length,
+          my_bid: myBid
+            ? { id: myBid.id, amount: myBid.amount, status: myBid.status }
+            : null,
+          work_image_count: workImages.length,
+          work_images: workImages.map((image) => ({
+            id: String(image.id),
+            image_url: String(image.image_url),
           })),
           buyer_rating: buyerRating?.reviewCount ? buyerRating.rating : undefined,
           buyer_review_count: buyerRating?.reviewCount || undefined,
@@ -197,9 +204,8 @@ export async function GET(request: NextRequest) {
                 badges: [{ label: "AnyJob Select", tone: "red", source: "system" }],
               }
             : buyerTrustByUser.get(String(job.user_id || "")) || null,
-        };
-      })
-    );
+      };
+    });
 
     return NextResponse.json({ jobs: jobsWithBidInfo });
   } catch (error) {

@@ -1,7 +1,13 @@
 import { acceptBidAndUnlockChat } from "@/lib/bids/accept-bid";
 import { getStripe } from "@/lib/stripe/server";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+
+function mobileRedirect(inquiryId: string, payment: string) {
+  const location = `anyjob://requests/${encodeURIComponent(inquiryId)}?payment=${encodeURIComponent(payment)}`;
+  return new NextResponse(null, { status: 302, headers: { Location: location } });
+}
 
 export async function GET(request: NextRequest) {
   const fallbackUrl = new URL("/", request.url);
@@ -19,6 +25,10 @@ export async function GET(request: NextRequest) {
     const bidId = session.metadata?.bid_id;
     const inquiryId = session.metadata?.inquiry_id;
     const buyerId = session.metadata?.buyer_id;
+    const client =
+      session.metadata?.client === "mobile" || request.nextUrl.searchParams.get("client") === "mobile"
+        ? "mobile"
+        : "web";
 
     if (
       session.metadata?.type !== "bid_acceptance_fee" ||
@@ -27,20 +37,27 @@ export async function GET(request: NextRequest) {
       !buyerId ||
       session.payment_status !== "paid"
     ) {
+      if (client === "mobile" && inquiryId) {
+        return mobileRedirect(inquiryId, "not_paid");
+      }
       fallbackUrl.pathname = inquiryId ? `/dashboard/requests/${inquiryId}` : "/dashboard/requests";
       fallbackUrl.searchParams.set("payment", "not_paid");
       return NextResponse.redirect(fallbackUrl);
     }
 
-    const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const supabase =
+      client === "mobile" ? createAdminSupabaseClient() : await createServerSupabaseClient();
 
-    if (!user || user.id !== buyerId) {
-      fallbackUrl.pathname = `/dashboard/requests/${inquiryId}`;
-      fallbackUrl.searchParams.set("payment", "auth_required");
-      return NextResponse.redirect(fallbackUrl);
+    if (client === "web") {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || user.id !== buyerId) {
+        fallbackUrl.pathname = `/dashboard/requests/${inquiryId}`;
+        fallbackUrl.searchParams.set("payment", "auth_required");
+        return NextResponse.redirect(fallbackUrl);
+      }
     }
 
     const { data: bid, error: bidError } = await supabase
@@ -51,13 +68,20 @@ export async function GET(request: NextRequest) {
 
     const inquiry = Array.isArray(bid?.inquiry) ? bid?.inquiry[0] : bid?.inquiry;
 
-    if (bidError || !bid || !inquiry || inquiry.user_id !== user.id) {
+    if (bidError || !bid || !inquiry || inquiry.user_id !== buyerId) {
+      if (client === "mobile") {
+        return mobileRedirect(inquiryId, "bid_not_found");
+      }
       fallbackUrl.pathname = `/dashboard/requests/${inquiryId}`;
       fallbackUrl.searchParams.set("payment", "bid_not_found");
       return NextResponse.redirect(fallbackUrl);
     }
 
     await acceptBidAndUnlockChat(supabase, { ...bid, inquiry });
+
+    if (client === "mobile") {
+      return mobileRedirect(inquiryId, "success");
+    }
 
     fallbackUrl.pathname = `/dashboard/requests/${inquiryId}`;
     fallbackUrl.searchParams.set("payment", "success");

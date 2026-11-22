@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { bid_id: bidId } = await request.json();
+    const { bid_id: bidId, client: requestedClient } = await request.json();
+    const client = requestedClient === "mobile" ? "mobile" : "web";
     if (!bidId) {
       return NextResponse.json({ error: "bid_id is required" }, { status: 400 });
     }
@@ -70,7 +71,17 @@ export async function POST(request: NextRequest) {
     }
 
     const origin = request.nextUrl.origin;
-    if (process.env.STRIPE_ENABLED !== "true" || !getStripeSecretKey()) {
+    if (!getStripeSecretKey()) {
+      const dummyPaymentsAllowed =
+        process.env.NODE_ENV !== "production" && process.env.PAYMENTS_DUMMY_MODE === "true";
+
+      if (!dummyPaymentsAllowed) {
+        return NextResponse.json(
+          { error: "Payments are temporarily unavailable. Please try again later." },
+          { status: 503 },
+        );
+      }
+
       await acceptBidAndUnlockChat(supabase, { ...bid, inquiry });
       return NextResponse.json({
         checkoutUrl: `${origin}/dashboard/requests/${bid.inquiry_id}?payment=success&mode=dummy`,
@@ -105,9 +116,13 @@ export async function POST(request: NextRequest) {
         seller_quote: String(breakdown.sellerQuote),
         anyjob_fee: String(breakdown.bookingToken),
         buyer_total: String(breakdown.buyerTotal),
+        client,
       },
-      success_url: `${origin}/api/payments/bid-checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/dashboard/requests/${bid.inquiry_id}?payment=cancelled`,
+      success_url: `${origin}/api/payments/bid-checkout/success?session_id={CHECKOUT_SESSION_ID}&client=${client}`,
+      cancel_url:
+        client === "mobile"
+          ? `${origin}/api/payments/bid-checkout/return?inquiry_id=${encodeURIComponent(bid.inquiry_id)}&payment=cancelled`
+          : `${origin}/dashboard/requests/${bid.inquiry_id}?payment=cancelled`,
     });
 
     return NextResponse.json({ checkoutUrl: session.url, sessionId: session.id });

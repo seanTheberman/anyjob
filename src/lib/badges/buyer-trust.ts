@@ -25,6 +25,13 @@ export type BuyerTrustSummary = {
 
 const hiredStatuses = new Set(["accepted", "bid_accepted", "confirmed", "in_progress", "completed", "converted"]);
 const paidStatuses = new Set(["confirmed", "in_progress", "completed", "reviewed"]);
+const verifiedKycStatuses = new Set([
+  "approved",
+  "confirmed",
+  "verified",
+  "manual_override",
+  "manually_verified",
+]);
 
 function money(value: number) {
   return new Intl.NumberFormat("en-GB", {
@@ -85,11 +92,14 @@ export async function getBuyerTrustForUsers(admin: any, buyerIds: string[]) {
     });
   }
 
-  const [jobs, bookings, buyers, profiles, userBadges] = await Promise.all([
+  const [jobs, bookings, buyers, profiles, userImages, userBadges] = await Promise.all([
     safeRows(admin, "service_inquiries", "id,user_id,status", (query) => query.in("user_id", ids).limit(5000)),
     safeRows(admin, "eloo_bookings", "id,client_id,total_price,status,is_paid", (query) => query.in("client_id", ids).limit(5000)),
-    safeRows(admin, "buyers", "id,kyc_status", (query) => query.in("id", ids).limit(1000)),
-    safeRows(admin, "eloo_profiles", "id,is_verified", (query) => query.in("id", ids).limit(1000)),
+    safeRows(admin, "buyers", "id,kyc_status,id_document_url,selfie_video_url", (query) => query.in("id", ids).limit(1000)),
+    safeRows(admin, "eloo_profiles", "id,is_verified,kyc_status", (query) => query.in("id", ids).limit(1000)),
+    safeRows(admin, "user_images", "user_id,image_type,title,description", (query) =>
+      query.in("user_id", ids).in("image_type", ["id_document", "selfie_video"]).limit(5000)
+    ),
     safeRows(
       admin,
       "user_badges",
@@ -120,13 +130,35 @@ export async function getBuyerTrustForUsers(admin: any, buyerIds: string[]) {
   for (const buyer of buyers as AnyRecord[]) {
     const summary = summaries.get(String(buyer.id || ""));
     if (!summary) continue;
-    summary.kycVerified = summary.kycVerified || String(buyer.kyc_status || "").toLowerCase() === "approved";
+    summary.kycVerified =
+      summary.kycVerified || verifiedKycStatuses.has(String(buyer.kyc_status || "").toLowerCase());
   }
 
   for (const profile of profiles as AnyRecord[]) {
     const summary = summaries.get(String(profile.id || ""));
     if (!summary) continue;
-    summary.kycVerified = summary.kycVerified || profile.is_verified === true;
+    summary.kycVerified =
+      summary.kycVerified ||
+      profile.is_verified === true ||
+      verifiedKycStatuses.has(String(profile.kyc_status || "").toLowerCase());
+  }
+
+  const imagesByUser = new Map<string, AnyRecord[]>();
+  for (const image of userImages as AnyRecord[]) {
+    const userId = String(image.user_id || "");
+    imagesByUser.set(userId, [...(imagesByUser.get(userId) || []), image]);
+  }
+  const buyersById = new Map((buyers as AnyRecord[]).map((buyer) => [String(buyer.id || ""), buyer]));
+  for (const [userId, images] of imagesByUser.entries()) {
+    const summary = summaries.get(userId);
+    if (!summary || summary.kycVerified) continue;
+    const buyer = buyersById.get(userId) || {};
+    const documents = images.filter((image) => image.image_type === "id_document");
+    const text = (image: AnyRecord) => `${image.title || ""} ${image.description || ""}`.toLowerCase();
+    const hasFront = Boolean(buyer.id_document_url) || documents.length >= 1 || documents.some((image) => text(image).includes("front"));
+    const hasBack = documents.length >= 2 || documents.some((image) => text(image).includes("back"));
+    const hasSelfie = Boolean(buyer.selfie_video_url) || images.some((image) => image.image_type === "selfie_video");
+    summary.kycVerified = hasFront && hasBack && hasSelfie;
   }
 
   for (const award of userBadges as AnyRecord[]) {

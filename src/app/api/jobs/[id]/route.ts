@@ -100,48 +100,14 @@ export async function GET(
 
     const adminSupabase = createAdminSupabaseClient() as any;
 
-    // Check if user has already bid on this job (only if user is authenticated)
-    let myBid = null;
-    if (user) {
-      try {
-        const { data: bidData } = await supabase
-          .from('bids')
-          .select('id, amount, status, created_at, visit_verification_code, visit_verification_code_created_at')
-          .eq('inquiry_id', jobId)
-          .eq('provider_id', user.id)
-          .single();
-        myBid = bidData;
-      } catch (bidError) {
-        // No bid found, that's okay
-        myBid = null;
-      }
-    }
-
-    // Fetch the specific job inquiry. Accepted jobs may be hidden by row policies,
-    // but a provider who owns a bid still needs the detail page for contact unlocks.
-    const { data: visibleJob, error } = await supabase
+    const { data: job, error } = await adminSupabase
       .from('service_inquiries')
       .select('*')
       .eq('id', jobId)
       .eq('country_code', marketCountry)
       .maybeSingle();
 
-    let job = visibleJob;
-    if (!job) {
-      const { data: adminJob, error: adminJobError } = await adminSupabase
-        .from('service_inquiries')
-        .select('*')
-        .eq('id', jobId)
-        .eq('country_code', marketCountry)
-        .maybeSingle();
-
-      if (adminJobError) {
-        console.error('Admin job fetch error:', adminJobError);
-      }
-      job = adminJob;
-    }
-
-    if (error && !myBid) {
+    if (error) {
       console.error('Job fetch error:', error);
     }
 
@@ -157,33 +123,25 @@ export async function GET(
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    // Get bid count for this job
-    const { count: bidCount } = await supabase
-      .from('bids')
-      .select('*', { count: 'exact', head: true })
-      .eq('inquiry_id', jobId);
-
-    // Get work images with the admin client because providers should be able
-    // to inspect job photos even when image rows are protected by owner RLS.
-    const { data: images, error: imagesError } = await adminSupabase
-      .from('user_images')
-      .select('id, image_url, public_id, created_at')
-      .eq('inquiry_id', jobId)
-      .eq('image_type', 'work_image')
-      .order('created_at', { ascending: true });
-
-    if (imagesError) {
-      console.error('Work image fetch error:', imagesError);
-    }
-
-    const imageCount = images?.length || 0;
-
-    const [{ data: bids }, { data: buyerJobs }, { data: buyerReviewsGiven }, { data: buyerReviewsReceived }] = await Promise.all([
+    const [
+      { data: bids },
+      { data: images, error: imagesError },
+      { data: buyerJobs },
+      { data: buyerReviewsGiven },
+      { data: buyerReviewsReceived },
+      buyerTrustByUser,
+    ] = await Promise.all([
       adminSupabase
         .from("bids")
         .select("id,inquiry_id,provider_id,amount,message,estimated_duration_hours,available_date,status,created_at,visit_verification_code,visit_verification_code_created_at")
         .eq("inquiry_id", jobId)
         .order("created_at", { ascending: false }),
+      adminSupabase
+        .from('user_images')
+        .select('id, image_url, public_id, created_at')
+        .eq('inquiry_id', jobId)
+        .eq('image_type', 'work_image')
+        .order('created_at', { ascending: true }),
       job.user_id
         ? adminSupabase
             .from("service_inquiries")
@@ -207,9 +165,19 @@ export async function GET(
             .eq("is_public", true)
             .limit(1000)
         : Promise.resolve({ data: [] }),
+      job.user_id
+        ? getBuyerTrustForUsers(adminSupabase, [String(job.user_id)])
+        : Promise.resolve(new Map()),
     ]);
 
-    if (!myBid && user) {
+    if (imagesError) {
+      console.error('Work image fetch error:', imagesError);
+    }
+
+    const imageCount = images?.length || 0;
+    let myBid = null;
+
+    if (user) {
       const ownBid = ((bids || []) as LooseRow[]).find((bid) => String(bid.provider_id || "") === user.id);
       myBid = ownBid ? {
         id: ownBid.id,
@@ -288,7 +256,7 @@ export async function GET(
     const buyerReceivedReviewCount = buyerReceivedReviewRows.length;
     const buyerReceivedRating = average(buyerReceivedReviewRows);
     const buyerTrust = job.user_id
-      ? (await getBuyerTrustForUsers(adminSupabase, [String(job.user_id)])).get(String(job.user_id)) || null
+      ? buyerTrustByUser.get(String(job.user_id)) || null
       : null;
 
     const showContact = myBid?.status === 'accepted';
@@ -342,7 +310,7 @@ export async function GET(
       isTargetedProvider: Boolean(user && job.target_provider_id === user.id),
       anyjobSelect: isAnyJobSelect,
       adminPosted: job.admin_posted === true,
-      bid_count: bidCount || 0,
+      bid_count: (bids || []).length,
       my_bid: myBid,
       work_image_count: imageCount,
       work_images: images || [],

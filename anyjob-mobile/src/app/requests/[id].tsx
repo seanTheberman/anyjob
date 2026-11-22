@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Alert, StyleSheet, Text, View } from "react-native";
@@ -77,11 +78,24 @@ export default function RequestDetailScreen() {
     mutationFn: (bidId: string) =>
       api<any>("/api/payments/bid-checkout", {
         method: "POST",
-        ...jsonBody({ bid_id: bidId }),
+        ...jsonBody({ bid_id: bidId, client: "mobile" }),
       }),
     onSuccess: async (data) => {
       if (data.checkoutUrl && !data.dummyPayment) {
-        await WebBrowser.openBrowserAsync(data.checkoutUrl);
+        const returnUrl = `anyjob://requests/${id}`;
+        const result = await WebBrowser.openAuthSessionAsync(data.checkoutUrl, returnUrl);
+        await refresh();
+
+        if (result.type === "success") {
+          const payment = Linking.parse(result.url).queryParams?.payment;
+          Alert.alert(
+            payment === "success" ? "Payment confirmed" : "Payment not completed",
+            payment === "success"
+              ? "The provider is confirmed and chat is now unlocked."
+              : "Your quote was not accepted and no payment was completed.",
+          );
+        }
+        return;
       }
       await refresh();
       Alert.alert(
