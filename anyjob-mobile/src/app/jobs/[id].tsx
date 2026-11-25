@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { Image } from "expo-image";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -18,7 +19,7 @@ import {
   User,
 } from "lucide-react-native";
 import { cloneElement, useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   Button,
   Card,
@@ -154,6 +155,34 @@ function budgetLabel(job: JobDetails) {
   if (min && max && min !== max) return `${currency}${min}–${max}`;
   if (max || min) return `${currency}${max || min}`;
   return "Open budget";
+}
+
+function formatDateValue(value: Date) {
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, "0"),
+    String(value.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function parseDateValue(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const parsed = new Date(`${value}T12:00:00`);
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return today;
+}
+
+function displayDate(value: string) {
+  if (!value) return "Choose an available date";
+  return parseDateValue(value).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 export default function JobDetailScreen() {
@@ -572,11 +601,7 @@ export default function JobDetailScreen() {
             keyboardType="number-pad"
             onChangeText={setDuration}
           />
-          <Field
-            label="Available date (YYYY-MM-DD)"
-            value={date}
-            onChangeText={setDate}
-          />
+          <QuoteDatePicker value={date} onChange={setDate} />
           <Field
             label="Message to buyer"
             multiline
@@ -665,6 +690,108 @@ export default function JobDetailScreen() {
 function SectionTitle({ title }: { title: string }) {
   const { colors } = useAppTheme();
   return <Text style={[styles.cardTitle, { color: colors.ink }]}>{title}</Text>;
+}
+
+function QuoteDatePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { colors, isDark } = useAppTheme();
+  const [visible, setVisible] = useState(false);
+  const [draft, setDraft] = useState(() => parseDateValue(value));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const open = () => {
+    setDraft(parseDateValue(value));
+    setVisible(true);
+  };
+
+  return (
+    <View style={styles.dateField}>
+      <Text style={[styles.dateLabel, { color: colors.ink }]}>Available date</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Available date: ${displayDate(value)}`}
+        onPress={open}
+        style={({ pressed }) => [
+          styles.dateControl,
+          { backgroundColor: colors.soft, borderColor: colors.line },
+          pressed && styles.dateControlPressed,
+        ]}
+      >
+        <Calendar color={colors.brand} size={20} />
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[
+            styles.dateValue,
+            { color: value ? colors.ink : colors.muted },
+          ]}
+        >
+          {displayDate(value)}
+        </Text>
+      </Pressable>
+
+      {visible ? (
+        <View
+          style={[
+            styles.datePickerPanel,
+            { backgroundColor: colors.surface, borderColor: colors.line },
+          ]}
+        >
+          <DateTimePicker
+            value={draft}
+            mode="date"
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            minimumDate={today}
+            themeVariant={isDark ? "dark" : "light"}
+            accentColor={colors.brand}
+            onChange={(event, selected) => {
+              if (Platform.OS === "android") {
+                setVisible(false);
+                if (event.type === "set" && selected) {
+                  onChange(formatDateValue(selected));
+                }
+                return;
+              }
+              if (selected) setDraft(selected);
+            }}
+          />
+          {Platform.OS === "ios" ? (
+            <View style={styles.datePickerActions}>
+              {value ? (
+                <Button
+                  title="Clear"
+                  variant="ghost"
+                  onPress={() => {
+                    onChange("");
+                    setVisible(false);
+                  }}
+                />
+              ) : null}
+              <Button
+                title="Cancel"
+                variant="secondary"
+                onPress={() => setVisible(false)}
+              />
+              <Button
+                title="Done"
+                onPress={() => {
+                  onChange(formatDateValue(draft));
+                  setVisible(false);
+                }}
+              />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+    </View>
+  );
 }
 
 function Fact({
@@ -905,6 +1032,32 @@ const styles = StyleSheet.create({
   },
   headerBudgetText: { fontSize: 12, fontWeight: "900" },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
+  dateField: { gap: 7 },
+  dateLabel: { fontSize: 13, fontWeight: "800" },
+  dateControl: {
+    minHeight: 52,
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  dateControlPressed: { opacity: 0.78 },
+  dateValue: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: "800" },
+  datePickerPanel: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    overflow: "hidden",
+    padding: 8,
+  },
+  datePickerActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    flexWrap: "wrap",
+    gap: 8,
+    padding: 8,
+  },
   heroTitle: { fontSize: 22, lineHeight: 27, fontWeight: "900", marginTop: 12 },
   factGrid: { gap: 14, marginTop: 18 },
   fact: { flexDirection: "row", gap: 12, alignItems: "flex-start" },

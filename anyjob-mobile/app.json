@@ -2,7 +2,7 @@
   "expo": {
     "name": "AnyJob",
     "slug": "anyjob-mobile",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/anyjob-icon-v2.png",
     "scheme": "anyjob",
@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/images/anyjob-icon-v2.png",
       "bundleIdentifier": "ie.anyjob.ios",
-      "buildNumber": "9",
+      "buildNumber": "10",
       "associatedDomains": [
         "applinks:anyjob-mu.vercel.app"
       ],
