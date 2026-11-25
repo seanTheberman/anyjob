@@ -6,6 +6,7 @@ import { countryCodeFromName, viewerCountryCode } from "@/lib/location/market-lo
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { getSellerServiceAreas, serviceAreaMatches, serviceAreasForDisplay, viewerServiceLocation } from "@/lib/location/service-areas";
+import { usersHaveBlockedEachOther } from "@/lib/safety/blocks";
 
 const getCachedProviderProfile = unstable_cache(
   (providerId: string) => getProviderProfileById(providerId),
@@ -34,6 +35,9 @@ export async function GET(
   try {
     const auth = await createServerSupabaseClient();
     const viewer = await getFastAuthUser(auth);
+    if (viewer && await usersHaveBlockedEachOther(viewer.id, profileId)) {
+      return NextResponse.json({ error: "Profile not available" }, { status: 404 });
+    }
     const marketCountry = await viewerCountryCode(request, viewer?.id);
     const viewerLocation = await viewerServiceLocation(request, viewer?.id);
     const preferProvider =

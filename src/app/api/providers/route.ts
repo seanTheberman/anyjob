@@ -4,6 +4,7 @@ import { countryCodeFromName, viewerCountryCode } from "@/lib/location/market-lo
 import { getSellerServiceAreas, serviceAreaMatches, serviceAreasForDisplay, viewerServiceLocation } from "@/lib/location/service-areas";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
+import { blockedParticipantIds } from "@/lib/safety/blocks";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,12 @@ export async function GET(request: Request) {
   const marketCountry = await viewerCountryCode(request, viewer?.id);
   const viewerLocation = await viewerServiceLocation(request, viewer?.id);
   const allProviders = await getMarketplaceProviders();
+  const blockedIds = viewer
+    ? await blockedParticipantIds(viewer.id, allProviders.map((provider) => provider.id))
+    : new Set<string>();
   const visibleProviders = allProviders.filter((provider) =>
     countryCodeFromName(provider.country) === marketCountry &&
+    !blockedIds.has(provider.id) &&
     (!category || provider.categorySlug === category)
   );
   const areas = await getSellerServiceAreas(visibleProviders.map((provider) => provider.id));

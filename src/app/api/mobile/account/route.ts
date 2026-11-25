@@ -100,3 +100,29 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
+
+export async function DELETE(request: NextRequest) {
+  const user = await currentUser();
+  if (!user)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  if (text(body.confirmation) !== "DELETE") {
+    return NextResponse.json(
+      { error: "Type DELETE to confirm permanent account deletion." },
+      { status: 400 },
+    );
+  }
+
+  const admin = createAdminSupabaseClient();
+  const { error } = await admin.auth.admin.deleteUser(user.id);
+  if (error) {
+    console.error("Account deletion failed:", error);
+    return NextResponse.json(
+      { error: "Your account could not be deleted. Please contact support." },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({ success: true });
+}

@@ -6,6 +6,7 @@ import {
   KeyRound,
   LockKeyhole,
   ShieldCheck,
+  Trash2,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, StyleSheet, Switch, Text, View } from "react-native";
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui";
 import { api, jsonBody } from "@/lib/api";
 import { useAppTheme } from "@/providers/theme-provider";
+import { useAuth } from "@/providers/auth-provider";
 
 type SecurityResponse = {
   account: {
@@ -37,10 +39,13 @@ function displayDate(value: string | null | undefined) {
 
 export default function SecurityScreen() {
   const { colors } = useAppTheme();
+  const { signOut } = useAuth();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [biometric, setBiometric] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [showDelete, setShowDelete] = useState(false);
   const query = useQuery({
     queryKey: ["account-security"],
     queryFn: () => api<SecurityResponse>("/api/provider/security"),
@@ -90,6 +95,21 @@ export default function SecurityScreen() {
     setBiometric(enabled);
     await AsyncStorage.setItem("anyjob-biometric-lock", String(enabled));
   };
+
+  const deleteAccount = useMutation({
+    mutationFn: () =>
+      api("/api/mobile/account", {
+        method: "DELETE",
+        ...jsonBody({ confirmation: deleteConfirmation }),
+      }),
+    onSuccess: async () => {
+      await AsyncStorage.removeItem("anyjob-biometric-lock");
+      Alert.alert("Account deleted", "Your AnyJob account has been permanently deleted.");
+      await signOut();
+    },
+    onError: (error: Error) =>
+      Alert.alert("Could not delete account", error.message),
+  });
 
   if (query.isLoading)
     return (
@@ -221,6 +241,55 @@ export default function SecurityScreen() {
           thumbColor="white"
         />
       </View>
+
+      <SectionHeader title="Delete account" />
+      <Card>
+        <View style={styles.cardHead}>
+          <View style={[styles.cardIcon, { backgroundColor: colors.soft }]}>
+            <Trash2 color={colors.danger} size={18} />
+          </View>
+          <View style={styles.dangerCopy}>
+            <Text style={[styles.cardTitle, { color: colors.ink }]}>Permanent deletion</Text>
+            <Text style={[styles.dangerBody, { color: colors.muted }]}>Deletes your profile and account access. This action cannot be undone.</Text>
+          </View>
+        </View>
+        {showDelete ? (
+          <>
+            <Field
+              label="Type DELETE to confirm"
+              autoCapitalize="characters"
+              value={deleteConfirmation}
+              onChangeText={setDeleteConfirmation}
+            />
+            <Button
+              title="Permanently delete account"
+              variant="danger"
+              disabled={deleteConfirmation !== "DELETE"}
+              loading={deleteAccount.isPending}
+              onPress={() =>
+                Alert.alert(
+                  "Delete your account?",
+                  "Your account and profile data will be permanently deleted.",
+                  [
+                    { text: "Cancel", style: "cancel" },
+                    { text: "Delete", style: "destructive", onPress: () => deleteAccount.mutate() },
+                  ],
+                )
+              }
+            />
+            <Button
+              title="Cancel"
+              variant="ghost"
+              onPress={() => {
+                setShowDelete(false);
+                setDeleteConfirmation("");
+              }}
+            />
+          </>
+        ) : (
+          <Button title="Delete account" variant="danger" onPress={() => setShowDelete(true)} />
+        )}
+      </Card>
     </Screen>
   );
 }
@@ -264,6 +333,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cardTitle: { flex: 1, fontSize: 14, fontWeight: "900" },
+  dangerCopy: { flex: 1, gap: 3 },
+  dangerBody: { fontSize: 10.5, lineHeight: 15 },
   accountRow: { gap: 3 },
   accountLabel: { fontSize: 10.5, fontWeight: "800" },
   accountValue: { fontSize: 13, lineHeight: 18, fontWeight: "800" },

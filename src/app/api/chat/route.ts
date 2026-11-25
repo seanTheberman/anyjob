@@ -2,6 +2,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getFastAuthUser } from "@/lib/auth/fast-user";
 import { notifyJobEvent } from "@/lib/notifications/email-functions";
+import { blockedParticipantIds, usersHaveBlockedEachOther } from "@/lib/safety/blocks";
 import { NextRequest, NextResponse } from "next/server";
 
 async function isConversationUnlocked(
@@ -45,6 +46,16 @@ export async function GET(request: NextRequest) {
 
       if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      }
+
+      const otherUserId = conversation.client_id === user.id
+        ? conversation.provider_id
+        : conversation.client_id;
+      if (otherUserId && await usersHaveBlockedEachOther(user.id, otherUserId)) {
+        return NextResponse.json(
+          { error: "This conversation is unavailable because one of the accounts is blocked." },
+          { status: 403 },
+        );
       }
 
       const unlocked = await isConversationUnlocked(supabase, conversation);
@@ -97,7 +108,18 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
 
     const allConversations = conversations || [];
-    const bidIds = Array.from(new Set(allConversations.map((conversation) => conversation.bid_id).filter(Boolean)));
+    const allParticipantIds = allConversations.flatMap((conversation) => [
+      conversation.client_id,
+      conversation.provider_id,
+    ]).filter(Boolean);
+    const blockedIds = await blockedParticipantIds(user.id, allParticipantIds);
+    const visibleConversations = allConversations.filter((conversation) => {
+      const otherUserId = conversation.client_id === user.id
+        ? conversation.provider_id
+        : conversation.client_id;
+      return !otherUserId || !blockedIds.has(otherUserId);
+    });
+    const bidIds = Array.from(new Set(visibleConversations.map((conversation) => conversation.bid_id).filter(Boolean)));
     const acceptedBidIds = new Set<string>();
 
     if (bidIds.length) {
@@ -112,7 +134,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const unlockedConversations = allConversations.filter((conversation) => (
+    const unlockedConversations = visibleConversations.filter((conversation) => (
       !conversation.bid_id || acceptedBidIds.has(String(conversation.bid_id))
     ));
     const conversationIds = unlockedConversations.map((conversation) => conversation.id);
@@ -211,6 +233,16 @@ export async function POST(request: NextRequest) {
 
     if (!conversation) {
       return NextResponse.json({ error: "Conversation not found or unauthorized" }, { status: 404 });
+    }
+
+    const otherUserId = conversation.client_id === user.id
+      ? conversation.provider_id
+      : conversation.client_id;
+    if (otherUserId && await usersHaveBlockedEachOther(user.id, otherUserId)) {
+      return NextResponse.json(
+        { error: "Messages cannot be sent because one of the accounts is blocked." },
+        { status: 403 },
+      );
     }
 
     if (!conversation.is_active) {

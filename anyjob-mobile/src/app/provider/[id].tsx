@@ -12,6 +12,7 @@ import {
   MapPin,
   RefreshCw,
   ShieldCheck,
+  ShieldAlert,
   Star,
 } from "lucide-react-native";
 import { useEffect, useState } from "react";
@@ -989,6 +990,16 @@ export default function PublicProviderScreen() {
       ) : (
         <Button title="Post a custom request" onPress={continueBooking} />
       )}
+      <Button
+        title="Report or block provider"
+        variant="ghost"
+        icon={<ShieldAlert color={colors.muted} size={18} />}
+        onPress={() =>
+          router.push(
+            `/safety/report?targetUserId=${encodeURIComponent(providerId)}&targetName=${encodeURIComponent(name)}&sourcePath=${encodeURIComponent(`/provider/${providerId}`)}` as never,
+          )
+        }
+      />
     </Screen>
   );
 }
