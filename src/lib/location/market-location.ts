@@ -25,6 +25,37 @@ export class MarketLocationError extends Error {
   }
 }
 
+type ReviewAccountUser = {
+  app_metadata?: Record<string, unknown>;
+};
+
+export function reviewMarketLocationForUser(user: ReviewAccountUser | null | undefined) {
+  const metadata = user?.app_metadata;
+  if (metadata?.apple_review_account !== true) return null;
+  const configured = metadata.review_market_location;
+  if (!configured || typeof configured !== "object" || Array.isArray(configured)) return null;
+  const row = configured as Record<string, unknown>;
+  const countryCode = cleanCountryCode(cleanLocationText(row.countryCode, 2));
+  const city = cleanLocationText(row.city);
+  const country = cleanLocationText(row.country);
+  if (!countryCode || !city || !country) return null;
+
+  return {
+    countryCode,
+    country,
+    region: cleanLocationText(row.region),
+    city,
+    postalCode: cleanLocationText(row.postalCode, 30),
+    coarseLatitude: validCoordinate(row.coarseLatitude, -90, 90),
+    coarseLongitude: validCoordinate(row.coarseLongitude, -180, 180),
+    accuracyMeters: null,
+    ipCountryCode: null,
+    gpsCountryCode: countryCode,
+    source: "gps" as const,
+    expiresAt: Date.now() + 2 * 60 * 60_000,
+  } satisfies VerifiedMarketLocation;
+}
+
 function signingKey() {
   const key = process.env.LOCATION_TOKEN_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) throw new Error("Missing location token signing secret");
@@ -210,7 +241,11 @@ export function signMarketLocation(location: VerifiedMarketLocation) {
   return `${payload}.${signature}`;
 }
 
-export function verifyMarketLocationToken(request: Request, token: unknown) {
+export function verifyMarketLocationToken(
+  request: Request,
+  token: unknown,
+  options: { allowCountryMismatch?: boolean } = {},
+) {
   if (typeof token !== "string" || !token.includes(".")) {
     throw new MarketLocationError("Verify your location before continuing.");
   }
@@ -234,7 +269,7 @@ export function verifyMarketLocationToken(request: Request, token: unknown) {
     throw new MarketLocationError("Location verification expired. Verify your location again.");
   }
   const currentIpCountry = ipMarketLocation(request).countryCode;
-  if (currentIpCountry && currentIpCountry !== location.countryCode) {
+  if (!options.allowCountryMismatch && currentIpCountry && currentIpCountry !== location.countryCode) {
     throw new MarketLocationError("Your network country changed. Disable any VPN and verify your location again.", 409);
   }
   return location;

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   MarketLocationError,
   persistUserMarketLocation,
+  reviewMarketLocationForUser,
   resolveMarketLocation,
   signMarketLocation,
 } from "@/lib/location/market-location";
@@ -10,11 +11,11 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
-    const input = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const location = await resolveMarketLocation(request, input);
-    const token = signMarketLocation(location);
     const supabase = await createServerSupabaseClient();
     const { data: { user } } = await supabase.auth.getUser();
+    const input = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const location = reviewMarketLocationForUser(user) || await resolveMarketLocation(request, input);
+    const token = signMarketLocation(location);
     if (user) await persistUserMarketLocation(user.id, location);
 
     const response = NextResponse.json({ location, token });

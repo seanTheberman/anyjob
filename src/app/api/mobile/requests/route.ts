@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   MarketLocationError,
   persistUserMarketLocation,
+  reviewMarketLocationForUser,
   verifyMarketLocationToken,
 } from "@/lib/location/market-location";
 import { notifyJobEvent } from "@/lib/notifications/email-functions";
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
     string,
     unknown
   >;
-  const location = verifyMarketLocationToken(
+  const reviewLocation = reviewMarketLocationForUser(user);
+  const location = reviewLocation || verifyMarketLocationToken(
     request,
     value(body, "location_token", "locationToken") || request.cookies.get("anyjob_market_location")?.value,
   );

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   MarketLocationError,
   persistUserMarketLocation,
+  reviewMarketLocationForUser,
   verifyMarketLocationToken,
 } from "@/lib/location/market-location";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -14,7 +15,8 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const body = (await request.json().catch(() => ({}))) as { token?: string };
     const token = body.token || request.cookies.get("anyjob_market_location")?.value;
-    const location = verifyMarketLocationToken(request, token);
+    const reviewLocation = reviewMarketLocationForUser(user);
+    const location = reviewLocation || verifyMarketLocationToken(request, token);
     await persistUserMarketLocation(user.id, location);
     return NextResponse.json({ ok: true, location });
   } catch (error) {
